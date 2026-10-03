@@ -26,13 +26,31 @@ dotnet run --project src/api/Reticula.Api                  # api on :5000 (see l
 npm --prefix src/web start                                 # web on :4200, proxies /api
 ```
 
+## Sign in
+
+There is no self-registration. On first start with an empty user table the API creates the engineer account from `Bootstrap:EngineerEmail` and `Bootstrap:EngineerPassword`. Development settings use `engineer@reticula.local` with the password `change-me-dev-only`. The engineer then adds inspectors under `/api/users`.
+
+Passwords need at least 12 characters. Access tokens last 1 hour and refresh tokens 14 days, so a tablet stays signed in through offline field work.
+
 ## Test
 
 ```
 uv --directory src/calc run pytest
-dotnet test src/api
+dotnet test src/api            # needs Postgres+PostGIS; set RETICULA_TEST_DB to override the default local connection
 npm --prefix src/web test
 ```
+
+API tests create and drop a throwaway database per test class. The connecting role needs CREATEDB and permission to create the postgis extension.
+
+## Migrations
+
+```
+cd src/api
+dotnet tool restore
+dotnet ef migrations add <Name> -p Reticula.Infrastructure -s Reticula.Api -o Data/Migrations
+```
+
+CI fails if the model has changes without a migration.
 
 ## Rules
 
