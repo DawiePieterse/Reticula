@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://reticula.app/rules/schema.json",
+  "title": "Reticula authority rules file",
+  "type": "object",
+  "required": ["authority", "version", "effective_date", "standards", "voltage", "conductors"],
+  "additionalProperties": false,
+  "properties": {
+    "authority": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "effective_date": { "type": "string", "format": "date" },
+    "base": { "type": "string", "description": "Rules file this one overrides, as authority/version" },
+    "notes": { "type": "string" },
+    "standards": {
+      "type": "object",
+      "description": "Standard id -> edition used by this rules file",
+      "additionalProperties": { "type": "string" }
+    },
+    "voltage": {
+      "type": "object",
+      "required": ["lv_nominal_v", "lv_max_drop_pct"],
+      "additionalProperties": false,
+      "properties": {
+        "lv_nominal_v": { "type": "number", "exclusiveMinimum": 0 },
+        "lv_max_drop_pct": { "type": "number", "exclusiveMinimum": 0 },
+        "mv_nominal_kv": { "type": "number", "exclusiveMinimum": 0 },
+        "clause": { "type": "string" }
+      }
+    },
+    "conductors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["code", "kind", "r_ohm_per_km", "x_ohm_per_km", "rating_a"],
+        "additionalProperties": false,
+        "properties": {
+          "code": { "type": "string" },
+          "description": { "type": "string" },
+          "kind": { "type": "string", "enum": ["overhead", "underground"] },
+          "r_ohm_per_km": { "type": "number", "minimum": 0 },
+          "x_ohm_per_km": { "type": "number", "minimum": 0 },
+          "rating_a": { "type": "number", "exclusiveMinimum": 0 },
+          "clause": { "type": "string" }
+        }
+      }
+    }
+  }
+}

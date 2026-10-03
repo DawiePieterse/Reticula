@@ -78,13 +78,13 @@ Each phase ends usable on its own. Every phase includes: unit tests, hand-worked
 
 Deliverables: running skeleton, auth, project CRUD, map, CI.
 
-- [ ] 0.1 Repo scaffold: .NET solution, Angular workspace, Python service, docker-compose (Postgres+PostGIS, MinIO).
-- [ ] 0.2 CI: build, test, lint for all three; migration check; Python calc test gate.
+- [x] 0.1 Repo scaffold: .NET solution, Angular workspace, Python service, docker-compose (Postgres+PostGIS, MinIO).
+- [x] 0.2 CI: build, test, lint for all three; Python calc test gate. (migration check added with 0.4)
 - [ ] 0.3 Auth: single-tenant login, roles `engineer` and `inspector`.
 - [ ] 0.4 Project entity + area polygon drawing on MapLibre.
 - [ ] 0.5 PWA shell: service worker, install prompt, offline route guard.
-- [ ] 0.6 Rules-file JSON schema, loader, hashing, version endpoint.
-- [ ] 0.7 Traceability record type and storage; a sample calc end-to-end (one formula) proving the pipeline.
+- [x] 0.6 Rules-file JSON schema, loader, hashing, version endpoint.
+- [x] 0.7 Traceability record type and a sample calc end-to-end (LV voltage drop) proving the pipeline. (DB storage of records lands with 0.4)
 - [ ] 0.8 Background job framework with progress events.
 - [ ] 0.9 Logging, error reporting, backup job for Postgres and object store.
 

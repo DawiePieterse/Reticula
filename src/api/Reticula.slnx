@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="Reticula.Api.Tests/Reticula.Api.Tests.csproj" />
+  <Project Path="Reticula.Api/Reticula.Api.csproj" />
+  <Project Path="Reticula.Domain/Reticula.Domain.csproj" />
+  <Project Path="Reticula.Infrastructure/Reticula.Infrastructure.csproj" />
+</Solution>

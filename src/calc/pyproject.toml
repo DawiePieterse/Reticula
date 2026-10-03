@@ -1,0 +1,41 @@
+[project]
+name = "reticula-calc"
+version = "0.1.0"
+description = "Reticula calculation service"
+readme = "README.md"
+authors = [
+    { name = "Dawie Pieterse" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.142.2",
+    "jsonschema>=4.26.0",
+    "networkx>=3.7",
+    "numpy>=2.4.6",
+    "pandapower>=3.5.5",
+    "pydantic>=2.13.5",
+    "pyyaml>=6.0.3",
+    "shapely>=2.1.2",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[project.scripts]
+reticula-calc = "reticula_calc:main"
+
+[build-system]
+requires = ["uv_build>=0.8.17,<0.9.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.13.1",
+    "pytest>=9.1.1",
+    "ruff>=0.16.10",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

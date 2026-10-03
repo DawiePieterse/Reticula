@@ -1,0 +1,34 @@
+# Eskom residential distribution rules – STARTER FILE.
+# Every value must be checked against the current edition before use in a design.
+authority: eskom
+version: 0.1.0
+effective_date: 2026-10-03
+notes: Placeholder values for pipeline development. Not for design use.
+
+standards:
+  NRS034-1: "2024"      # TODO confirm edition
+  NRS048-2: "2024"      # TODO confirm edition
+  SANS1507: "2024"      # TODO confirm edition
+  IEC60909: "2016"      # TODO confirm edition
+
+voltage:
+  lv_nominal_v: 400
+  lv_max_drop_pct: 7.5  # TODO confirm against NRS 048-2 / NRS 034-1
+  mv_nominal_kv: 11
+  clause: "NRS034-1 §TBD"
+
+conductors:
+  - code: ABC-70
+    description: 70 mm² ABC (placeholder impedance)
+    kind: overhead
+    r_ohm_per_km: 0.443
+    x_ohm_per_km: 0.085
+    rating_a: 200
+    clause: "SANS1418 / NRS034-1 §TBD"
+  - code: CU-PVC-35
+    description: 35 mm² Cu PVC SWA (placeholder impedance)
+    kind: underground
+    r_ohm_per_km: 0.524
+    x_ohm_per_km: 0.080
+    rating_a: 150
+    clause: "SANS1507 §TBD"
