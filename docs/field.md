@@ -40,9 +40,36 @@ Re-estimating a load reopens its entries. When the engineer confirms a load, its
 
 The **Loads** page lists every building that is present, with its load or "No load recorded". It shows totals after diversity from the calc service. With `eskom/0.2.0` this is Herman-Beta at 90 % confidence over balanced phases, plus special loads. The CSV export carries the rules version and hash, the generation time and the totals. Cell values that would start a spreadsheet formula are prefixed with an apostrophe.
 
-## Ready for offline sync
+## Offline
 
-Offline capture is the next slice (plan items 1.8 and 1.9). The field data is already shaped for it:
+The field screen works without a connection for any project opened on the tablet while online.
+
+**What is kept on the tablet** (IndexedDB, database `reticula`):
+
+- `snapshots`: per project, the stands, buildings, candidates, load points, observation form (from the rules file) and the last progress figures. It is refreshed every time the field screen loads from the server and after every change made on the tablet.
+- `outbox`: changes the server has not accepted yet, in the order they were made, including photo bytes.
+
+The service worker caches the app itself, so the field screen reloads offline. When the server cannot be reached, the home screen lists the projects saved on the tablet.
+
+**Writing.** A change goes straight to the server when the tablet is online and nothing is waiting. Otherwise it joins the outbox and the screen shows the expected result at once. The progress bar is then counted on the tablet; the open-assumptions figure stays at the server's last value, because the server raises assumptions.
+
+**Loads offline.** The observations and any chosen class are saved, but no kVA is shown until the tablet syncs: the calc service works out every engineering number (plan decision B), and the tablet never does.
+
+**Sync.** The outbox is sent in order when the connection returns, when the field screen opens, or on "Sync now". Rules:
+
+1. Changes to one building, candidate or load are sent strictly in order. A load also waits for its building's changes, because the server refuses a load on a building marked not present.
+2. After the server accepts a change, later changes to the same thing move onto the new version, because they were made on top of it.
+3. Ids are generated on the device and every write is idempotent, so a change whose reply was lost is never applied twice. A 409 whose server copy already matches the change counts as done.
+4. Sending stops quietly when the connection drops or the session needs signing in again, and resumes later.
+
+**Conflicts.** When the server refuses a change because someone else changed the same thing first (409), the change is parked. The sync chip turns red ("1 to resolve") and opens a side-by-side view of the inspector's version and the server's, with differences highlighted. The inspector chooses:
+
+- **Keep mine**: the change is sent again on top of the server's current version.
+- **Keep the server's**: the change is dropped and the screen shows the server's version.
+
+Nothing is overwritten automatically. Later changes to the same thing wait until the conflict is settled. A change the server rejects as invalid (400) shows the reason, with **Try again** and **Discard my change**.
+
+## Server support for offline sync
 
 - Building ids, inspection ids, candidate ids and photo ids are generated on the device. Sending the same record twice stores it once.
 - Every building, candidate and load point carries a version. A stale write returns 409 with the current state, which the app shows instead of overwriting.

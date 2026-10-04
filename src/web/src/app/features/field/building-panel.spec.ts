@@ -7,6 +7,7 @@ import { BuildingPanel, SelectedBuilding } from './building-panel';
 import { BuildingField } from './field.api';
 import { LoadTool } from './load-tool';
 import { PhotoService } from './photo.service';
+import { idle } from '../../../testing/idle';
 
 @Component({ selector: 'app-load-tool', template: '' })
 class LoadToolStub {
@@ -15,6 +16,7 @@ class LoadToolStub {
   readonly buildingType = input<string>();
   readonly form = input<unknown>();
   readonly existing = input<unknown>();
+  readonly label = input<string>();
   readonly saved = output<unknown>();
 }
 
@@ -41,6 +43,7 @@ async function setup(building: SelectedBuilding = { id: 'b1', props: props() }) 
   fixture.componentInstance.changed.subscribe((b) => changed.push(b));
   const http = TestBed.inject(HttpTestingController);
   fixture.detectChanges();
+  await idle();
   http.expectOne('/api/projects/p1/photos?buildingId=b1').flush([]);
   await fixture.whenStable();
   return { fixture, http, changed, el: fixture.nativeElement as HTMLElement };
@@ -63,6 +66,7 @@ describe('BuildingPanel', () => {
     notes.dispatchEvent(new Event('input'));
     button(el, 'Confirm house').click();
 
+    await idle();
     const req = http.expectOne({ method: 'PUT', url: '/api/projects/p1/buildings/b1/inspection' });
     expect(req.request.body).toMatchObject({ action: 'confirm', type: 'house', version: 7, notes: 'Shack at the back', position: { lon: 28.1, lat: -25.52, accuracyM: 4 } });
     expect(req.request.body.inspectionId).toMatch(/^[0-9a-f-]{36}$/);
@@ -74,17 +78,20 @@ describe('BuildingPanel', () => {
   it('corrects the type and marks not present', async () => {
     const { fixture, http, el } = await setup();
     button(el, 'school').click();
+    await idle();
     const correct = http.expectOne('/api/projects/p1/buildings/b1/inspection');
     expect(correct.request.body).toMatchObject({ action: 'correct', type: 'school' });
     correct.flush(field({ confirmedType: 'school', effectiveType: 'school' }));
     await settle(fixture);
     button(el, 'Not present').click();
+    await idle();
     expect(http.expectOne('/api/projects/p1/buildings/b1/inspection').request.body).toMatchObject({ action: 'not_present' });
   });
 
   it('shows a conflict without overwriting and passes the current state up', async () => {
     const { fixture, http, changed, el } = await setup();
     button(el, 'Confirm house').click();
+    await idle();
     http.expectOne('/api/projects/p1/buildings/b1/inspection').flush(field({ effectiveType: 'shop', confirmedType: 'shop' }), { status: 409, statusText: 'Conflict' });
     await settle(fixture);
     expect(el.querySelector('[role="alert"]')?.textContent).toContain('Someone else updated this building');
@@ -97,6 +104,7 @@ describe('BuildingPanel', () => {
     Object.defineProperty(input, 'files', { value: [new File([new Uint8Array([0xff, 0xd8])], 'p.jpg', { type: 'image/jpeg' })], configurable: true });
     input.dispatchEvent(new Event('change'));
     await settle(fixture);
+    await idle();
     const req = http.expectOne({ method: 'POST', url: '/api/projects/p1/photos' });
     expect((req.request.body as FormData).get('buildingId')).toBe('b1');
     req.flush({ id: 'x', buildingId: 'b1', candidateId: null, contentType: 'image/jpeg', sizeBytes: 2, capturedAt: '' });

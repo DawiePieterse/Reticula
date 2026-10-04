@@ -99,6 +99,8 @@ export interface LoadPoint {
   status: 'estimated' | 'confirmed';
   updatedAt: string;
   version: number;
+  /** Saved on the device but not yet sent: the kVA shown is the last calculated value, if any. */
+  pendingSync?: boolean;
 }
 
 export interface LoadRequest {

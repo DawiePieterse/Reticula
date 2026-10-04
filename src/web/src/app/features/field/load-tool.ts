@@ -2,9 +2,9 @@ import { DecimalPipe } from '@angular/common';
 import { Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
 import { toApiProblem } from '../../core/api-problem';
-import { AdmdForm, AdmdFormField, FieldApi, LoadPoint } from './field.api';
+import { AdmdForm, AdmdFormField, LoadPoint } from './field.api';
+import { FieldSync } from './field-sync';
 
 const SPECIAL_FOR_TYPE: Record<string, string> = { school: 'school', shop: 'shop', other: 'other' };
 
@@ -74,6 +74,13 @@ const SPECIAL_FOR_TYPE: Record<string, string> = { school: 'school', shop: 'shop
       @if (problem()) { <p class="error" role="alert">{{ problem() }}</p> }
 
       @if (current(); as lp) {
+        @if (lp.pendingSync) {
+          <div class="result pending">
+            <strong>Saved on this tablet</strong>
+            @if (lp.kind === 'residential' && lp.classOverride) { · {{ classLabel(lp.classOverride) }} (chosen) }
+            <div class="muted">The kVA is worked out by the server when this tablet syncs.</div>
+          </div>
+        } @else {
         <div class="result" [class.confirmed]="lp.status === 'confirmed'">
           <strong>{{ lp.kva | number: '1.0-2' }} kVA</strong>
           @if (lp.kind === 'residential') {
@@ -85,6 +92,7 @@ const SPECIAL_FOR_TYPE: Record<string, string> = { school: 'school', shop: 'shop
           <div class="muted">{{ lp.status === 'confirmed' ? 'Confirmed by the engineer' : 'Estimate: in the assumptions register until confirmed' }}</div>
           @if (lp.missing.length) { <div class="muted">Not recorded, scored as zero: {{ lp.missing.join(', ') }}</div> }
         </div>
+        }
       }
     </section>
   `,
@@ -102,6 +110,7 @@ const SPECIAL_FOR_TYPE: Record<string, string> = { school: 'school', shop: 'shop
     .override { display: grid; grid-template-columns: 7rem 1fr; gap: .5rem; }
     .result { margin-top: .75rem; padding: .6rem; border-radius: 8px; background: var(--warn-bg); }
     .result.confirmed { background: var(--ok-bg); }
+    .result.pending { background: var(--bg); border: 1px dashed var(--border); }
     .warn { color: var(--danger); }
   `,
 })
@@ -111,9 +120,11 @@ export class LoadTool {
   readonly buildingType = input<string>('house');
   readonly form = input<AdmdForm | null>(null);
   readonly existing = input<LoadPoint | null>(null);
+  /** How the building is named in the sync list, e.g. "erf 12". */
+  readonly label = input<string>('building');
   readonly saved = output<LoadPoint>();
 
-  private readonly api = inject(FieldApi);
+  private readonly sync = inject(FieldSync);
 
   protected readonly kind = signal<'residential' | 'special'>('residential');
   protected readonly loadClass = signal('');
@@ -200,17 +211,15 @@ export class LoadTool {
     const obs = { ...this.observations() };
     if (residential) for (const f of this.multiFields() as AdmdFormField[]) obs[f.key] ??= [];
     try {
-      const lp = await firstValueFrom(
-        this.api.saveLoad(this.projectId(), this.buildingId(), {
-          kind: this.kind(),
-          observations: residential ? obs : undefined,
-          specialLoad: residential ? null : this.specialLoad(),
-          overrideKva: this.overrideOn() ? this.overrideKva() : null,
-          overrideReason: this.overrideOn() ? this.overrideReason().trim() : null,
-          version: this.current()?.version ?? null,
-          loadClass: residential && this.loadClass() ? this.loadClass() : null,
-        }),
-      );
+      const lp = await this.sync.saveLoad(this.projectId(), this.buildingId(), {
+        kind: this.kind(),
+        observations: residential ? obs : undefined,
+        specialLoad: residential ? null : this.specialLoad(),
+        overrideKva: this.overrideOn() ? this.overrideKva() : null,
+        overrideReason: this.overrideOn() ? this.overrideReason().trim() : null,
+        version: this.current()?.version ?? null,
+        loadClass: residential && this.loadClass() ? this.loadClass() : null,
+      }, this.current(), this.label());
       this.current.set(lp);
       this.saved.emit(lp);
     } catch (e) {

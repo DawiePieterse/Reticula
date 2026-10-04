@@ -1,8 +1,11 @@
-import { Component, OnDestroy, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { Component, DestroyRef, OnDestroy, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { toApiProblem } from '../../core/api-problem';
+import { ConnectivityService } from '../../core/connectivity.service';
 import { Position } from '../projects/geo';
 import { BUILDING_COLOURS, BuildingProps, FeatureCollection, GeoJsonPoint, LayoutApi, StandProps } from '../projects/layout.api';
 import { GeoJsonPolygon } from '../projects/geo';
@@ -25,13 +28,16 @@ import {
 } from './field.api';
 import { FieldMap, FieldMode } from './field-map';
 import { GeolocationService } from './geolocation.service';
+import { Applied, FieldSync } from './field-sync';
+import { FieldSnapshots } from './field-snapshot';
+import { SyncPanel } from './sync-panel';
 
 type Buildings = FeatureCollection<BuildingProps, GeoJsonPolygon | GeoJsonPoint>;
 
 /** Tablet field screen: the map first, one building at a time, progress always visible. */
 @Component({
   selector: 'app-field-page',
-  imports: [FormsModule, RouterLink, FieldMap, BuildingPanel],
+  imports: [FormsModule, RouterLink, FieldMap, BuildingPanel, SyncPanel],
   template: `
     <div class="field">
       <header class="bar">
@@ -45,7 +51,8 @@ type Buildings = FeatureCollection<BuildingProps, GeoJsonPolygon | GeoJsonPoint>
             <span [class.warn]="p.assumptionsOpen > 0">{{ p.assumptionsOpen }} assumptions open</span>
           </div>
         }
-        <a [routerLink]="['/projects', id(), 'loads']">Loads</a>
+        <app-sync-panel [projectId]="id()" [savedAt]="savedAt()" />
+        @if (connectivity.online()) { <a [routerLink]="['/projects', id(), 'loads']">Loads</a> }
       </header>
 
       <nav class="tools" aria-label="Tools">
@@ -165,6 +172,9 @@ export class FieldPage implements OnDestroy {
   readonly id = input.required<string>();
 
   private readonly field = inject(FieldApi);
+  private readonly sync = inject(FieldSync);
+  private readonly snapshots = inject(FieldSnapshots);
+  protected readonly connectivity = inject(ConnectivityService);
   private readonly layout = inject(LayoutApi);
   private readonly projects = inject(ProjectsApi);
   protected readonly gps = inject(GeolocationService);
@@ -191,6 +201,9 @@ export class FieldPage implements OnDestroy {
   protected readonly candidateNotes = signal('');
   protected readonly busy = signal(false);
   protected readonly problem = signal<string | null>(null);
+  /** When the data on screen came from the tablet's copy rather than the server. */
+  protected readonly savedAt = signal<string | null>(null);
+  private loaded = false;
 
   protected readonly inspected = computed(() => {
     const p = this.progress();
@@ -219,6 +232,17 @@ export class FieldPage implements OnDestroy {
       const c = this.selectedCandidate();
       untracked(() => this.candidateNotes.set(c?.properties.notes ?? ''));
     });
+    // Keep the tablet's copy current so the screen reopens offline with every change made here.
+    effect((onCleanup) => {
+      const snapshot = {
+        projectId: this.id(), projectName: this.projectName(), stands: this.stands(), buildings: this.buildings(),
+        candidates: this.candidates(), loads: [...this.loads().values()], form: this.form(), progress: this.progress(),
+      };
+      if (!this.loaded) return;
+      const t = setTimeout(() => void this.snapshots.save({ ...snapshot, savedAt: new Date().toISOString() }), 400);
+      onCleanup(() => clearTimeout(t));
+    });
+    this.sync.applied.pipe(takeUntilDestroyed(inject(DestroyRef))).subscribe((a) => this.onApplied(a));
   }
 
   ngOnDestroy(): void {
@@ -270,7 +294,7 @@ export class FieldPage implements OnDestroy {
     this.buildings.update((fc) => fc && {
       ...fc,
       features: fc.features.map((f) => f.id === b.id
-        ? { ...f, properties: { ...f.properties, status: b.status, confirmedType: b.confirmedType, effectiveType: b.effectiveType, version: b.version } }
+        ? { ...f, properties: { ...f.properties, status: b.status, confirmedType: b.confirmedType, effectiveType: b.effectiveType, erf: b.erf ?? f.properties.erf, version: b.version } }
         : f),
     });
     void this.refreshProgress();
@@ -286,19 +310,12 @@ export class FieldPage implements OnDestroy {
     if (!p) return;
     await this.run(async () => {
       const fix = this.gps.fix();
-      const b = await firstValueFrom(this.field.addBuilding(this.id(), {
+      const b = await this.sync.addBuilding(this.id(), {
         id: newId(), inspectionId: newId(), type,
         position: { lon: p[0], lat: p[1], accuracyM: fix && fix.lon === p[0] && fix.lat === p[1] ? fix.accuracyM : null },
         capturedAt: new Date().toISOString(), notes: this.newNotes().trim() || null,
-      }));
-      this.buildings.update((fc) => fc && {
-        ...fc,
-        features: [...fc.features, {
-          type: 'Feature', id: b.id, geometry: b.location,
-          properties: { predictedType: b.predictedType, confidence: 1, source: 'field', lowConfidence: false, status: b.status,
-            confirmedType: b.confirmedType, effectiveType: b.effectiveType, areaM2: 0, erf: b.erf, zoning: null, signals: [], version: b.version },
-        }],
       });
+      this.appendBuilding(b);
       this.newNotes.set('');
       this.setMode('select');
       this.selectedId.set(b.id);
@@ -309,9 +326,9 @@ export class FieldPage implements OnDestroy {
     const c = this.selectedCandidate();
     if (!c) return;
     await this.run(async () => {
-      const saved = await firstValueFrom(this.field.saveCandidate(this.id(), c.id, {
+      const saved = await this.sync.saveCandidate(this.id(), c.id, {
         kind: c.properties.kind, geometry: c.geometry, notes: this.candidateNotes().trim() || null, version: c.properties.version,
-      }));
+      });
       this.candidates.update((fc) => fc && { ...fc, features: fc.features.map((f) => (f.id === saved.id ? saved : f)) });
     });
   }
@@ -320,7 +337,7 @@ export class FieldPage implements OnDestroy {
     const c = this.selectedCandidate();
     if (!c) return;
     await this.run(async () => {
-      await firstValueFrom(this.field.archiveCandidate(this.id(), c.id));
+      await this.sync.archiveCandidate(this.id(), c.id, c.properties.kind);
       this.candidates.update((fc) => fc && { ...fc, features: fc.features.filter((f) => f.id !== c.id) });
       this.selectedId.set(null);
     });
@@ -329,9 +346,9 @@ export class FieldPage implements OnDestroy {
   private async saveCandidate(kind: CandidateKind, geometry: Candidates['features'][number]['geometry']): Promise<void> {
     await this.run(async () => {
       const id = newId();
-      const saved = await firstValueFrom(this.field.saveCandidate(this.id(), id, {
+      const saved = await this.sync.saveCandidate(this.id(), id, {
         kind, geometry, position: this.gps.fix(), capturedAt: new Date().toISOString(),
-      }));
+      });
       this.candidates.update((fc) => ({ type: 'FeatureCollection', features: [...(fc?.features ?? []), saved] }));
       this.setMode('select');
       this.selectedId.set(saved.id);
@@ -353,15 +370,61 @@ export class FieldPage implements OnDestroy {
   }
 
   private async refreshProgress(): Promise<void> {
+    if (!this.connectivity.online()) {
+      this.progress.update((last) => localProgress(this.buildings(), this.loads(), this.candidates(), last));
+      return;
+    }
     try {
       this.progress.set(await firstValueFrom(this.field.progress(this.id())));
     } catch {
-      // Progress is informative; a failed refresh keeps the last value.
+      // Progress is informative; a failed refresh keeps the last value, counted again on the tablet.
+      this.progress.update((last) => localProgress(this.buildings(), this.loads(), this.candidates(), last));
     }
   }
 
+  /** The server's version of a change that waited in the outbox. */
+  private onApplied(a: Applied): void {
+    if (a.projectId !== this.id()) return;
+    switch (a.kind) {
+      case 'inspect':
+        this.applyBuilding(a.entity as BuildingField);
+        break;
+      case 'addBuilding': {
+        const b = a.entity as BuildingField;
+        if (this.buildings()?.features.some((f) => f.id === b.id)) this.applyBuilding(b);
+        else this.appendBuilding(b);
+        break;
+      }
+      case 'saveCandidate': {
+        const saved = a.entity as Candidates['features'][number];
+        this.candidates.update((fc) => fc && { ...fc, features: fc.features.some((f) => f.id === saved.id) ? fc.features.map((f) => (f.id === saved.id ? saved : f)) : [...fc.features, saved] });
+        break;
+      }
+      case 'saveLoad':
+        this.applyLoad(a.entity as LoadPoint);
+        break;
+      default:
+        void this.refreshProgress();
+    }
+  }
+
+  private appendBuilding(b: BuildingField): void {
+    this.buildings.update((fc) => fc && {
+      ...fc,
+      features: [...fc.features, {
+        type: 'Feature', id: b.id, geometry: b.location,
+        properties: { predictedType: b.predictedType, confidence: 1, source: 'field', lowConfidence: false, status: b.status,
+          confirmedType: b.confirmedType, effectiveType: b.effectiveType, areaM2: 0, erf: b.erf, zoning: null, signals: [], version: b.version },
+      }],
+    });
+  }
+
   private async load(id: string): Promise<void> {
+    this.loaded = false;
+    // Send what is waiting first, so the server's data already includes this tablet's changes.
+    await this.sync.sync();
     try {
+      if (!this.connectivity.online()) throw new HttpErrorResponse({ status: 0 });
       const [project, stands, buildings, candidates, loads, form, progress] = await Promise.all([
         firstValueFrom(this.projects.get(id)),
         firstValueFrom(this.layout.stands(id)),
@@ -378,8 +441,56 @@ export class FieldPage implements OnDestroy {
       this.loads.set(new Map(loads.map((l) => [l.buildingId, l])));
       this.form.set(form);
       this.progress.set(progress);
+      this.savedAt.set(null);
+      this.loaded = true;
     } catch (e) {
-      this.problem.set(toApiProblem(e).message);
+      if (e instanceof HttpErrorResponse && e.status === 0) await this.loadSnapshot(id);
+      else this.problem.set(toApiProblem(e).message);
     }
   }
+
+  private async loadSnapshot(id: string): Promise<void> {
+    const s = await this.snapshots.load(id);
+    if (!s) {
+      this.problem.set('This project has not been opened on this tablet while online, so it is not available offline.');
+      return;
+    }
+    this.projectName.set(s.projectName);
+    this.stands.set(s.stands);
+    this.buildings.set(s.buildings);
+    this.candidates.set(s.candidates);
+    this.loads.set(new Map(s.loads.map((l) => [l.buildingId, l])));
+    this.form.set(s.form);
+    this.progress.set(localProgress(s.buildings, this.loads(), s.candidates, s.progress));
+    this.savedAt.set(s.savedAt);
+    this.loaded = true;
+  }
+}
+
+/**
+ * Progress counted on the tablet from its own copy, for when the server cannot be asked.
+ * The open-assumptions count is the server's last figure: assumptions are raised by the server.
+ */
+export function localProgress(
+  buildings: Buildings | null, loads: Map<string, LoadPoint>, candidates: Candidates | null, last: FieldProgress | null,
+): FieldProgress | null {
+  if (!buildings) return last;
+  const props = buildings.features.map((f) => ({ id: f.id, ...f.properties }));
+  const count = (pred: (p: (typeof props)[number]) => boolean) => props.filter(pred).length;
+  const kinds: Record<string, number> = {};
+  for (const c of candidates?.features ?? []) kinds[c.properties.kind] = (kinds[c.properties.kind] ?? 0) + 1;
+  const lps = [...loads.values()];
+  return {
+    buildings: props.length,
+    confirmed: count((p) => p.status === 'confirmed'),
+    notPresent: count((p) => p.status === 'notpresent'),
+    added: count((p) => p.status === 'new'),
+    outstanding: count((p) => p.status === 'predicted'),
+    outstandingLowConfidence: count((p) => p.status === 'predicted' && p.lowConfidence),
+    loadsEstimated: lps.filter((l) => l.status === 'estimated').length,
+    loadsConfirmed: lps.filter((l) => l.status === 'confirmed').length,
+    buildingsWithoutLoad: count((p) => p.status !== 'notpresent' && !loads.has(p.id)),
+    assumptionsOpen: last?.assumptionsOpen ?? 0,
+    candidates: kinds,
+  };
 }

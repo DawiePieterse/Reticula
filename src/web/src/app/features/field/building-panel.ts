@@ -6,6 +6,7 @@ import { firstValueFrom } from 'rxjs';
 import { toApiProblem } from '../../core/api-problem';
 import { BUILDING_COLOURS, BuildingProps } from '../projects/layout.api';
 import { AdmdForm, BUILDING_TYPES, BuildingAction, BuildingField, FieldApi, GpsFix, LoadPoint, newId } from './field.api';
+import { FieldSync } from './field-sync';
 import { LoadTool } from './load-tool';
 import { PhotoService } from './photo.service';
 
@@ -79,6 +80,7 @@ const STATUS_LABEL: Record<string, string> = {
           [buildingType]="b.props.effectiveType"
           [form]="form()"
           [existing]="load()"
+          [label]="b.props.erf ? 'erf ' + b.props.erf : 'building'"
           (saved)="loadSaved.emit($event)"
         />
       }
@@ -114,6 +116,7 @@ export class BuildingPanel {
 
   private readonly api = inject(FieldApi);
   private readonly photos = inject(PhotoService);
+  private readonly sync = inject(FieldSync);
 
   protected readonly types = BUILDING_TYPES;
   protected readonly colours = BUILDING_COLOURS;
@@ -132,7 +135,10 @@ export class BuildingPanel {
         this.problem.set(null);
         this.conflict.set(null);
         this.photoCount.set(0);
-        if (id) this.api.photos(this.projectId(), id).subscribe({ next: (p) => this.photoCount.set(p.length), error: () => undefined });
+        // Photos still waiting on this tablet count too.
+        const queued = id ? this.sync.pendingFor(this.projectId()).filter((o) => o.kind === 'photo' && (o.request as { buildingId?: string }).buildingId === id).length : 0;
+        this.photoCount.set(queued);
+        if (id) this.api.photos(this.projectId(), id).subscribe({ next: (p) => this.photoCount.set(p.length + queued), error: () => undefined });
       });
     });
   }
@@ -148,17 +154,15 @@ export class BuildingPanel {
     this.problem.set(null);
     this.conflict.set(null);
     try {
-      const result = await firstValueFrom(
-        this.api.inspect(this.projectId(), b.id, {
-          inspectionId: newId(),
-          action,
-          type,
-          position: this.gps(),
-          capturedAt: new Date().toISOString(),
-          notes: this.notes().trim() || null,
-          version: b.props.version,
-        }),
-      );
+      const result = await this.sync.inspect(this.projectId(), b, {
+        inspectionId: newId(),
+        action,
+        type,
+        position: this.gps(),
+        capturedAt: new Date().toISOString(),
+        notes: this.notes().trim() || null,
+        version: b.props.version,
+      });
       this.notes.set('');
       this.changed.emit(result);
     } catch (e) {
@@ -184,7 +188,7 @@ export class BuildingPanel {
     this.problem.set(null);
     try {
       const blob = await this.photos.prepare(file);
-      await firstValueFrom(this.api.uploadPhoto(this.projectId(), { id: newId(), blob, buildingId: b.id, capturedAt: new Date().toISOString() }));
+      await this.sync.uploadPhoto(this.projectId(), { id: newId(), blob, buildingId: b.id, capturedAt: new Date().toISOString() });
       this.photoCount.update((n) => n + 1);
     } catch (e) {
       this.problem.set(toApiProblem(e).message);

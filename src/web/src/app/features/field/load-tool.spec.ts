@@ -3,6 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { AdmdForm, LoadPoint } from './field.api';
 import { LoadTool } from './load-tool';
+import { idle } from '../../../testing/idle';
 
 const FORM: AdmdForm = {
   rules_hash: 'abc',
@@ -56,6 +57,7 @@ describe('LoadTool', () => {
     await settle(fixture);
 
     button(el, 'Save load').click();
+    await idle();
     const req = http.expectOne({ method: 'PUT', url: '/api/projects/p1/buildings/b1/load' });
     expect(req.request.body).toEqual({
       kind: 'residential', observations: { dwelling: 'brick_small', appliances: ['fridge'], stand_size_m2: 450 },
@@ -82,6 +84,7 @@ describe('LoadTool', () => {
     select.dispatchEvent(new Event('change'));
     await settle(fixture);
     button(el, 'Save load').click();
+    await idle();
     const req = http.expectOne('/api/projects/p1/buildings/b1/load');
     expect(req.request.body.loadClass).toBe('informal_settlement');
     req.flush(lp({ category: 'informal_settlement', classOverride: 'informal_settlement', kva: 1.3, estimatedKva: 1.3 }));
@@ -93,6 +96,7 @@ describe('LoadTool', () => {
   it('defaults a school to a special load', async () => {
     const { fixture, http, el } = await setup('school');
     button(el, 'Save load').click();
+    await idle();
     expect(http.expectOne('/api/projects/p1/buildings/b1/load').request.body).toMatchObject({ kind: 'special', specialLoad: 'school' });
     await settle(fixture);
   });
@@ -117,6 +121,7 @@ describe('LoadTool', () => {
   it('shows a conflict and the other version', async () => {
     const { fixture, http, el } = await setup('house', lp());
     button(el, 'Save load').click();
+    await idle();
     http.expectOne('/api/projects/p1/buildings/b1/load').flush(lp({ kva: 3, version: 4 }), { status: 409, statusText: 'Conflict' });
     await settle(fixture);
     expect(el.querySelector('[role="alert"]')?.textContent).toContain('Someone else changed this load');
