@@ -23,13 +23,30 @@ jobs:
   api:
     name: API (.NET 10)
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:17-3.5
+        env:
+          POSTGRES_USER: reticula
+          POSTGRES_PASSWORD: reticula
+          POSTGRES_DB: reticula
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U reticula"
+          --health-interval 5s
+          --health-retries 10
+    env:
+      RETICULA_TEST_DB: "Host=localhost;Username=reticula;Password=reticula"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with: { dotnet-version: "10.0.x" }
-      - run: dotnet restore
+      - run: dotnet restore && dotnet tool restore
         working-directory: src/api
       - run: dotnet build --no-restore -warnaserror
+        working-directory: src/api
+      - name: Fail if the EF model has changes without a migration
+        run: dotnet ef migrations has-pending-model-changes -p Reticula.Infrastructure -s Reticula.Api --no-build
         working-directory: src/api
       - run: dotnet test --no-build
         working-directory: src/api

@@ -1,1 +1,56 @@
-/* You can add global styles to this file, and also import other style files */
+:root {
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --text: #1c2128;
+  --muted: #5b6573;
+  --border: #d0d7de;
+  --accent: #1f6feb;
+  --accent-text: #ffffff;
+  --danger: #b42318;
+  --danger-bg: #fdecea;
+  --ok: #1a7f37;
+  --ok-bg: #e6f4ea;
+  --warn-bg: #fff4e5;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --border: #30363d;
+    --accent: #4493f8;
+    --danger: #f85149;
+    --danger-bg: #3d1a1a;
+    --ok: #3fb950;
+    --ok-bg: #12261a;
+    --warn-bg: #3a2a10;
+  }
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); }
+a { color: var(--accent); }
+h2 { margin: 0 0 1rem; }
+
+/* Touch-friendly controls: 44px minimum target for tablet use. */
+button, .button, input, select {
+  font: inherit; min-height: 44px; border-radius: 6px; border: 1px solid var(--border);
+  padding: .5rem .9rem; background: var(--surface); color: var(--text);
+}
+button, .button { cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
+button.primary, .button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+button:disabled { opacity: .55; cursor: default; }
+
+form label, form .field { display: flex; flex-direction: column; gap: .35rem; margin-bottom: 1rem; }
+.field-error, .error { color: var(--danger); }
+.muted { color: var(--muted); }
+.actions { display: flex; gap: .5rem; }
+.page-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.banner { border-radius: 8px; padding: .75rem 1rem; margin-bottom: 1rem; }
+.banner.warn { background: var(--warn-bg); }
+
+table { width: 100%; border-collapse: collapse; background: var(--surface); }
+th, td { text-align: left; padding: .6rem .75rem; border-bottom: 1px solid var(--border); }

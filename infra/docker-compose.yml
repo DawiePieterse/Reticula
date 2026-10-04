@@ -37,6 +37,11 @@ services:
       ConnectionStrings__Default: "Host=db;Database=reticula;Username=reticula;Password=reticula"
       Calc__BaseUrl: "http://calc:8001"
       Storage__Endpoint: "http://storage:9000"
+      Database__MigrateOnStartup: "true"
+      # First start only: creates the engineer account when no users exist. Change before use.
+      Bootstrap__EngineerEmail: "${RETICULA_ENGINEER_EMAIL:-engineer@reticula.local}"
+      Bootstrap__EngineerPassword: "${RETICULA_ENGINEER_PASSWORD:?set RETICULA_ENGINEER_PASSWORD}"
+      Bootstrap__EngineerName: "${RETICULA_ENGINEER_NAME:-Engineer}"
     ports: ["5000:8080"]
 
 volumes:
