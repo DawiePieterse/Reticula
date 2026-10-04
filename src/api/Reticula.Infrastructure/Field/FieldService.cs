@@ -35,7 +35,7 @@ public sealed class FieldService(ReticulaDbContext db, ICalcClient calc, TimePro
 
         var now = time.GetUtcNow();
         lp.SetEstimate(estimate.Kind, request.SpecialLoad, JsonSerializer.Serialize(request.Observations ?? [], Json),
-            estimate.IncomeBand, estimate.Category, estimate.EstimatedKva, estimate.AdmdKva.Value, estimate.Overridden,
+            estimate.LoadClass?.ChosenBy == "engineer" ? estimate.LoadClass.Code : null, estimate.IncomeBand, estimate.Category, estimate.EstimatedKva, estimate.AdmdKva.Value, estimate.Overridden,
             estimate.Overridden ? request.OverrideReason : null, JsonSerializer.Serialize(estimate.Missing, Json),
             estimate.Raw, estimate.RulesHash, userId, now);
 
@@ -45,7 +45,10 @@ public sealed class FieldService(ReticulaDbContext db, ICalcClient calc, TimePro
         await UpsertAsync(project.Id, lp.Id, AssumptionCodes.AdmdEstimated, true,
             estimate.Kind == LoadKinds.Special
                 ? $"Special load '{request.SpecialLoad}' at {label} taken as {kva} kVA (rules default {est} kVA)."
-                : $"ADMD at {label} estimated as {est} kVA from site observations (income band {estimate.IncomeBand}, category {estimate.Category}).",
+                : estimate.LoadClass is { } lc
+                    ? $"ADMD at {label} taken as {est} kVA: class {lc.Description} ({lc.TableSource}), " +
+                      (lc.ChosenBy == "engineer" ? "chosen by the engineer." : $"from the site-observation score (band {estimate.IncomeBand}).")
+                    : $"ADMD at {label} estimated as {est} kVA from site observations (income band {estimate.IncomeBand}, category {estimate.Category}).",
             userId, now, ct);
         await UpsertAsync(project.Id, lp.Id, AssumptionCodes.AdmdOverridden, estimate.Overridden,
             $"ADMD at {label} overridden to {kva} kVA (method gave {est} kVA): {request.OverrideReason}", userId, now, ct);

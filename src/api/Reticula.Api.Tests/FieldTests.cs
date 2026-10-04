@@ -260,6 +260,25 @@ public class FieldTests(ReticulaApiFactory factory)
     }
 
     [Fact]
+    public async Task Engineer_class_choice_is_stored_and_classes_reach_the_group_calculation()
+    {
+        var ctx = await SetupAsync();
+        var obs = new Dictionary<string, JsonElement> { ["dwelling"] = JsonSerializer.SerializeToElement("rdp") };
+        var scored = await (await ctx.Engineer.PutAsJsonAsync($"/api/projects/{ctx.ProjectId}/buildings/{ctx.Buildings[0]}/load",
+            new LoadRequest("residential", obs, null, null, null, null))).Content.ReadFromJsonAsync<LoadPointDto>();
+        Assert.Equal(("township_area", null), (scored!.Category, scored.ClassOverride));
+
+        var chosen = await (await ctx.Engineer.PutAsJsonAsync($"/api/projects/{ctx.ProjectId}/buildings/{ctx.Buildings[1]}/load",
+            new LoadRequest("residential", obs, null, null, null, null, "rural_village"))).Content.ReadFromJsonAsync<LoadPointDto>();
+        Assert.Equal(("rural_village", "rural_village"), (chosen!.Category, chosen.ClassOverride));
+        var text = (await OpenAssumptionsAsync(ctx)).First(a => a.SubjectId == chosen.Id && a.Code == "admd_estimated").Text;
+        Assert.Contains("chosen by the engineer", text);
+
+        await ctx.Engineer.GetFromJsonAsync<LoadSchedule>($"/api/projects/{ctx.ProjectId}/load-schedule");
+        Assert.Equal(["rural_village", "township_area"], factory.Calc.LastGroupLoads.Select(l => l.LoadClass).Order());
+    }
+
+    [Fact]
     public async Task Rejected_observations_return_400_with_the_reason()
     {
         var ctx = await SetupAsync();

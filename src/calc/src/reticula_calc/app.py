@@ -108,5 +108,5 @@ def admd_estimate(req: EstimateRequest) -> EstimateResult:
 def admd_group(req: GroupRequest) -> GroupResult:
     try:
         return group(req, load_rules(req.rules))
-    except RulesError as e:
+    except (RulesError, AdmdInputError) as e:
         raise HTTPException(status_code=422, detail=str(e)) from e

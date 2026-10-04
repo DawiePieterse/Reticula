@@ -10,10 +10,15 @@ const FORM: AdmdForm = {
   multi_indicators: [{ key: 'appliances', label: 'Visible appliances', type: 'multi', options: ['fridge', 'geyser'] }],
   band_indicators: [{ key: 'stand_size_m2', label: 'Stand size', type: 'number', unit: 'm²' }],
   special_loads: { school: 25, shop: 5, other: 2 },
+  load_classes: [
+    { code: 'informal_settlement', description: 'Informal settlement', table: 'nrs034_15y', admd_kva: 1.3, income_min_zar: 800, income_max_zar: 1500, usable: true },
+    { code: 'township_area', description: 'Township area', table: 'nrs034_15y', admd_kva: 2.37, income_min_zar: 1500, income_max_zar: 3000, usable: true },
+    { code: 'c8', description: 'Urban town house II', table: 'sans507_15y', admd_kva: 5.64, income_min_zar: null, income_max_zar: null, usable: false },
+  ],
 };
 
 const lp = (over: Partial<LoadPoint> = {}): LoadPoint => ({
-  id: 'lp1', buildingId: 'b1', kind: 'residential', specialLoad: null, observations: {}, incomeBand: 'low', category: 'R2',
+  id: 'lp1', buildingId: 'b1', kind: 'residential', specialLoad: null, observations: {}, classOverride: null, incomeBand: 'low', category: 'township_area',
   estimatedKva: 1.5, kva: 1.5, overridden: false, overrideReason: null, missing: ['roof'], status: 'estimated', updatedAt: '', version: 3, ...over,
 });
 
@@ -54,12 +59,35 @@ describe('LoadTool', () => {
     const req = http.expectOne({ method: 'PUT', url: '/api/projects/p1/buildings/b1/load' });
     expect(req.request.body).toEqual({
       kind: 'residential', observations: { dwelling: 'brick_small', appliances: ['fridge'], stand_size_m2: 450 },
-      specialLoad: null, overrideKva: null, overrideReason: null, version: null,
+      specialLoad: null, overrideKva: null, overrideReason: null, version: null, loadClass: null,
     });
     req.flush(lp());
     await settle(fixture);
     expect(el.textContent).toContain('1.5 kVA');
+    expect(el.textContent).toContain('Township area');
     expect(el.textContent).toContain('Not recorded, scored as zero: roof');
+  });
+
+  it('lets the engineer choose a class and blocks unverified ones', async () => {
+    const { fixture, http, el } = await setup();
+    const options = [...el.querySelectorAll<HTMLOptionElement>('select[name="loadClass"] option')];
+    const township = options.find((o) => o.value === 'township_area')!.textContent!;
+    expect(township).toContain('Township area · 2.37 kVA');
+    expect(township).toContain('/month');
+    expect(options[0].textContent).toContain('From the observations');
+    expect(options.find((o) => o.value === 'c8')?.disabled).toBe(true);
+
+    const select = el.querySelector<HTMLSelectElement>('select[name="loadClass"]')!;
+    select.value = 'informal_settlement';
+    select.dispatchEvent(new Event('change'));
+    await settle(fixture);
+    button(el, 'Save load').click();
+    const req = http.expectOne('/api/projects/p1/buildings/b1/load');
+    expect(req.request.body.loadClass).toBe('informal_settlement');
+    req.flush(lp({ category: 'informal_settlement', classOverride: 'informal_settlement', kva: 1.3, estimatedKva: 1.3 }));
+    await settle(fixture);
+    expect(el.textContent).toContain('Informal settlement');
+    expect(el.textContent).toContain('(chosen)');
   });
 
   it('defaults a school to a special load', async () => {

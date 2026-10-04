@@ -88,6 +88,7 @@ export interface LoadPoint {
   kind: 'residential' | 'special';
   specialLoad: string | null;
   observations: Record<string, unknown>;
+  classOverride: string | null;
   incomeBand: string | null;
   category: string | null;
   estimatedKva: number;
@@ -107,6 +108,7 @@ export interface LoadRequest {
   overrideKva?: number | null;
   overrideReason?: string | null;
   version?: number | null;
+  loadClass?: string | null;
 }
 
 /** The observation form, passed through from the calc service (snake_case). */
@@ -118,12 +120,24 @@ export interface AdmdFormField {
   unit?: string;
 }
 
+export interface AdmdLoadClass {
+  code: string;
+  description: string;
+  table: string;
+  admd_kva: number;
+  income_min_zar: number | null;
+  income_max_zar: number | null;
+  usable: boolean;
+}
+
 export interface AdmdForm {
   rules_hash: string;
   indicators: AdmdFormField[];
   multi_indicators: AdmdFormField[];
   band_indicators: AdmdFormField[];
   special_loads: Record<string, number>;
+  /** Classes of the rules file's design table; empty for rules without load tables. */
+  load_classes?: AdmdLoadClass[];
 }
 
 export interface FieldProgress {

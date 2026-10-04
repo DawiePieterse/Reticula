@@ -26,7 +26,12 @@ def _run_admd_group(inp: dict) -> dict:
     return {"diversity_factor": r.diversity_factor.value, "residential_kva": r.residential_kva.value, "total_kva": r.total_kva.value}
 
 
-RUNNERS = {"voltage_drop": _run_voltage_drop, "admd": _run_admd, "admd_group": _run_admd_group}
+def _run_hb_group(inp: dict) -> dict:
+    r = group(GroupRequest(**inp), load_rules(inp["rules"]))
+    return {"design_current_a": r.design_current_a.value, "residential_kva": r.residential_kva.value}
+
+
+RUNNERS = {"voltage_drop": _run_voltage_drop, "admd": _run_admd, "admd_group": _run_admd_group, "hb_group": _run_hb_group}
 
 
 def _cases():

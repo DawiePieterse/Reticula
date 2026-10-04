@@ -36,6 +36,9 @@ public sealed class LoadPoint
     public string? SpecialLoad { get; private set; }
     public string ObservationsJson { get; private set; } = "{}";
     public string? IncomeBand { get; private set; }
+
+    /// <summary>Load class the engineer chose; null when the class came from the indicator score.</summary>
+    public string? ClassOverride { get; private set; }
     public string? Category { get; private set; }
 
     /// <summary>ADMD (or special-load kVA) the method gives.</summary>
@@ -56,13 +59,14 @@ public sealed class LoadPoint
     public DateTimeOffset? ConfirmedAt { get; private set; }
     public uint Version { get; private set; }
 
-    public void SetEstimate(string kind, string? specialLoad, string observationsJson, string? incomeBand, string? category,
+    public void SetEstimate(string kind, string? specialLoad, string observationsJson, string? classOverride, string? incomeBand, string? category,
         double estimatedKva, double kva, bool overridden, string? overrideReason, string missingJson, string traceJson,
         string rulesHash, Guid by, DateTimeOffset now)
     {
         Kind = kind;
         SpecialLoad = specialLoad;
         ObservationsJson = observationsJson;
+        ClassOverride = classOverride;
         IncomeBand = incomeBand;
         Category = category;
         EstimatedKva = estimatedKva;
