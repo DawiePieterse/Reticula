@@ -160,12 +160,12 @@ Deliverables: LV layout, phasing, conductor sizing, voltage drop, fault level, O
 
 ### Phase 7 – Review and sign-off
 
-- [ ] 7.1 Assumptions register v2: full listing, confirm/clear workflow, blocks sign-off until empty.
-- [ ] 7.2 Revision snapshot and numbering; reproduce-run from a revision.
-- [ ] 7.3 Sign-off: engineer only, registration number captured, document set locked.
-- [ ] 7.4 Audit trail: who changed what, when, before/after.
-- [ ] 7.5 Open-format export of whole project (GeoJSON + JSON + files).
-- [ ] 7.6 Release gate: all `/test-cases` pass before tagging a release.
+- [x] 7.1 Assumptions register v2: full listing, confirm/clear workflow, blocks sign-off until empty. (docs/review.md.)
+- [x] 7.2 Revision snapshot and numbering; reproduce-run from a revision.
+- [x] 7.3 Sign-off: engineer only, registration number captured, document set locked.
+- [x] 7.4 Audit trail: who changed what, when, before/after.
+- [x] 7.5 Open-format export of whole project (GeoJSON + JSON + files).
+- [x] 7.6 Release gate: all `/test-cases` pass before tagging a release. (.github/workflows/release.yml.)
 
 ### Phase 8 – Design assistant
 
@@ -216,7 +216,7 @@ F. **Performance targets.** Field UI usable on mid-range Android tablet; 2,000-s
 - [x] Phase 4 Bulk supply – load flow and IEC 60909 validated (against hand-worked cases; authority sample pending)
 - [x] Phase 5 Optimisation – three options + compare view
 - [x] Phase 6 Documents – one-step full document set
-- [ ] Phase 7 Review and sign-off – revision, audit, export
+- [x] Phase 7 Review and sign-off – revision, audit, export
 - [ ] Phase 8 Design assistant – flagged, optional, tested
 
 ### Release gate (every release)

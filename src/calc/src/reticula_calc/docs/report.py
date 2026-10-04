@@ -99,6 +99,7 @@ def render_report(pkg: DocumentPackage, sheets: list[Any] | None = None) -> byte
     s += [Paragraph(f"{pkg.project.name}", H1), Paragraph("Electrification design report", H2), _p(tpl.get("title", ""), BODY), Spacer(1, 6)]
     s.append(table([["Stamp", ""], ["Design rules", f"{pkg.stamp.rules} (hash {pkg.stamp.rules_hash})"], ["Rate list", f"{pkg.stamp.rate_list}, rate date {pkg.stamp.rate_date}"],
                     ["Design date", pkg.stamp.design_date], ["Revision", pkg.stamp.revision], ["Engineer", pkg.stamp.engineer or "—"],
+                    ["Signed off", pkg.stamp.signed_off or "Not signed off (draft)"],
                     ["Generated", pkg.stamp.generated_at]], [45 * mm, W - 45 * mm]))
     if unverified(pkg):
         s += [Spacer(1, 6), _p("NOT FOR SUBMISSION. This design uses rules values not yet verified against the current standards: "

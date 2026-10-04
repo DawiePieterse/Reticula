@@ -14,11 +14,8 @@ using Reticula.Infrastructure.Jobs;
 
 namespace Reticula.Infrastructure.Documents;
 
-/// <summary>
-/// "Generate all" (plan 6.7): gathers the design runs named in the set's sources, the loads, connection point,
-/// assumptions and stands into a package, has the calc service make every document, and stores the files.
-/// </summary>
-public sealed class DocumentsJob(ReticulaDbContext db, ICalcClient calc, DesignInputs inputs, IFileStore files, TimeProvider time) : IJobHandler
+/// <summary>"Generate all" (plan 6.7) as a background job.</summary>
+public sealed class DocumentsJob(ReticulaDbContext db, DocumentGenerator generator, TimeProvider time) : IJobHandler
 {
     public const string JobKind = "documents.generate";
 
@@ -28,29 +25,10 @@ public sealed class DocumentsJob(ReticulaDbContext db, ICalcClient calc, DesignI
     {
         var setId = context.Payload.GetProperty("documentSetId").GetGuid();
         var set = await db.DocumentSets.FirstAsync(s => s.Id == setId, ct);
-        set.Start();
-        await db.SaveChangesAsync(ct);
         try
         {
-            await context.Progress.ReportAsync(10, "Gathering the design results", ct);
-            var package = await PackageAsync(set, ct);
-            await context.Progress.ReportAsync(30, "Making drawings, report, BoQ, GIS data and the submission pack", ct);
-            var result = await calc.RenderDocumentsAsync(new JsonObject { ["package"] = package }, ct);
-            await context.Progress.ReportAsync(85, "Storing the documents", ct);
-            var now = time.GetUtcNow();
-            foreach (var f in result.GetProperty("files").EnumerateArray())
-            {
-                var name = f.GetProperty("name").GetString()!;
-                var key = $"projects/{set.ProjectId:N}/documents/{set.Id:N}/{name}";
-                var bytes = Convert.FromBase64String(f.GetProperty("data_b64").GetString()!);
-                await using (var ms = new MemoryStream(bytes))
-                    await files.SaveAsync(key, ms, ct);
-                db.ProjectDocuments.Add(new ProjectDocument(Guid.CreateVersion7(), set.Id, set.ProjectId, f.GetProperty("kind").GetString()!, name,
-                    f.GetProperty("title").GetString()!, f.GetProperty("content_type").GetString()!, key, bytes.LongLength, f.GetProperty("sha256").GetString()!, now));
-            }
-            set.Succeed(result.GetProperty("checklist").GetRawText(), result.GetProperty("warnings").GetRawText(), now);
-            await db.SaveChangesAsync(ct);
-            return new { documentSetId = set.Id, files = result.GetProperty("files").GetArrayLength() };
+            var files = await generator.GenerateAsync(set, context.Progress, ct);
+            return new { documentSetId = set.Id, files };
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
@@ -58,6 +36,38 @@ public sealed class DocumentsJob(ReticulaDbContext db, ICalcClient calc, DesignI
             await db.SaveChangesAsync(CancellationToken.None);
             throw;
         }
+    }
+}
+
+/// <summary>
+/// Gathers the design runs named in a document set's sources, the loads, connection point, assumptions and stands
+/// into a package, has the calc service make every document, and stores the files.
+/// </summary>
+public sealed class DocumentGenerator(ReticulaDbContext db, ICalcClient calc, DesignInputs inputs, IFileStore files, TimeProvider time)
+{
+    public async Task<int> GenerateAsync(DocumentSet set, IJobProgress progress, CancellationToken ct)
+    {
+        set.Start();
+        await db.SaveChangesAsync(ct);
+        await progress.ReportAsync(10, "Gathering the design results", ct);
+        var package = await PackageAsync(set, ct);
+        await progress.ReportAsync(30, "Making drawings, report, BoQ, GIS data and the submission pack", ct);
+        var result = await calc.RenderDocumentsAsync(new JsonObject { ["package"] = package }, ct);
+        await progress.ReportAsync(85, "Storing the documents", ct);
+        var now = time.GetUtcNow();
+        foreach (var f in result.GetProperty("files").EnumerateArray())
+        {
+            var name = f.GetProperty("name").GetString()!;
+            var key = $"projects/{set.ProjectId:N}/documents/{set.Id:N}/{name}";
+            var bytes = Convert.FromBase64String(f.GetProperty("data_b64").GetString()!);
+            await using (var ms = new MemoryStream(bytes))
+                await files.SaveAsync(key, ms, ct);
+            db.ProjectDocuments.Add(new ProjectDocument(Guid.CreateVersion7(), set.Id, set.ProjectId, f.GetProperty("kind").GetString()!, name,
+                f.GetProperty("title").GetString()!, f.GetProperty("content_type").GetString()!, key, bytes.LongLength, f.GetProperty("sha256").GetString()!, now));
+        }
+        set.Succeed(result.GetProperty("checklist").GetRawText(), result.GetProperty("warnings").GetRawText(), now);
+        await db.SaveChangesAsync(ct);
+        return result.GetProperty("files").GetArrayLength();
     }
 
     private async Task<JsonObject> PackageAsync(DocumentSet set, CancellationToken ct)
@@ -117,7 +127,7 @@ public sealed class DocumentsJob(ReticulaDbContext db, ICalcClient calc, DesignI
             {
                 ["rules"] = project.RulesRef, ["rules_hash"] = lvResults[0].RulesHash ?? "", ["rate_list"] = rates is JsonObject r2 ? r2["name"]!.GetValue<string>() : (string)rates,
                 ["rate_date"] = rateDate ?? "", ["design_date"] = designDate.ToString("yyyy-MM-dd"), ["revision"] = set.Revision,
-                ["generated_at"] = time.GetUtcNow().ToString("yyyy-MM-dd HH:mm 'UTC'"), ["engineer"] = set.Engineer,
+                ["generated_at"] = time.GetUtcNow().ToString("yyyy-MM-dd HH:mm 'UTC'"), ["engineer"] = set.Engineer, ["signed_off"] = set.SignedOff,
             },
             ["lv_designs"] = lv,
             ["mv_design"] = Stored(sources.Mv),

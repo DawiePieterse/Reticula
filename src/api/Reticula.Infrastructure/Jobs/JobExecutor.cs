@@ -4,6 +4,7 @@ using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Reticula.Domain.Jobs;
+using Reticula.Infrastructure.Audit;
 using Reticula.Infrastructure.Data;
 
 namespace Reticula.Infrastructure.Jobs;
@@ -17,6 +18,7 @@ public sealed class JobExecutor(
     IEnumerable<IJobHandler> handlers,
     IJobNotifier notifier,
     TimeProvider time,
+    AuditActor actor,
     ILogger<JobExecutor> logger)
 {
     [AutomaticRetry(Attempts = 0)]
@@ -43,6 +45,8 @@ public sealed class JobExecutor(
             ["TraceId"] = activity.TraceId.ToString(),
         });
 
+        // Changes made by the job are audited as the user who started it.
+        actor.UserId = run.RequestedBy;
         var handler = handlers.FirstOrDefault(h => h.Kind == run.Kind);
         if (handler is null)
         {

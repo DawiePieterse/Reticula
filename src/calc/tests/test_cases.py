@@ -123,3 +123,9 @@ def test_hand_worked_case(runner, case: Path):
             assert got[key] == exp, key
         else:
             assert got[key] == pytest.approx(exp, rel=tol), key
+
+
+def test_every_case_folder_has_a_runner():
+    """The release gate runs every case: a folder without a runner would be skipped silently."""
+    topics = {p.name for p in CASES_DIR.iterdir() if p.is_dir() and any(p.glob("case-*"))}
+    assert topics <= set(RUNNERS), f"no runner for {sorted(topics - set(RUNNERS))}"

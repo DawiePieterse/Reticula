@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Reticula.Domain.Audit;
 using Reticula.Domain.Costs;
 using Reticula.Domain.Design;
 using Reticula.Domain.Documents;
@@ -9,6 +10,7 @@ using Reticula.Domain.Maps;
 using Reticula.Domain.Jobs;
 using Reticula.Domain.Layout;
 using Reticula.Domain.Projects;
+using Reticula.Domain.Review;
 using Reticula.Infrastructure.Identity;
 
 namespace Reticula.Infrastructure.Data;
@@ -33,6 +35,9 @@ public sealed class ReticulaDbContext(DbContextOptions<ReticulaDbContext> option
     public DbSet<RateList> RateLists => Set<RateList>();
     public DbSet<DocumentSet> DocumentSets => Set<DocumentSet>();
     public DbSet<ProjectDocument> ProjectDocuments => Set<ProjectDocument>();
+    public DbSet<Revision> Revisions => Set<Revision>();
+    public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+    public DbSet<ProjectExport> ProjectExports => Set<ProjectExport>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -262,6 +267,7 @@ public sealed class ReticulaDbContext(DbContextOptions<ReticulaDbContext> option
             e.Property(x => x.SourcesHash).HasMaxLength(64).IsRequired();
             e.Property(x => x.RulesRef).HasMaxLength(50).IsRequired();
             e.Property(x => x.Engineer).HasMaxLength(200);
+            e.Property(x => x.SignedOff).HasMaxLength(300);
             e.Property(x => x.ChecklistJson).HasColumnType("jsonb");
             e.Property(x => x.WarningsJson).HasColumnType("jsonb");
             e.Property(x => x.Error).HasMaxLength(2000);
@@ -280,6 +286,47 @@ public sealed class ReticulaDbContext(DbContextOptions<ReticulaDbContext> option
             e.Property(x => x.Sha256).HasMaxLength(64).IsRequired();
             e.HasIndex(x => x.SetId);
             e.HasOne<DocumentSet>().WithMany().HasForeignKey(x => x.SetId).OnDelete(DeleteBehavior.Cascade);
+        });
+        b.Entity<Revision>(e =>
+        {
+            e.ToTable("revisions");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Label).HasMaxLength(10).IsRequired();
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.SourcesHash).HasMaxLength(64).IsRequired();
+            e.Property(x => x.SnapshotKey).HasMaxLength(300);
+            e.Property(x => x.SnapshotSha256).HasMaxLength(64);
+            e.Property(x => x.SignedOffName).HasMaxLength(200).IsRequired();
+            e.Property(x => x.RegistrationNumber).HasMaxLength(30).IsRequired();
+            e.Property(x => x.Notes).HasMaxLength(2000);
+            e.Property(x => x.Error).HasMaxLength(2000);
+            e.Property(x => x.ReproductionJson).HasColumnType("jsonb");
+            e.HasIndex(x => new { x.ProjectId, x.Number }).IsUnique();
+            e.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<DocumentSet>().WithMany().HasForeignKey(x => x.DocumentSetId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<ProjectExport>(e =>
+        {
+            e.ToTable("project_exports");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.StorageKey).HasMaxLength(300);
+            e.Property(x => x.FileName).HasMaxLength(200);
+            e.Property(x => x.Sha256).HasMaxLength(64);
+            e.Property(x => x.Error).HasMaxLength(2000);
+            e.HasIndex(x => x.ProjectId);
+            e.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
+        });
+        b.Entity<AuditEntry>(e =>
+        {
+            e.ToTable("audit_entries");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.EntityType).HasMaxLength(50).IsRequired();
+            e.Property(x => x.EntityId).HasMaxLength(64).IsRequired();
+            e.Property(x => x.Action).HasMaxLength(10).IsRequired();
+            e.Property(x => x.ChangesJson).HasColumnType("jsonb").IsRequired();
+            e.HasIndex(x => new { x.ProjectId, x.At });
+            e.HasIndex(x => new { x.EntityType, x.EntityId });
         });
         b.Entity<ConnectionPoint>(e =>
         {

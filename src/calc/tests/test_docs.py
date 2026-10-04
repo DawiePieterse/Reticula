@@ -110,6 +110,17 @@ def test_submission_pack_holds_every_document_and_the_registers(rendered):
     assert "RET-TT1-001" in reg and "checklist,C06" in reg
 
 
+def test_a_signed_off_revision_carries_the_sign_off():
+    pkg = package().model_copy(deep=True)
+    pkg.stamp.revision = "A"
+    pkg.stamp.signed_off = "A. Engineer, ECSA Pr Eng 20231234, 2026-10-05"
+    r = render(RenderRequest(package=pkg, kinds=["report", "drawings"]))
+    report = base64.b64decode(r.files[1].data_b64) if r.files[1].kind == "report" else base64.b64decode(r.files[0].data_b64)
+    assert "ECSA Pr Eng 20231234" in pdf_text(report)
+    dxf = next(base64.b64decode(f.data_b64) for f in r.files if f.kind == "drawings").decode()
+    assert "Signed off: A. Engineer, ECSA Pr Eng 20231234" in dxf
+
+
 def test_endpoint_returns_only_the_requested_kinds(client):
     res = client.post("/docs/render", json={"package": package().model_dump(mode="json"), "kinds": ["gis_geojson", "loads_xlsx"]})
     assert res.status_code == 200, res.text

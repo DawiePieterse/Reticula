@@ -35,6 +35,8 @@ class Stamp(BaseModel):
     revision: str
     generated_at: str
     engineer: str | None = None
+    #: An issued revision's sign-off: engineer, ECSA registration and date (plan 7.3).
+    signed_off: str | None = None
 
 
 class ProjectInfo(BaseModel):
@@ -177,8 +179,11 @@ class Projection:
 
 def stamp_lines(pkg: DocumentPackage) -> list[str]:
     s = pkg.stamp
-    return [f"Rules {s.rules} ({s.rules_hash})", f"Rates {s.rate_list}, rate date {s.rate_date}", f"Design date {s.design_date}",
-            f"Revision {s.revision}", f"Generated {s.generated_at} by Reticula"]
+    lines = [f"Rules {s.rules} ({s.rules_hash})", f"Rates {s.rate_list}, rate date {s.rate_date}", f"Design date {s.design_date}",
+             f"Revision {s.revision}", f"Generated {s.generated_at} by Reticula"]
+    if s.signed_off:
+        lines.append(f"Signed off: {s.signed_off}")
+    return lines
 
 
 def stamp_text(pkg: DocumentPackage) -> str:

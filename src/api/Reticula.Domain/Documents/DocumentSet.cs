@@ -10,12 +10,15 @@ public sealed class DocumentSet
 {
     private DocumentSet() { } // EF
 
-    public DocumentSet(Guid id, Guid projectId, int number, string sourcesJson, string sourcesHash, string rulesRef, string? engineer, Guid createdBy, DateTimeOffset now)
+    public DocumentSet(Guid id, Guid projectId, int number, string sourcesJson, string sourcesHash, string rulesRef, string? engineer, Guid createdBy, DateTimeOffset now,
+        string? revisionLabel = null, string? signedOff = null)
     {
         Id = id;
         ProjectId = projectId;
         Number = number;
-        Revision = $"D{number}";
+        Revision = revisionLabel ?? $"D{number}";
+        SignedOff = signedOff;
+        Locked = revisionLabel is not null;
         SourcesJson = sourcesJson;
         SourcesHash = sourcesHash;
         RulesRef = rulesRef;
@@ -35,6 +38,10 @@ public sealed class DocumentSet
     public string SourcesHash { get; private set; } = "";
     public string RulesRef { get; private set; } = "";
     public string? Engineer { get; private set; }
+    /// <summary>The sign-off line printed on an issued revision's documents.</summary>
+    public string? SignedOff { get; private set; }
+    /// <summary>An issued revision's documents: never regenerated or replaced (plan 7.3).</summary>
+    public bool Locked { get; private set; }
     public string? ChecklistJson { get; private set; }
     public string? WarningsJson { get; private set; }
     public string? Error { get; private set; }

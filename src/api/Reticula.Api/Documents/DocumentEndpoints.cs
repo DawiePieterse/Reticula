@@ -14,6 +14,7 @@ using Reticula.Infrastructure.Calc;
 using Reticula.Infrastructure.Data;
 using Reticula.Infrastructure.Documents;
 using Reticula.Infrastructure.Files;
+using Reticula.Infrastructure.Review;
 using Reticula.Infrastructure.Jobs;
 
 namespace Reticula.Api.Documents;
@@ -22,7 +23,7 @@ public sealed record GenerateDocumentsRequest(string? Engineer);
 
 public sealed record DocumentDto(Guid Id, string Kind, string FileName, string Title, string ContentType, long SizeBytes, string Sha256, DateTimeOffset CreatedAt);
 
-public sealed record DocumentSetDto(Guid Id, int Number, string Revision, string Status, Guid? JobId, string RulesRef, string? Engineer, JsonElement? Checklist,
+public sealed record DocumentSetDto(Guid Id, int Number, string Revision, bool Locked, string? SignedOff, string Status, Guid? JobId, string RulesRef, string? Engineer, JsonElement? Checklist,
     JsonElement? Warnings, string? Error, DateTimeOffset CreatedAt, DateTimeOffset? FinishedAt, IReadOnlyList<DocumentDto> Documents);
 
 /// <summary>The latest set is stale when anything upstream changed since it was made (plan 6.7).</summary>
@@ -52,11 +53,13 @@ public static class DocumentEndpoints
     }
 
     private static async Task<Results<Accepted<StartedDocuments>, NotFound, ValidationProblem>> Generate(Guid projectId, GenerateDocumentsRequest req, ReticulaDbContext db,
-        IJobQueue queue, TimeProvider time, ClaimsPrincipal user, CancellationToken ct)
+        AssumptionRegister register, IJobQueue queue, TimeProvider time, ClaimsPrincipal user, CancellationToken ct)
     {
         var project = await db.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.Id == projectId && p.ArchivedAt == null, ct);
         if (project is null) return TypedResults.NotFound();
         if (req.Engineer is { Length: > 200 }) return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["engineer"] = ["At most 200 characters."] });
+        // The register is brought up to date first: the documents list it and its state is part of their sources.
+        await register.SyncAsync(projectId, ct);
         var sources = await DocumentSourceSet.CurrentAsync(db, projectId, ct);
         if (sources.Lv.Count == 0)
             return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["lvDesign"] = ["Run an LV design before generating documents."] });
@@ -160,7 +163,7 @@ public static class DocumentEndpoints
     }
 
     private static DocumentSetDto ToDto(DocumentSet s, IEnumerable<ProjectDocument> docs) => new(
-        s.Id, s.Number, s.Revision, s.Status.ToString().ToLowerInvariant(), s.JobId, s.RulesRef, s.Engineer,
+        s.Id, s.Number, s.Revision, s.Locked, s.SignedOff, s.Status.ToString().ToLowerInvariant(), s.JobId, s.RulesRef, s.Engineer,
         s.ChecklistJson is null ? null : JsonDocument.Parse(s.ChecklistJson).RootElement.Clone(),
         s.WarningsJson is null ? null : JsonDocument.Parse(s.WarningsJson).RootElement.Clone(), s.Error, s.CreatedAt, s.FinishedAt,
         [.. docs.Select(d => new DocumentDto(d.Id, d.Kind, d.FileName, d.Title, d.ContentType, d.SizeBytes, d.Sha256, d.CreatedAt))]);

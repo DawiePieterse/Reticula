@@ -55,6 +55,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/documents/documents-page').then((m) => m.DocumentsPage),
       },
       {
+        path: 'projects/:id/review',
+        canActivate: [onlineGuard],
+        loadComponent: () => import('./features/review/review-page').then((m) => m.ReviewPage),
+      },
+      {
         path: 'projects/:id/bulk',
         canActivate: [onlineGuard],
         loadComponent: () => import('./features/design/bulk-supply-page').then((m) => m.BulkSupplyPage),

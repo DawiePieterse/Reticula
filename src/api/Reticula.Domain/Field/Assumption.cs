@@ -3,7 +3,12 @@ namespace Reticula.Domain.Field;
 public enum AssumptionStatus
 {
     Open,
+    /// <summary>Resolved: the missing information was obtained.</summary>
     Cleared,
+    /// <summary>The engineer accepts it as part of the design basis, with a reason (plan 7.1).</summary>
+    Accepted,
+    /// <summary>No longer raised by the latest design runs.</summary>
+    Withdrawn,
 }
 
 public static class AssumptionCodes
@@ -54,6 +59,21 @@ public sealed class Assumption
         ClearedBy = null;
         ClearedAt = null;
         ClearNote = null;
+        UpdatedAt = now;
+    }
+
+    public void Accept(Guid by, string note, DateTimeOffset now)
+    {
+        Status = AssumptionStatus.Accepted;
+        ClearedBy = by;
+        ClearedAt = now;
+        ClearNote = note;
+        UpdatedAt = now;
+    }
+
+    public void Withdraw(DateTimeOffset now)
+    {
+        Status = AssumptionStatus.Withdrawn;
         UpdatedAt = now;
     }
 

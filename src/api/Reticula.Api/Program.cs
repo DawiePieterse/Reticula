@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.HttpLogging;
 using Reticula.Api;
 using Reticula.Api.Auth;
@@ -10,6 +11,8 @@ using Reticula.Api.Jobs;
 using Reticula.Api.Layout;
 using Reticula.Api.Maps;
 using Reticula.Api.Projects;
+using Reticula.Api.Review;
+using Reticula.Infrastructure.Audit;
 using Reticula.Infrastructure.Calc;
 using Reticula.Infrastructure.Data;
 using Reticula.Infrastructure.Design;
@@ -20,6 +23,7 @@ using Reticula.Infrastructure.Jobs;
 using Reticula.Infrastructure.Jobs.Handlers;
 using Reticula.Infrastructure.Layout;
 using Reticula.Infrastructure.Maps;
+using Reticula.Infrastructure.Review;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -47,6 +51,12 @@ builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<CalcUnavailableExceptionHandler>();
 builder.Services.AddExceptionHandler<UnknownJobKindExceptionHandler>();
 builder.Services.AddCalcClient(builder.Configuration);
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped(sp =>
+{
+    var http = sp.GetRequiredService<IHttpContextAccessor>();
+    return new AuditActor(() => Guid.TryParse(http.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null);
+});
 builder.Services.AddReticulaData();
 builder.Services.AddReticulaAuth();
 builder.Services.AddSignalR();
@@ -59,7 +69,13 @@ builder.Services.AddJobHandler<LvDesignJob>();
 builder.Services.AddJobHandler<MvDesignJob>();
 builder.Services.AddJobHandler<BulkStudyJob>();
 builder.Services.AddJobHandler<OptionSearchJob>();
+builder.Services.AddScoped<DocumentGenerator>();
 builder.Services.AddJobHandler<DocumentsJob>();
+builder.Services.AddScoped<AssumptionRegister>();
+builder.Services.AddScoped<ReviewReadiness>();
+builder.Services.AddJobHandler<RevisionIssueJob>();
+builder.Services.AddJobHandler<RevisionReproduceJob>();
+builder.Services.AddJobHandler<ProjectExportJob>();
 builder.Services.AddScoped<LayoutService>();
 builder.Services.AddHttpClient<OverpassClient>(c =>
 {
@@ -97,6 +113,7 @@ app.MapDesignEndpoints();
 app.MapBulkEndpoints();
 app.MapRateListEndpoints();
 app.MapDocumentEndpoints();
+app.MapReviewEndpoints();
 
 await app.InitialiseDatabaseAsync();
 

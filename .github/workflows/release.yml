@@ -1,0 +1,48 @@
+name: Release gate
+
+# Plan 7.6: a release is tagged v<version>. Every check in the release gate must pass on the tagged commit before the
+# release is published; the summary lists each gate item and the job that proves it.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  ci:
+    name: Full suite
+    uses: ./.github/workflows/ci.yml
+
+  test-cases:
+    name: Hand-worked test cases
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with: { python-version: "3.12" }
+      - run: uv sync --frozen
+        working-directory: src/calc
+      - name: Every case under /test-cases, within tolerance
+        run: uv run pytest -v tests/test_cases.py --junitxml=test-cases.xml
+        working-directory: src/calc
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: test-cases, path: src/calc/test-cases.xml }
+
+  gate:
+    name: Release gate
+    needs: [ci, test-cases]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Summary
+        run: |
+          {
+            echo "## Release gate passed for ${GITHUB_REF_NAME}"
+            echo "| Gate item | Proved by |"
+            echo "|---|---|"
+            echo "| All hand-worked test cases pass | test-cases job (tests/test_cases.py, every folder under /test-cases has a runner) |"
+            echo "| Full suite passes with the assistant disabled | ci: calc, api, web jobs (assistant flag off by default) |"
+            echo "| Offline sync regression passes | ci: web job (field-sync and offline specs) |"
+            echo "| Every document carries rules version, rate date, design date | ci: calc job (tests/test_docs.py) |"
+            echo "| Backup and restore tested | ci: backup job (infra/backup/test-restore.sh) |"
+            echo "| Reproduce a prior revision bit-for-bit | ci: api job (ReviewTests: revision reproduce) |"
+          } >> "$GITHUB_STEP_SUMMARY"
