@@ -4,22 +4,26 @@ import type { GeoJSONSource, Map as MlMap, MapMouseEvent, StyleSpecification } f
 import { Position, bounds } from '../projects/geo';
 import { AnyGeometry, BUILDING_COLOURS, FeatureCollection } from '../projects/layout.api';
 import { CANDIDATE_COLOURS, GpsFix } from './field.api';
+import type { LocalTilePack } from './tile-packs';
 
 export type FieldMode = 'select' | 'building' | 'site' | 'route';
 
+const OSM_SOURCE = {
+  type: 'raster' as const,
+  tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+  tileSize: 256,
+  maxzoom: 19,
+  attribution: '© OpenStreetMap contributors',
+};
+
 const STYLE: StyleSpecification = {
   version: 8,
-  sources: {
-    osm: {
-      type: 'raster',
-      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-      tileSize: 256,
-      maxzoom: 19,
-      attribution: '© OpenStreetMap contributors',
-    },
-  },
-  layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
+  sources: { base: OSM_SOURCE },
+  layers: [{ id: 'base', type: 'raster', source: 'base' }],
 };
+
+/** The base map in use: online tiles, or the project's offline pack (by content hash). */
+type BaseKey = 'online' | `pack:${string}`;
 
 const WORKER_PATH = 'maplibre/maplibre-gl-worker.mjs';
 const SOURCES = ['stands', 'buildings', 'candidates', 'draft', 'gps'] as const;
@@ -30,6 +34,7 @@ type Coll = FeatureCollection<unknown, AnyGeometry> | null;
   selector: 'app-field-map',
   template: `
     <div class="map" #mapEl [class.placing]="mode() !== 'select'"></div>
+    @if (!connected() && !offlineMap()) { <div class="no-base">No offline map on this tablet: only the project's data is shown.</div> }
     @if (mode() === 'route') {
       <div class="route-tools">
         <span>{{ draft().length }} points</span>
@@ -42,6 +47,10 @@ type Coll = FeatureCollection<unknown, AnyGeometry> | null;
     :host { display: block; position: relative; height: 100%; }
     .map { position: absolute; inset: 0; }
     .placing { outline: 3px solid var(--accent); outline-offset: -3px; }
+    .no-base {
+      position: absolute; left: .75rem; top: .75rem; right: 4rem; padding: .35rem .6rem; border-radius: 6px;
+      background: var(--warn-bg); font-size: .85rem;
+    }
     .route-tools {
       position: absolute; left: .75rem; bottom: 2rem; display: flex; gap: .5rem; align-items: center;
       background: var(--surface); padding: .5rem; border-radius: 8px; box-shadow: 0 2px 8px rgb(0 0 0 / .2);
@@ -55,6 +64,9 @@ export class FieldMap implements OnDestroy {
   readonly selectedId = input<string | null>(null);
   readonly mode = input<FieldMode>('select');
   readonly gps = input<GpsFix | null>(null);
+  readonly connected = input(true);
+  /** The project's offline base map, used when the tablet is offline. */
+  readonly offlineMap = input<LocalTilePack | null>(null);
 
   readonly buildingSelect = output<string>();
   readonly candidateSelect = output<string>();
@@ -65,6 +77,8 @@ export class FieldMap implements OnDestroy {
   private readonly mapEl = viewChild.required<ElementRef<HTMLDivElement>>('mapEl');
   private map: MlMap | null = null;
   private fitted = false;
+  private base: BaseKey = 'online';
+  private protocol: import('pmtiles').Protocol | null = null;
 
   private readonly gpsCollection = computed<GjCollection>(() => {
     const g = this.gps();
@@ -98,6 +112,13 @@ export class FieldMap implements OnDestroy {
     });
     effect(() => {
       if (this.mode() !== 'route') untracked(() => this.draft.set([]));
+    });
+    effect(() => {
+      const online = this.connected();
+      const pack = this.offlineMap();
+      // Load the reader while still online, so it is at hand when the connection goes.
+      if (pack) void import('pmtiles');
+      untracked(() => void this.applyBase(online, pack));
     });
 
     afterNextRender(async () => {
@@ -145,6 +166,7 @@ export class FieldMap implements OnDestroy {
         const b = this.buildings();
         if (b?.features.length) this.fitTo(b);
         this.highlight(this.selectedId());
+        void this.applyBase(this.connected(), this.offlineMap());
       });
       map.on('click', (e: MapMouseEvent) => this.onClick(e));
       this.map = map;
@@ -187,6 +209,31 @@ export class FieldMap implements OnDestroy {
     }
     const b = map.queryRenderedFeatures(box, { layers: ['buildings-fill', 'buildings-point'] })[0];
     if (b?.id !== undefined) this.buildingSelect.emit(String(b.id));
+  }
+
+  /** Online tiles while connected; the project's PMTiles pack, read from the device, when offline. */
+  private async applyBase(online: boolean, pack: LocalTilePack | null): Promise<void> {
+    const map = this.map;
+    if (!map?.getLayer('stands-line')) return; // overlays not added yet; called again on load
+    const want: BaseKey = online || !pack ? 'online' : `pack:${pack.sha256}`;
+    if (want === this.base) return;
+    this.base = want;
+    let source: Parameters<MlMap['addSource']>[1] = OSM_SOURCE;
+    if (pack && want !== 'online') {
+      const [{ Protocol, PMTiles, FileSource }, { addProtocol }] = await Promise.all([import('pmtiles'), import('maplibre-gl')]);
+      if (!this.protocol) {
+        this.protocol = new Protocol();
+        addProtocol('pmtiles', this.protocol.tile);
+      }
+      const name = `${pack.projectId}-${pack.sha256.slice(0, 12)}.pmtiles`;
+      this.protocol.add(new PMTiles(new FileSource(new File([pack.bytes], name))));
+      source = { type: 'raster', url: `pmtiles://${name}`, tileSize: 256, attribution: pack.attribution };
+    }
+    if (this.base !== want || this.map !== map) return; // changed again while loading
+    if (map.getLayer('base')) map.removeLayer('base');
+    if (map.getSource('base')) map.removeSource('base');
+    map.addSource('base', source);
+    map.addLayer({ id: 'base', type: 'raster', source: 'base' }, 'stands-line');
   }
 
   private set(source: (typeof SOURCES)[number], data: Coll): void {

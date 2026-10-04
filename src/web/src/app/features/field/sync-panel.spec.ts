@@ -1,8 +1,14 @@
 import { TestBed } from '@angular/core/testing';
-import { computed, signal } from '@angular/core';
+import { Component, computed, input, signal } from '@angular/core';
 import { ConnectivityService } from '../../core/connectivity.service';
 import { FieldSync, OutboxOp } from './field-sync';
 import { SyncPanel } from './sync-panel';
+import { OfflineMapPanel } from './offline-map-panel';
+
+@Component({ selector: 'app-offline-map-panel', template: '' })
+class OfflineMapPanelStub {
+  readonly projectId = input<string>();
+}
 
 const conflict: OutboxOp = {
   seq: 1, projectId: 'p1', kind: 'saveLoad', entity: 'load:b1', targetId: 'b1', request: {}, label: 'load at erf 12',
@@ -27,7 +33,7 @@ function setup(ops: OutboxOp[], online = true) {
         },
       },
     ],
-  });
+  }).overrideComponent(SyncPanel, { remove: { imports: [OfflineMapPanel] }, add: { imports: [OfflineMapPanelStub] } });
   const fixture = TestBed.createComponent(SyncPanel);
   fixture.componentRef.setInput('projectId', 'p1');
   fixture.detectChanges();

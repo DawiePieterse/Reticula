@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Reticula.Domain.Field;
+using Reticula.Domain.Maps;
 using Reticula.Domain.Jobs;
 using Reticula.Domain.Layout;
 using Reticula.Domain.Projects;
@@ -22,6 +23,7 @@ public sealed class ReticulaDbContext(DbContextOptions<ReticulaDbContext> option
     public DbSet<Candidate> Candidates => Set<Candidate>();
     public DbSet<LoadPoint> LoadPoints => Set<LoadPoint>();
     public DbSet<Assumption> Assumptions => Set<Assumption>();
+    public DbSet<TilePack> TilePacks => Set<TilePack>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -209,6 +211,17 @@ public sealed class ReticulaDbContext(DbContextOptions<ReticulaDbContext> option
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
             e.HasIndex(x => new { x.ProjectId, x.SubjectType, x.SubjectId, x.Code }).IsUnique();
             e.HasIndex(x => new { x.ProjectId, x.Status });
+            e.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<TilePack>(e =>
+        {
+            e.ToTable("tile_packs");
+            e.HasKey(x => x.ProjectId);
+            e.Property(x => x.StorageKey).HasMaxLength(300).IsRequired();
+            e.Property(x => x.Sha256).HasMaxLength(64).IsRequired();
+            e.Property(x => x.Source).HasMaxLength(500).IsRequired();
+            e.Property(x => x.Attribution).HasMaxLength(300).IsRequired();
             e.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
         });
     }

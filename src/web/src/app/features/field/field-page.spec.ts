@@ -20,6 +20,8 @@ class FieldMapStub {
   readonly selectedId = input<string | null>();
   readonly mode = input<string>();
   readonly gps = input<unknown>();
+  readonly connected = input<boolean>();
+  readonly offlineMap = input<unknown>();
   readonly buildingSelect = output<string>();
   readonly candidateSelect = output<string>();
   readonly mapTap = output<[number, number]>();

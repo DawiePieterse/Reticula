@@ -69,6 +69,14 @@ The service worker caches the app itself, so the field screen reloads offline. W
 
 Nothing is overwritten automatically. Later changes to the same thing wait until the conflict is settled. A change the server rejects as invalid (400) shows the reason, with **Try again** and **Discard my change**.
 
+## Offline map
+
+Each project can have an offline base map: a PMTiles archive of the project area and a margin around it, built on the server from the configured tile source (docs/operations.md, Offline map tiles).
+
+- The sync sheet's **Offline map** section builds the map ("Build offline map", showing the tile count and zoom range), downloads it to the tablet with a progress bar, offers **Download the newer map** when the server's copy changed, and removes it from the tablet.
+- The archive is kept in IndexedDB (`tilepacks`). When the tablet is offline, the field map reads tiles straight from it; online, it uses the live tiles. Without an offline map, an offline field map shows a note and only the project's own data.
+- A pack goes as deep as the tile budget allows: zoom levels are added from the minimum until the next level would exceed it.
+
 ## Server support for offline sync
 
 - Building ids, inspection ids, candidate ids and photo ids are generated on the device. Sending the same record twice stores it once.

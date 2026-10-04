@@ -31,6 +31,7 @@ import { GeolocationService } from './geolocation.service';
 import { Applied, FieldSync } from './field-sync';
 import { FieldSnapshots } from './field-snapshot';
 import { SyncPanel } from './sync-panel';
+import { TilePacks } from './tile-packs';
 
 type Buildings = FeatureCollection<BuildingProps, GeoJsonPolygon | GeoJsonPoint>;
 
@@ -74,6 +75,8 @@ type Buildings = FeatureCollection<BuildingProps, GeoJsonPolygon | GeoJsonPoint>
           [selectedId]="selectedId()"
           [mode]="mode()"
           [gps]="gps.fix()"
+          [connected]="connectivity.online()"
+          [offlineMap]="offlineMap()"
           (buildingSelect)="selectBuilding($event)"
           (candidateSelect)="selectCandidate($event)"
           (mapTap)="onTap($event)"
@@ -175,6 +178,8 @@ export class FieldPage implements OnDestroy {
   private readonly sync = inject(FieldSync);
   private readonly snapshots = inject(FieldSnapshots);
   protected readonly connectivity = inject(ConnectivityService);
+  private readonly tilePacks = inject(TilePacks);
+  protected readonly offlineMap = computed(() => this.tilePacks.local().get(this.id()) ?? null);
   private readonly layout = inject(LayoutApi);
   private readonly projects = inject(ProjectsApi);
   protected readonly gps = inject(GeolocationService);
@@ -421,6 +426,7 @@ export class FieldPage implements OnDestroy {
 
   private async load(id: string): Promise<void> {
     this.loaded = false;
+    void this.tilePacks.loadLocal(id);
     // Send what is waiting first, so the server's data already includes this tablet's changes.
     await this.sync.sync();
     try {

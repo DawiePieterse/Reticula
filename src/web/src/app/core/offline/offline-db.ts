@@ -1,12 +1,13 @@
 import { Injectable } from '@angular/core';
 
 const DB_NAME = 'reticula';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 export const SNAPSHOTS = 'snapshots';
 export const OUTBOX = 'outbox';
+export const TILE_PACKS = 'tilepacks';
 
-type StoreName = typeof SNAPSHOTS | typeof OUTBOX;
+type StoreName = typeof SNAPSHOTS | typeof OUTBOX | typeof TILE_PACKS;
 
 function request<T>(req: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -17,7 +18,8 @@ function request<T>(req: IDBRequest<T>): Promise<T> {
 
 /**
  * The device's offline store. `snapshots` holds the last field data seen per project (keyed by project id);
- * `outbox` holds changes made on the device that the server has not accepted yet, in the order they were made.
+ * `outbox` holds changes made on the device that the server has not accepted yet, in the order they were made;
+ * `tilepacks` holds each project's offline base map (a PMTiles archive) by project id.
  */
 @Injectable({ providedIn: 'root' })
 export class OfflineDb {
@@ -30,6 +32,7 @@ export class OfflineDb {
         const db = req.result;
         if (!db.objectStoreNames.contains(SNAPSHOTS)) db.createObjectStore(SNAPSHOTS);
         if (!db.objectStoreNames.contains(OUTBOX)) db.createObjectStore(OUTBOX, { keyPath: 'seq', autoIncrement: true });
+        if (!db.objectStoreNames.contains(TILE_PACKS)) db.createObjectStore(TILE_PACKS);
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => {

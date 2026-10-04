@@ -100,7 +100,7 @@ Deliverables: predicted building types, tablet inspection, income/ADMD tool, loa
 - [x] 1.6 Progress panel: confirmed / outstanding / low-confidence-first list.
 - [x] 1.7 Income and ADMD tool: observable inputs → income band → category → ADMD (per NRS 034-1 tables in rules file); group after-diversity demand; special loads at own kVA; override with reason. (eskom/0.2.0: NRS 034 and SANS 507-1 load classes and Herman-Beta group demand; see docs/load-data.md. Score thresholds still a heuristic; SANS 507 C8 unverified.)
 - [x] 1.8 Offline: IndexedDB store, cached rules tables, photo queue, sync engine with conflict detection and side-by-side resolution UI (never auto-overwrite). (docs/field.md, Offline. Loads saved offline get their kVA from the calc service on sync.)
-- [ ] 1.9 Offline map tiles: PMTiles pack per project area, download/refresh.
+- [x] 1.9 Offline map tiles: PMTiles pack per project area, download/refresh. (Raster tiles from a configured source with an offline licence; docs/field.md, Offline map.)
 - [~] 1.10 Load schedule view and export (CSV/Excel). (Done: view and CSV. To do: Excel with the documents in Phase 6.)
 - [x] 1.11 Assumptions register v1: every estimate and override auto-registered.
 - [~] 1.12 Validation: ADMD hand-worked cases from NRS 034-1 examples in `/test-cases`. (Done: hand-worked ADMD and Herman-Beta cases, and a self-check of every load class against its α, β and c. ReticMaster's Herman-Beta example added. To do: compare with NRS 034-1 worked examples and ReticMaster results.)

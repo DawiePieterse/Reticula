@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
 using Reticula.Infrastructure.Calc;
 using Reticula.Infrastructure.Jobs;
+using Reticula.Infrastructure.Maps;
 
 namespace Reticula.Api.Tests;
 
@@ -31,6 +32,7 @@ public sealed class ReticulaApiFactory : WebApplicationFactory<Program>, IAsyncL
 
     public FakeCalc Calc { get; } = new();
     public JobGate Gate { get; } = new();
+    public FakeTileServer Tiles { get; } = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -42,12 +44,16 @@ public sealed class ReticulaApiFactory : WebApplicationFactory<Program>, IAsyncL
         builder.UseSetting("Storage:Root", StorageRoot);
         builder.UseSetting("Jobs:PollIntervalMs", "100");
         builder.UseSetting("Jobs:CancellationCheckMs", "200");
+        builder.UseSetting("Tiles:SourceUrl", "http://tiles.test/{z}/{x}/{y}.png?key=secret");
+        builder.UseSetting("Tiles:MinZoom", "12");
+        builder.UseSetting("Tiles:MaxZoom", "16");
         builder.ConfigureServices(s =>
         {
             s.Replace(ServiceDescriptor.Singleton<ICalcClient>(Calc));
             s.AddSingleton(Gate);
             s.AddJobHandler<GatedJob>();
             s.AddJobHandler<FailingJob>();
+            s.AddHttpClient(TilePackJob.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => Tiles);
         });
     }
 
@@ -212,4 +218,26 @@ public sealed class FailingJob : IJobHandler
 public sealed class ApiCollection : ICollectionFixture<ReticulaApiFactory>
 {
     public const string Name = "api";
+}
+
+/// <summary>Answers tile requests with a tiny PNG per tile; tiles in <see cref="Missing"/> return 404.</summary>
+public sealed class FakeTileServer : HttpMessageHandler
+{
+    private int _requests;
+    public int Requests => _requests;
+    public Func<Uri, bool> Missing { get; set; } = _ => false;
+    public bool Down { get; set; }
+
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+    {
+        Interlocked.Increment(ref _requests);
+        if (Down) return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.ServiceUnavailable));
+        if (Missing(request.RequestUri!)) return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.NotFound));
+        var path = request.RequestUri!.AbsolutePath; // /z/x/y.png
+        byte[] png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, .. System.Text.Encoding.ASCII.GetBytes(path)];
+        return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new ByteArrayContent(png) });
+    }
+
+    // The client factory recycles handlers; this one lives as long as the test host.
+    protected override void Dispose(bool disposing) { }
 }

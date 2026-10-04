@@ -2,11 +2,12 @@ import { DatePipe } from '@angular/common';
 import { Component, computed, inject, input, signal } from '@angular/core';
 import { ConnectivityService } from '../../core/connectivity.service';
 import { FieldSync, OutboxOp } from './field-sync';
+import { OfflineMapPanel } from './offline-map-panel';
 
 /** Connection and sync status for the field screen, with side-by-side resolution of conflicts. */
 @Component({
   selector: 'app-sync-panel',
-  imports: [DatePipe],
+  imports: [DatePipe, OfflineMapPanel],
   template: `
     <button type="button" class="chip" [attr.data-state]="state()" (click)="open.set(!open())" [attr.aria-expanded]="open()">
       @switch (state()) {
@@ -64,6 +65,8 @@ import { FieldSync, OutboxOp } from './field-sync';
             @for (op of pending(); track op.seq) { <li>{{ op.label }} <span class="muted">{{ op.createdAt | date: 'HH:mm' }}</span></li> }
           </ul>
         }
+
+        <app-offline-map-panel [projectId]="projectId()" />
       </div>
     }
   `,

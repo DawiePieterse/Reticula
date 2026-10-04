@@ -5,6 +5,7 @@ using Reticula.Api.Field;
 using Reticula.Api.Infrastructure;
 using Reticula.Api.Jobs;
 using Reticula.Api.Layout;
+using Reticula.Api.Maps;
 using Reticula.Api.Projects;
 using Reticula.Infrastructure.Calc;
 using Reticula.Infrastructure.Data;
@@ -13,6 +14,7 @@ using Reticula.Infrastructure.Files;
 using Reticula.Infrastructure.Jobs;
 using Reticula.Infrastructure.Jobs.Handlers;
 using Reticula.Infrastructure.Layout;
+using Reticula.Infrastructure.Maps;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -46,6 +48,7 @@ builder.Services.AddSignalR();
 builder.Services.AddSingleton<IJobNotifier, SignalRJobNotifier>();
 builder.Services.AddReticulaJobs();
 builder.Services.AddJobHandler<DiagnosticsJob>();
+builder.Services.AddTilePacks();
 builder.Services.AddScoped<LayoutService>();
 builder.Services.AddScoped<FieldService>();
 builder.Services.AddSingleton<IFileStore, FileSystemFileStore>();
@@ -73,6 +76,7 @@ app.MapProjectEndpoints();
 app.MapJobEndpoints();
 app.MapLayoutEndpoints();
 app.MapFieldEndpoints();
+app.MapTilePackEndpoints();
 
 await app.InitialiseDatabaseAsync();
 
