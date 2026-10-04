@@ -98,12 +98,12 @@ Deliverables: predicted building types, tablet inspection, income/ADMD tool, loa
 - [x] 1.4 Inspection UI (tablet): map-first, one-tap confirm, type picker (house/shop/school/other/not present/new), photo capture, notes, GPS, timestamp. (docs/field.md; offline in 1.8)
 - [x] 1.5 Candidate marking: transformer, mini-sub, MV route, pole site, LV route.
 - [x] 1.6 Progress panel: confirmed / outstanding / low-confidence-first list.
-- [x] 1.7 Income and ADMD tool: observable inputs → income band → category → ADMD (per NRS 034-1 tables in rules file); group after-diversity demand; special loads at own kVA; override with reason. (Method in place; rules values are placeholders until the authority's NRS 034-1 values are encoded.)
+- [x] 1.7 Income and ADMD tool: observable inputs → income band → category → ADMD (per NRS 034-1 tables in rules file); group after-diversity demand; special loads at own kVA; override with reason. (eskom/0.2.0: NRS 034 and SANS 507-1 load classes and Herman-Beta group demand; see docs/load-data.md. Score thresholds still a heuristic; SANS 507 C8 unverified.)
 - [ ] 1.8 Offline: IndexedDB store, cached rules tables, photo queue, sync engine with conflict detection and side-by-side resolution UI (never auto-overwrite).
 - [ ] 1.9 Offline map tiles: PMTiles pack per project area, download/refresh.
 - [~] 1.10 Load schedule view and export (CSV/Excel). (Done: view and CSV. To do: Excel with the documents in Phase 6.)
 - [x] 1.11 Assumptions register v1: every estimate and override auto-registered.
-- [~] 1.12 Validation: ADMD hand-worked cases from NRS 034-1 examples in `/test-cases`. (Done: hand-worked cases against the placeholder rules. To do: NRS 034-1 worked examples once real values are encoded.)
+- [~] 1.12 Validation: ADMD hand-worked cases from NRS 034-1 examples in `/test-cases`. (Done: hand-worked ADMD and Herman-Beta cases, and a self-check of every load class against its α, β and c. To do: compare with NRS 034-1 worked examples and ReticMaster results.)
 
 ### Phase 2 – LV design
 

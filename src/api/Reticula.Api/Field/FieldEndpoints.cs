@@ -293,7 +293,8 @@ public static class FieldEndpoints
         try
         {
             var lp = await field.EstimateLoadAsync(project, building,
-                new AdmdEstimateRequest(project.RulesRef, req.Kind, req.Observations ?? [], req.SpecialLoad, req.OverrideKva, Trim(req.OverrideReason, 1000)),
+                new AdmdEstimateRequest(project.RulesRef, req.Kind, req.Observations ?? [], req.SpecialLoad, req.OverrideKva, Trim(req.OverrideReason, 1000),
+                    req.Kind == LoadKinds.Residential && !string.IsNullOrWhiteSpace(req.LoadClass) ? req.LoadClass : null),
                 erf, req.Version, UserId(user), ct);
             return TypedResults.Ok(ToDto(lp));
         }
@@ -380,8 +381,10 @@ public static class FieldEndpoints
                 Num(r.Kva), Num(r.EstimatedKva), r.Overridden ? "yes" : "no", r.OverrideReason, r.LoadStatus));
         if (s.Totals is { } t)
         {
-            sb.AppendLine(Csv("TOTAL residential", null, null, null, null, null, null, Num(t.ResidentialKva), null, null,
-                $"{t.ResidentialCount} loads, diversity factor {Num(t.DiversityFactor)}", null));
+            var method = t.Method == "herman_beta"
+                ? $"{t.ResidentialCount} loads, Herman-Beta {Num(t.ConfidencePct)} % over {t.Phases} phase(s), {Num(t.DesignCurrentA)} A per phase, factor {Num(t.DiversityFactor)} on Σ ADMD"
+                : $"{t.ResidentialCount} loads, diversity factor {Num(t.DiversityFactor)}";
+            sb.AppendLine(Csv("TOTAL residential", null, null, null, null, null, null, Num(t.ResidentialKva), null, null, method, null));
             sb.AppendLine(Csv("TOTAL special", null, null, null, null, null, null, Num(t.SpecialKva), null, null, $"{t.SpecialCount} loads", null));
             sb.AppendLine(Csv("TOTAL after diversity", null, null, null, null, null, null, Num(t.TotalKva), null, null, $"{t.Formula}; {t.Clause}", null));
         }
@@ -409,7 +412,8 @@ public static class FieldEndpoints
             x.l?.Kind, x.l?.Category, x.l?.IncomeBand, x.l?.Kva, x.l?.EstimatedKva, x.l?.Overridden ?? false, x.l?.OverrideReason,
             x.l?.Status.ToString().ToLowerInvariant())).ToList();
 
-        var loads = rows.Where(x => x.l is not null).Select(x => new AdmdGroupLoad(x.l!.Id.ToString(), x.l.Kind, x.l.Kva)).ToList();
+        var loads = rows.Where(x => x.l is not null)
+            .Select(x => new AdmdGroupLoad(x.l!.Id.ToString(), x.l.Kind, x.l.Kva, x.l.Kind == LoadKinds.Residential ? x.l.Category : null)).ToList();
         LoadScheduleTotals? totals = null;
         var rulesHash = rows.FirstOrDefault(x => x.l is not null)?.l!.RulesHash ?? "";
         if (loads.Count > 0)
@@ -417,7 +421,7 @@ public static class FieldEndpoints
             var g = await calc.GroupAdmdAsync(project.RulesRef, loads, ct);
             rulesHash = g.RulesHash;
             totals = new LoadScheduleTotals(g.ResidentialCount, g.SpecialCount, g.DiversityFactor?.Value, g.ResidentialKva.Value,
-                g.SpecialKva, g.TotalKva.Value, g.TotalKva.Formula, g.TotalKva.Clause);
+                g.SpecialKva, g.TotalKva.Value, g.TotalKva.Formula, g.TotalKva.Clause, g.Method, g.Phases, g.ConfidencePct, g.DesignCurrentA?.Value);
         }
         return new LoadSchedule(project.Name, project.RulesRef, rulesHash, time.GetUtcNow(), scheduleRows, totals);
     }
@@ -462,7 +466,7 @@ public static class FieldEndpoints
         new("Feature", c.Id.ToString(), GeometryInput.ToDto(c.Geometry), new CandidateProps(c.Kind, c.Notes, c.CreatedAt, c.Version));
 
     private static LoadPointDto ToDto(LoadPoint l) => new(
-        l.Id, l.BuildingId, l.Kind, l.SpecialLoad, JsonDocument.Parse(l.ObservationsJson).RootElement.Clone(), l.IncomeBand, l.Category,
+        l.Id, l.BuildingId, l.Kind, l.SpecialLoad, JsonDocument.Parse(l.ObservationsJson).RootElement.Clone(), l.ClassOverride, l.IncomeBand, l.Category,
         l.EstimatedKva, l.Kva, l.Overridden, l.OverrideReason, JsonSerializer.Deserialize<List<string>>(l.MissingJson, Json) ?? [],
         l.Status.ToString().ToLowerInvariant(), l.UpdatedAt, l.Version);
 

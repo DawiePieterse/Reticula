@@ -186,6 +186,7 @@ public sealed class ReticulaDbContext(DbContextOptions<ReticulaDbContext> option
             e.Property(x => x.SpecialLoad).HasMaxLength(50);
             e.Property(x => x.ObservationsJson).HasColumnType("jsonb").IsRequired();
             e.Property(x => x.IncomeBand).HasMaxLength(50);
+            e.Property(x => x.ClassOverride).HasMaxLength(50);
             e.Property(x => x.Category).HasMaxLength(50);
             e.Property(x => x.OverrideReason).HasMaxLength(1000);
             e.Property(x => x.MissingJson).HasColumnType("jsonb").IsRequired();

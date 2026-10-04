@@ -20,7 +20,8 @@ The tools add possible transformer, mini-sub and pole sites as points, and MV an
 - For a school, shop, borehole pump or other special load, the rules file's default kVA is used.
 - Any value can be overridden. An override needs a reason, and the method's estimate is kept alongside it.
 - Indicators left blank count as zero and are listed.
-- Every option, score, band, ADMD value, diversity constant and special-load default comes from the rules file's `income_admd` section. **The values in `eskom/0.1.0` are placeholders** and must be replaced with the authority's accepted NRS 034-1 method before a design is submitted.
+- Every option, score, band and special-load default comes from the rules file's `income_admd` section. In `eskom/0.2.0` the score picks an NRS 034 consumer class, or the engineer chooses the class directly. The class gives the ADMD and the Herman-Beta parameters. See `docs/load-data.md`.
+- `eskom/0.1.0` keeps placeholder bands and a placeholder diversity formula, and is not for design use.
 - Each load point keeps the calc service's full traced result. Records are kept per load point, never per person.
 
 ## Assumptions register
@@ -37,7 +38,7 @@ Re-estimating a load reopens its entries. When the engineer confirms a load, its
 
 ## Load schedule
 
-The **Loads** page lists every building that is present, with its load or "No load recorded". It shows totals after diversity from the calc service: Σ ADMD × (1 + k/N) over the residential loads, plus special loads. The CSV export carries the rules version and hash, the generation time and the totals. Cell values that would start a spreadsheet formula are prefixed with an apostrophe.
+The **Loads** page lists every building that is present, with its load or "No load recorded". It shows totals after diversity from the calc service. With `eskom/0.2.0` this is Herman-Beta at 90 % confidence over balanced phases, plus special loads. The CSV export carries the rules version and hash, the generation time and the totals. Cell values that would start a spreadsheet formula are prefixed with an apostrophe.
 
 ## Ready for offline sync
 

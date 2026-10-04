@@ -20,11 +20,13 @@ public sealed record CandidateRequest(string Kind, GeometryInput Geometry, strin
 
 public sealed record CandidateProps(string Kind, string? Notes, DateTimeOffset CreatedAt, uint Version);
 
+/// <param name="LoadClass">A class the engineer chooses instead of the score; null to use the score.</param>
 public sealed record LoadRequest(
-    string Kind, Dictionary<string, JsonElement>? Observations, string? SpecialLoad, double? OverrideKva, string? OverrideReason, uint? Version);
+    string Kind, Dictionary<string, JsonElement>? Observations, string? SpecialLoad, double? OverrideKva, string? OverrideReason, uint? Version,
+    string? LoadClass = null);
 
 public sealed record LoadPointDto(
-    Guid Id, Guid BuildingId, string Kind, string? SpecialLoad, JsonElement Observations, string? IncomeBand, string? Category,
+    Guid Id, Guid BuildingId, string Kind, string? SpecialLoad, JsonElement Observations, string? ClassOverride, string? IncomeBand, string? Category,
     double EstimatedKva, double Kva, bool Overridden, string? OverrideReason, IReadOnlyList<string> Missing, string Status,
     DateTimeOffset UpdatedAt, uint Version);
 
@@ -45,7 +47,7 @@ public sealed record LoadScheduleRow(
     double? Kva, double? EstimatedKva, bool Overridden, string? OverrideReason, string? LoadStatus);
 
 public sealed record LoadScheduleTotals(int ResidentialCount, int SpecialCount, double? DiversityFactor, double ResidentialKva,
-    double SpecialKva, double TotalKva, string Formula, string Clause);
+    double SpecialKva, double TotalKva, string Formula, string Clause, string Method, int? Phases, double? ConfidencePct, double? DesignCurrentA);
 
 public sealed record LoadSchedule(string Project, string RulesRef, string RulesHash, DateTimeOffset GeneratedAt,
     IReadOnlyList<LoadScheduleRow> Rows, LoadScheduleTotals? Totals);

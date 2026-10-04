@@ -21,6 +21,16 @@ const SPECIAL_FOR_TYPE: Record<string, string> = { school: 'school', shop: 'shop
       </div>
 
       @if (kind() === 'residential') {
+        @if (classes().length) {
+          <label>Load class
+            <select [ngModel]="loadClass()" (ngModelChange)="loadClass.set($event)" name="loadClass">
+              <option value="">From the observations below</option>
+              @for (c of classes(); track c.code) {
+                <option [value]="c.code" [disabled]="!c.usable">{{ c.description }} · {{ c.admd_kva }} kVA{{ incomeRange(c) }}{{ c.usable ? '' : ' (unverified)' }}</option>
+              }
+            </select>
+          </label>
+        }
         @for (f of choiceFields(); track f.key) {
           <label>{{ f.label }}
             <select [ngModel]="value(f.key)" (ngModelChange)="setValue(f.key, $event)" [attr.name]="f.key">
@@ -66,7 +76,10 @@ const SPECIAL_FOR_TYPE: Record<string, string> = { school: 'school', shop: 'shop
       @if (current(); as lp) {
         <div class="result" [class.confirmed]="lp.status === 'confirmed'">
           <strong>{{ lp.kva | number: '1.0-2' }} kVA</strong>
-          @if (lp.kind === 'residential') { · {{ lp.category }} · {{ lp.incomeBand }} income }
+          @if (lp.kind === 'residential') {
+            · {{ classLabel(lp.category) }}
+            @if (lp.classOverride) { (chosen) } @else { · {{ lp.incomeBand }} score band }
+          }
           @else { · {{ pretty(lp.specialLoad ?? '') }} }
           @if (lp.overridden) { <span class="warn"> · overridden (method gave {{ lp.estimatedKva | number: '1.0-2' }} kVA)</span> }
           <div class="muted">{{ lp.status === 'confirmed' ? 'Confirmed by the engineer' : 'Estimate: in the assumptions register until confirmed' }}</div>
@@ -103,6 +116,7 @@ export class LoadTool {
   private readonly api = inject(FieldApi);
 
   protected readonly kind = signal<'residential' | 'special'>('residential');
+  protected readonly loadClass = signal('');
   protected readonly observations = signal<Record<string, unknown>>({});
   protected readonly specialLoad = signal('other');
   protected readonly overrideOn = signal(false);
@@ -115,6 +129,7 @@ export class LoadTool {
   protected readonly choiceFields = computed(() => this.form()?.indicators ?? []);
   protected readonly multiFields = computed(() => this.form()?.multi_indicators ?? []);
   protected readonly numberFields = computed(() => this.form()?.band_indicators ?? []);
+  protected readonly classes = computed(() => this.form()?.load_classes ?? []);
   protected readonly specialOptions = computed(() => Object.entries(this.form()?.special_loads ?? {}).map(([key, kva]) => ({ key, kva })));
   protected readonly canSave = computed(() => !this.overrideOn() || ((this.overrideKva() ?? 0) > 0 && this.overrideReason().trim().length > 0));
 
@@ -129,12 +144,23 @@ export class LoadTool {
         this.problem.set(null);
         this.kind.set(lp?.kind ?? (type === 'house' ? 'residential' : 'special'));
         this.observations.set({ ...(lp?.observations ?? {}) });
+        this.loadClass.set(lp?.classOverride ?? '');
         this.specialLoad.set(lp?.specialLoad ?? SPECIAL_FOR_TYPE[type] ?? 'other');
         this.overrideOn.set(!!lp?.overridden);
         this.overrideKva.set(lp?.overridden ? lp.kva : null);
         this.overrideReason.set(lp?.overrideReason ?? '');
       });
     });
+  }
+
+  protected classLabel(code: string | null): string {
+    return this.classes().find((c) => c.code === code)?.description ?? code ?? '';
+  }
+
+  protected incomeRange(c: { income_min_zar: number | null; income_max_zar: number | null }): string {
+    if (c.income_min_zar === null || c.income_max_zar === null) return '';
+    const r = (v: number) => `R${v.toLocaleString('en-ZA')}`;
+    return ` · ${r(c.income_min_zar)}–${r(c.income_max_zar)}/month`;
   }
 
   protected pretty(s: string): string {
@@ -182,6 +208,7 @@ export class LoadTool {
           overrideKva: this.overrideOn() ? this.overrideKva() : null,
           overrideReason: this.overrideOn() ? this.overrideReason().trim() : null,
           version: this.current()?.version ?? null,
+          loadClass: residential && this.loadClass() ? this.loadClass() : null,
         }),
       );
       this.current.set(lp);

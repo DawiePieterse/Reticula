@@ -107,6 +107,7 @@ public sealed class FakeCalc : ICalcClient
         r => new CalcImportResult(r.Kind, "kml", "WGS84", "test", [], [], []);
 
     public CalcImportRequest? LastImport { get; private set; }
+    public IReadOnlyList<AdmdGroupLoad> LastGroupLoads { get; private set; } = [];
     public IReadOnlyList<BuildingPredictionInput> LastPredictionInputs { get; private set; } = [];
 
     public Task<CalcImportResult> ImportAsync(CalcImportRequest request, CancellationToken ct = default)
@@ -142,13 +143,16 @@ public sealed class FakeCalc : ICalcClient
         var kva = r.OverrideKva ?? estimated;
         var missing = special || r.Observations?.ContainsKey("roof") == true ? new List<string>() : ["roof"];
         var traced = new TracedValue(kva, "kVA", "test", "test", "test clause", "0123456789abcdef", JsonDocument.Parse("[]").RootElement.Clone());
-        var result = new AdmdEstimate(r.Kind, missing, special ? null : "low", special ? r.SpecialLoad : "R2", traced, estimated,
-            r.OverrideKva is not null, "0123456789abcdef", "");
+        var lc = special ? null : new AdmdLoadClass(r.LoadClass ?? "township_area", r.LoadClass is null ? "Township area" : $"Class {r.LoadClass}",
+            "nrs034_15y", "NRS 034 test table", estimated, r.LoadClass is null ? "score" : "engineer");
+        var result = new AdmdEstimate(r.Kind, missing, special ? null : "low", special ? r.SpecialLoad : lc!.Code, traced, estimated,
+            r.OverrideKva is not null, "0123456789abcdef", "", lc);
         return Task.FromResult(result with { Raw = JsonSerializer.Serialize(new { kind = r.Kind, admd_kva = kva }) });
     }
 
     public Task<AdmdGroup> GroupAdmdAsync(string rulesRef, IReadOnlyList<AdmdGroupLoad> loads, CancellationToken ct = default)
     {
+        LastGroupLoads = loads;
         var res = loads.Where(l => l.Kind == "residential").ToList();
         var factor = res.Count == 0 ? (double?)null : 1 + 1.5 / res.Count;
         var resKva = res.Sum(l => l.Kva) * (factor ?? 0);
