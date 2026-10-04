@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Reticula.Domain.Jobs;
+using Reticula.Domain.Layout;
 using Reticula.Domain.Projects;
 using Reticula.Infrastructure.Identity;
 
@@ -12,6 +13,9 @@ public sealed class ReticulaDbContext(DbContextOptions<ReticulaDbContext> option
 {
     public DbSet<Project> Projects => Set<Project>();
     public DbSet<JobRun> JobRuns => Set<JobRun>();
+    public DbSet<Stand> Stands => Set<Stand>();
+    public DbSet<Building> Buildings => Set<Building>();
+    public DbSet<ImportBatch> ImportBatches => Set<ImportBatch>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -62,6 +66,59 @@ public sealed class ReticulaDbContext(DbContextOptions<ReticulaDbContext> option
             e.HasIndex(j => j.Status);
             e.HasOne<Project>().WithMany().HasForeignKey(j => j.ProjectId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<AppUser>().WithMany().HasForeignKey(j => j.RequestedBy).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<ImportBatch>(e =>
+        {
+            e.ToTable("import_batches");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Kind).HasMaxLength(20).IsRequired();
+            e.Property(x => x.FileName).HasMaxLength(260).IsRequired();
+            e.Property(x => x.Format).HasMaxLength(20).IsRequired();
+            e.Property(x => x.SourceCrs).HasMaxLength(20);
+            e.Property(x => x.CrsReason).HasMaxLength(500);
+            e.Property(x => x.IssuesJson).HasColumnType("jsonb").IsRequired();
+            e.Property(x => x.Sha256).HasMaxLength(64).IsRequired();
+            e.HasIndex(x => new { x.ProjectId, x.CreatedAt });
+            e.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.CreatedBy).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<Stand>(e =>
+        {
+            e.ToTable("stands");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.SourceRef).HasMaxLength(200).IsRequired();
+            e.Property(x => x.ErfNumber).HasMaxLength(50);
+            e.Property(x => x.Zoning).HasMaxLength(100);
+            e.Property(x => x.Geometry).HasColumnType($"geometry(Polygon,{ProjectRules.Srid})").IsRequired();
+            e.Property(x => x.AttributesJson).HasColumnType("jsonb").IsRequired();
+            e.HasIndex(x => x.Geometry).HasMethod("gist");
+            e.HasIndex(x => new { x.ProjectId, x.ErfNumber });
+            e.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<ImportBatch>().WithMany().HasForeignKey(x => x.ImportBatchId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<Building>(e =>
+        {
+            e.ToTable("buildings");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.SourceRef).HasMaxLength(200).IsRequired();
+            e.Property(x => x.OsmId).HasMaxLength(50);
+            e.Property(x => x.Footprint).HasColumnType($"geometry(Polygon,{ProjectRules.Srid})").IsRequired();
+            e.Property(x => x.TagsJson).HasColumnType("jsonb").IsRequired();
+            e.Property(x => x.Zoning).HasMaxLength(100);
+            e.Property(x => x.PredictedType).HasMaxLength(20).IsRequired();
+            e.Property(x => x.PredictionSource).HasMaxLength(200).IsRequired();
+            e.Property(x => x.PredictionSignalsJson).HasColumnType("jsonb").IsRequired();
+            e.Property(x => x.PredictionRulesHash).HasMaxLength(16);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.ConfirmedType).HasMaxLength(20);
+            e.HasIndex(x => x.Footprint).HasMethod("gist");
+            e.HasIndex(x => new { x.ProjectId, x.Status, x.PredictedConfidence });
+            e.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<ImportBatch>().WithMany().HasForeignKey(x => x.ImportBatchId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne<Stand>().WithMany().HasForeignKey(x => x.StandId).OnDelete(DeleteBehavior.SetNull);
         });
     }
 }

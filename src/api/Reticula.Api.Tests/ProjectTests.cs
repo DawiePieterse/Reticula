@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Reticula.Api.Auth;
-using Reticula.Api.Geo;
+using Reticula.Infrastructure.Geo;
 using Reticula.Api.Projects;
 using Reticula.Domain.Auth;
 

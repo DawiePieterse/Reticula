@@ -8,12 +8,15 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "ezdxf>=1.4.4",
     "fastapi>=0.142.2",
     "jsonschema>=4.26.0",
     "networkx>=3.7",
     "numpy>=2.4.6",
     "pandapower>=3.5.5",
     "pydantic>=2.13.5",
+    "pyproj>=3.8.0",
+    "python-multipart>=0.0.32",
     "pyyaml>=6.0.3",
     "shapely>=2.1.2",
     "uvicorn[standard]>=0.54.0",

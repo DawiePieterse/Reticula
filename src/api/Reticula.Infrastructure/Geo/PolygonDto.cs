@@ -2,7 +2,7 @@ using NetTopologySuite;
 using NetTopologySuite.Geometries;
 using Reticula.Domain.Projects;
 
-namespace Reticula.Api.Geo;
+namespace Reticula.Infrastructure.Geo;
 
 /// <summary>GeoJSON Polygon: coordinates[ring][position][lon, lat]. First ring is the exterior.</summary>
 public sealed record PolygonDto(string Type, double[][][] Coordinates)

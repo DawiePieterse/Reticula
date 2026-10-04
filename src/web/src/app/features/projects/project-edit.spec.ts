@@ -8,12 +8,26 @@ import { AUTH_STORAGE_KEY } from '../../core/auth/auth.service';
 import { AreaMap } from './area-map';
 import { GeoJsonPolygon } from './geo';
 import { ProjectEdit } from './project-edit';
+import { ProjectLayout } from './project-layout';
 
 @Component({ selector: 'app-area-map', template: '' })
 class AreaMapStub {
   readonly area = input<GeoJsonPolygon | null>(null);
   readonly editable = input(false);
   readonly areaChange = output<GeoJsonPolygon | null>();
+  readonly stands = input<unknown>(null);
+  readonly buildings = input<unknown>(null);
+  readonly preview = input<unknown>(null);
+  readonly focusId = input<string | null>(null);
+  readonly featureClick = output<string>();
+}
+
+@Component({ selector: 'app-project-layout', template: '' })
+class ProjectLayoutStub {
+  readonly projectId = input<string>();
+  readonly canEdit = input(false);
+  readonly layersChange = output<unknown>();
+  readonly focus = output<string>();
 }
 
 const AREA: GeoJsonPolygon = {
@@ -34,7 +48,7 @@ async function setup(id?: string) {
   TestBed.configureTestingModule({
     imports: [ProjectEdit],
     providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
-  }).overrideComponent(ProjectEdit, { remove: { imports: [AreaMap] }, add: { imports: [AreaMapStub] } });
+  }).overrideComponent(ProjectEdit, { remove: { imports: [AreaMap, ProjectLayout] }, add: { imports: [AreaMapStub, ProjectLayoutStub] } });
 
   const fixture = TestBed.createComponent(ProjectEdit);
   if (id) fixture.componentRef.setInput('id', id);

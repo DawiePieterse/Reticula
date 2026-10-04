@@ -41,11 +41,55 @@ public sealed class CalcClient(HttpClient http) : ICalcClient
         return await r.Content.ReadFromJsonAsync<RulesInfo>(Json, ct);
     }
 
-    private async Task<HttpResponseMessage> SendAsync(string path, CancellationToken ct)
+    public async Task<CalcImportResult> ImportAsync(CalcImportRequest request, CancellationToken ct = default)
+    {
+        using var form = new MultipartFormDataContent();
+        var file = new StreamContent(request.File);
+        form.Add(file, "file", request.FileName);
+        form.Add(new StringContent(request.Kind), "kind");
+        if (!string.IsNullOrWhiteSpace(request.SourceCrs)) form.Add(new StringContent(request.SourceCrs), "source_crs");
+        if (!string.IsNullOrWhiteSpace(request.Layer)) form.Add(new StringContent(request.Layer), "layer");
+        if (!string.IsNullOrWhiteSpace(request.AreaGeoJson)) form.Add(new StringContent(request.AreaGeoJson), "area");
+
+        using var r = await SendAsync(() => http.PostAsync("/geo/import", form, ct), ct);
+        return await ReadAsync<CalcImportResult>(r, ct);
+    }
+
+    public async Task<PredictionResult> PredictBuildingTypesAsync(string rulesRef, IReadOnlyList<BuildingPredictionInput> buildings, CancellationToken ct = default)
+    {
+        using var content = JsonContent.Create(new { rules = rulesRef, buildings }, options: Json);
+        using var r = await SendAsync(() => http.PostAsync("/predict/building-types", content, ct), ct);
+        return await ReadAsync<PredictionResult>(r, ct);
+    }
+
+    private static async Task<T> ReadAsync<T>(HttpResponseMessage r, CancellationToken ct)
+    {
+        if (r.StatusCode is HttpStatusCode.UnprocessableEntity or HttpStatusCode.RequestEntityTooLarge)
+            throw new CalcRejectedException(await DetailAsync(r, ct));
+        if (!r.IsSuccessStatusCode)
+            throw new CalcUnavailableException($"Calc service returned {(int)r.StatusCode}.");
+        return await r.Content.ReadFromJsonAsync<T>(Json, ct) ?? throw new CalcUnavailableException("Calc service returned an empty body.");
+    }
+
+    private static async Task<string> DetailAsync(HttpResponseMessage r, CancellationToken ct)
     {
         try
         {
-            return await http.GetAsync(path, ct);
+            using var doc = JsonDocument.Parse(await r.Content.ReadAsStringAsync(ct));
+            if (doc.RootElement.TryGetProperty("detail", out var d))
+                return d.ValueKind == JsonValueKind.String ? d.GetString()! : d.ToString();
+        }
+        catch (JsonException) { }
+        return $"Calc service rejected the request ({(int)r.StatusCode}).";
+    }
+
+    private Task<HttpResponseMessage> SendAsync(string path, CancellationToken ct) => SendAsync(() => http.GetAsync(path, ct), ct);
+
+    private static async Task<HttpResponseMessage> SendAsync(Func<Task<HttpResponseMessage>> send, CancellationToken ct)
+    {
+        try
+        {
+            return await send();
         }
         catch (HttpRequestException e) { throw new CalcUnavailableException("Calc service unreachable.", e); }
         catch (TaskCanceledException e) when (!ct.IsCancellationRequested) { throw new CalcUnavailableException("Calc service timed out.", e); }
@@ -60,7 +104,8 @@ public static class CalcServiceCollectionExtensions
         services.AddHttpClient<ICalcClient, CalcClient>(c =>
         {
             c.BaseAddress = new Uri(baseUrl);
-            c.Timeout = TimeSpan.FromSeconds(10);
+            // Imports of large layouts can take a while; health checks pass their own short token.
+            c.Timeout = TimeSpan.FromSeconds(120);
         });
         return services;
     }

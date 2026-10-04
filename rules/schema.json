@@ -3,28 +3,65 @@
   "$id": "https://reticula.app/rules/schema.json",
   "title": "Reticula authority rules file",
   "type": "object",
-  "required": ["authority", "version", "effective_date", "standards", "voltage", "conductors"],
+  "required": [
+    "authority",
+    "version",
+    "effective_date",
+    "standards",
+    "voltage",
+    "conductors"
+  ],
   "additionalProperties": false,
   "properties": {
-    "authority": { "type": "string", "minLength": 1 },
-    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
-    "effective_date": { "type": "string", "format": "date" },
-    "base": { "type": "string", "description": "Rules file this one overrides, as authority/version" },
-    "notes": { "type": "string" },
+    "authority": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "effective_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "base": {
+      "type": "string",
+      "description": "Rules file this one overrides, as authority/version"
+    },
+    "notes": {
+      "type": "string"
+    },
     "standards": {
       "type": "object",
       "description": "Standard id -> edition used by this rules file",
-      "additionalProperties": { "type": "string" }
+      "additionalProperties": {
+        "type": "string"
+      }
     },
     "voltage": {
       "type": "object",
-      "required": ["lv_nominal_v", "lv_max_drop_pct"],
+      "required": [
+        "lv_nominal_v",
+        "lv_max_drop_pct"
+      ],
       "additionalProperties": false,
       "properties": {
-        "lv_nominal_v": { "type": "number", "exclusiveMinimum": 0 },
-        "lv_max_drop_pct": { "type": "number", "exclusiveMinimum": 0 },
-        "mv_nominal_kv": { "type": "number", "exclusiveMinimum": 0 },
-        "clause": { "type": "string" }
+        "lv_nominal_v": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "lv_max_drop_pct": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "mv_nominal_kv": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "clause": {
+          "type": "string"
+        }
       }
     },
     "conductors": {
@@ -32,16 +69,170 @@
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["code", "kind", "r_ohm_per_km", "x_ohm_per_km", "rating_a"],
+        "required": [
+          "code",
+          "kind",
+          "r_ohm_per_km",
+          "x_ohm_per_km",
+          "rating_a"
+        ],
         "additionalProperties": false,
         "properties": {
-          "code": { "type": "string" },
-          "description": { "type": "string" },
-          "kind": { "type": "string", "enum": ["overhead", "underground"] },
-          "r_ohm_per_km": { "type": "number", "minimum": 0 },
-          "x_ohm_per_km": { "type": "number", "minimum": 0 },
-          "rating_a": { "type": "number", "exclusiveMinimum": 0 },
-          "clause": { "type": "string" }
+          "code": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "overhead",
+              "underground"
+            ]
+          },
+          "r_ohm_per_km": {
+            "type": "number",
+            "minimum": 0
+          },
+          "x_ohm_per_km": {
+            "type": "number",
+            "minimum": 0
+          },
+          "rating_a": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "clause": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "building_prediction": {
+      "type": "object",
+      "description": "Heuristics that predict a building's type before the field visit.",
+      "additionalProperties": false,
+      "required": [
+        "osm_tags",
+        "footprint_m2"
+      ],
+      "properties": {
+        "clause": {
+          "type": "string"
+        },
+        "osm_tags": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "match",
+              "type",
+              "confidence"
+            ],
+            "properties": {
+              "match": {
+                "type": "string",
+                "pattern": "^[a-z_:]+=([A-Za-z0-9_;:-]+|\\*)$"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "house",
+                  "shop",
+                  "school",
+                  "other"
+                ]
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          }
+        },
+        "zoning": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "match",
+              "type",
+              "confidence"
+            ],
+            "properties": {
+              "match": {
+                "type": "string",
+                "minLength": 1
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "house",
+                  "shop",
+                  "school",
+                  "other"
+                ]
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          }
+        },
+        "footprint_m2": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "min",
+              "type",
+              "confidence"
+            ],
+            "properties": {
+              "min": {
+                "type": "number",
+                "minimum": 0
+              },
+              "max": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "house",
+                  "shop",
+                  "school",
+                  "other"
+                ]
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          }
+        },
+        "agreement_boost": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.5
+        },
+        "low_confidence_below": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
         }
       }
     }
