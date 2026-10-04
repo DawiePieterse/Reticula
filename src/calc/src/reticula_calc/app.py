@@ -58,6 +58,7 @@ def calc_voltage_drop(req: VoltageDropRequest) -> VoltageDropResult:
 
 
 MAX_IMPORT_BYTES = 50 * 1024 * 1024
+IMPORT_KINDS = ("stands", "buildings", "roads", "contours", "network")
 
 
 @app.post("/geo/import")
@@ -67,15 +68,17 @@ async def geo_import(
     source_crs: Annotated[str | None, Form()] = None,
     layer: Annotated[str | None, Form()] = None,
     area: Annotated[str | None, Form(description="Project area as a GeoJSON Polygon")] = None,
+    contour_interval: Annotated[float | None, Form(gt=0, description="Metres between contours drawn from a GeoTIFF")] = None,
 ) -> ImportResult:
-    if kind not in ("stands", "buildings"):
-        raise HTTPException(status_code=422, detail="kind must be 'stands' or 'buildings'")
+    if kind not in IMPORT_KINDS:
+        raise HTTPException(status_code=422, detail=f"kind must be one of: {', '.join(IMPORT_KINDS)}")
     data = await file.read(MAX_IMPORT_BYTES + 1)
     if len(data) > MAX_IMPORT_BYTES:
         raise HTTPException(status_code=413, detail="File is larger than 50 MB")
     try:
         area_geojson = json.loads(area) if area else None
-        return import_file(file.filename or "upload", data, kind, source_crs or None, layer or None, area_geojson)  # type: ignore[arg-type]
+        return import_file(file.filename or "upload", data, kind, source_crs or None, layer or None, area_geojson,  # type: ignore[arg-type]
+                           contour_interval)
     except (UnreadableFileError, crs_mod.CrsError, ValueError) as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 

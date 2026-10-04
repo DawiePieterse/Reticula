@@ -46,7 +46,8 @@ class TestCrs:
         with pytest.raises(crs.CrsError):
             crs.normalise("LO30")
         with pytest.raises(crs.CrsError):
-            crs.normalise("EPSG:3857")
+            crs.normalise("EPSG:999999")
+        assert crs.normalise("epsg:2054") == "EPSG:2054"  # declared by a shapefile
 
 
 class TestKml:
@@ -147,5 +148,5 @@ def test_import_endpoint(client):
     r = client.post("/geo/import", files={"file": ("layout.kml", data)}, data={"kind": "stands", "area": json.dumps(AREA)})
     assert r.status_code == 200
     assert r.json()["features"][0]["erf"] == "1001"
-    bad = client.post("/geo/import", files={"file": ("layout.kml", data)}, data={"kind": "roads"})
+    bad = client.post("/geo/import", files={"file": ("layout.kml", data)}, data={"kind": "rivers"})
     assert bad.status_code == 422

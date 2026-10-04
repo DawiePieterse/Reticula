@@ -50,6 +50,11 @@ builder.Services.AddReticulaJobs();
 builder.Services.AddJobHandler<DiagnosticsJob>();
 builder.Services.AddTilePacks();
 builder.Services.AddScoped<LayoutService>();
+builder.Services.AddHttpClient<OverpassClient>(c =>
+{
+    c.Timeout = TimeSpan.FromSeconds(120);
+    c.DefaultRequestHeaders.UserAgent.ParseAdd("Reticula/0.1 (electrification design)");
+});
 builder.Services.AddScoped<FieldService>();
 builder.Services.AddSingleton<IFileStore, FileSystemFileStore>();
 builder.Services.AddCors(o => o.AddDefaultPolicy(p => p.AllowAnyHeader().AllowAnyMethod().AllowAnyOrigin()));

@@ -7,6 +7,7 @@ Supported specs:
                    so southern-hemisphere y values are negative millions. Hartebeesthoek94 uses the
                    WGS84 ellipsoid, so this is a transverse Mercator with k=1 and no false origin.
   UTM34S..UTM36S   WGS84 / UTM south zones (EPSG:32734-32736).
+  EPSG:<code>      Any other EPSG system, as declared by a shapefile .prj or GeoTIFF keys.
 """
 
 from __future__ import annotations
@@ -15,7 +16,8 @@ import re
 from dataclasses import dataclass
 from functools import lru_cache
 
-from pyproj import Transformer
+from pyproj import CRS, Transformer
+from pyproj.exceptions import CRSError
 
 LO_MERIDIANS = tuple(range(15, 35, 2))
 UTM_ZONES = (34, 35, 36)
@@ -39,7 +41,13 @@ def _proj_for(spec: str) -> str:
         if zone not in UTM_ZONES:
             raise CrsError(f"UTM zone must be 34S, 35S or 36S, got {zone}S")
         return f"EPSG:{32700 + zone}"
-    raise CrsError(f"Unknown coordinate system {spec!r}; use WGS84, LO15..LO33 or UTM34S..UTM36S")
+    if re.fullmatch(r"EPSG:\d+", s):
+        try:
+            CRS.from_user_input(s)
+        except CRSError as e:
+            raise CrsError(f"Unknown EPSG code {s}") from e
+        return s
+    raise CrsError(f"Unknown coordinate system {spec!r}; use WGS84, LO15..LO33, UTM34S..UTM36S or EPSG:<code>")
 
 
 def normalise(spec: str) -> str:

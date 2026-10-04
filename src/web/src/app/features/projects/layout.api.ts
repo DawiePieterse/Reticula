@@ -60,6 +60,22 @@ export interface PreviewProps {
   ref: string;
   erf: string | null;
   areaM2: number;
+  lengthM?: number;
+  name?: string | null;
+  subtype?: string | null;
+  elevationM?: number | null;
+}
+
+export type MapLayer = 'roads' | 'contours' | 'network';
+
+/** A road, contour line or existing network asset. */
+export interface MapFeatureProps {
+  layer: MapLayer;
+  subtype: string | null;
+  name: string | null;
+  elevationM: number | null;
+  lengthM: number;
+  attributes: Record<string, unknown>;
 }
 
 export interface ImportIssue {
@@ -75,6 +91,7 @@ export interface DxfLayer {
   closedPolylines: number;
   openPolylines: number;
   texts: number;
+  points?: number;
 }
 
 export interface ImportResponse {
@@ -86,7 +103,7 @@ export interface ImportResponse {
   featureCount: number;
   issues: ImportIssue[];
   layers: DxfLayer[];
-  preview: FeatureCollection<PreviewProps> | null;
+  preview: FeatureCollection<PreviewProps, AnyGeometry> | null;
 }
 
 export interface LayoutSummary {
@@ -96,15 +113,19 @@ export interface LayoutSummary {
   lowConfidence: number;
   inspected: number;
   predictedByType: Record<string, number>;
+  roads: number;
+  contours: number;
+  networkAssets: number;
 }
 
-export type ImportKind = 'stands' | 'buildings';
+export type ImportKind = 'stands' | 'buildings' | MapLayer;
 
 export interface ImportOptions {
   kind: ImportKind;
   file: File;
   sourceCrs?: string;
   layer?: string;
+  contourInterval?: number | null;
   dryRun: boolean;
 }
 
@@ -138,7 +159,17 @@ export class LayoutApi {
     form.append('dryRun', String(o.dryRun));
     if (o.sourceCrs) form.append('sourceCrs', o.sourceCrs);
     if (o.layer) form.append('layer', o.layer);
+    if (o.contourInterval) form.append('contourInterval', String(o.contourInterval));
     return this.http.post<ImportResponse>(`${this.base(projectId)}/imports`, form);
+  }
+
+  /** Fetches buildings or roads for the project area from OpenStreetMap, checked like a file. */
+  importOverpass(projectId: string, kind: 'buildings' | 'roads', dryRun: boolean): Observable<ImportResponse> {
+    return this.http.post<ImportResponse>(`${this.base(projectId)}/imports/overpass`, { kind, dryRun });
+  }
+
+  mapFeatures(projectId: string, layer?: MapLayer): Observable<FeatureCollection<MapFeatureProps, AnyGeometry>> {
+    return this.http.get<FeatureCollection<MapFeatureProps, AnyGeometry>>(`${this.base(projectId)}/map-features${layer ? `?layer=${layer}` : ''}`);
   }
 
   repredict(projectId: string): Observable<void> {

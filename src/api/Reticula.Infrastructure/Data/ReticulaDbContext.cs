@@ -24,6 +24,7 @@ public sealed class ReticulaDbContext(DbContextOptions<ReticulaDbContext> option
     public DbSet<LoadPoint> LoadPoints => Set<LoadPoint>();
     public DbSet<Assumption> Assumptions => Set<Assumption>();
     public DbSet<TilePack> TilePacks => Set<TilePack>();
+    public DbSet<MapFeature> MapFeatures => Set<MapFeature>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -212,6 +213,22 @@ public sealed class ReticulaDbContext(DbContextOptions<ReticulaDbContext> option
             e.HasIndex(x => new { x.ProjectId, x.SubjectType, x.SubjectId, x.Code }).IsUnique();
             e.HasIndex(x => new { x.ProjectId, x.Status });
             e.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<MapFeature>(e =>
+        {
+            e.ToTable("map_features");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Layer).HasMaxLength(20).IsRequired();
+            e.Property(x => x.SourceRef).HasMaxLength(200).IsRequired();
+            e.Property(x => x.Subtype).HasMaxLength(50);
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.Geometry).HasColumnType($"geometry(Geometry,{ProjectRules.Srid})").IsRequired();
+            e.Property(x => x.AttributesJson).HasColumnType("jsonb").IsRequired();
+            e.HasIndex(x => new { x.ProjectId, x.Layer });
+            e.HasIndex(x => x.Geometry).HasMethod("gist");
+            e.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<ImportBatch>().WithMany().HasForeignKey(x => x.ImportBatchId).OnDelete(DeleteBehavior.Cascade);
         });
 
         b.Entity<TilePack>(e =>

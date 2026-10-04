@@ -6,6 +6,7 @@ import { firstValueFrom } from 'rxjs';
 import { toApiProblem } from '../../core/api-problem';
 import { GeoJsonPolygon } from './geo';
 import {
+  AnyGeometry,
   BUILDING_COLOURS,
   BuildingProps,
   FeatureCollection,
@@ -14,6 +15,7 @@ import {
   ImportResponse,
   LayoutApi,
   LayoutSummary,
+  MapFeatureProps,
   PreviewProps,
   StandProps,
 } from './layout.api';
@@ -21,8 +23,17 @@ import {
 export interface LayoutLayers {
   stands: FeatureCollection<StandProps> | null;
   buildings: FeatureCollection<BuildingProps, GeoJsonPolygon | GeoJsonPoint> | null;
-  preview: FeatureCollection<PreviewProps> | null;
+  preview: FeatureCollection<PreviewProps, AnyGeometry> | null;
+  mapFeatures: FeatureCollection<MapFeatureProps, AnyGeometry> | null;
 }
+
+const KINDS: { value: ImportKind; label: string; files: string; osm?: boolean }[] = [
+  { value: 'stands', label: 'Stands (planner layout)', files: 'KML, KMZ, GeoJSON, DXF or zipped shapefile' },
+  { value: 'buildings', label: 'Buildings (OpenStreetMap)', files: 'Overpass JSON, GeoJSON or zipped shapefile', osm: true },
+  { value: 'roads', label: 'Roads', files: 'Overpass JSON, GeoJSON, KML, DXF or zipped shapefile', osm: true },
+  { value: 'contours', label: 'Contours', files: 'DXF, GeoJSON, zipped shapefile, or a GeoTIFF elevation model' },
+  { value: 'network', label: 'Existing network (authority)', files: 'GeoJSON, CSV, zipped shapefile, KML or DXF' },
+];
 
 const CRS_OPTIONS = [
   { value: '', label: 'Detect automatically' },
@@ -31,7 +42,7 @@ const CRS_OPTIONS = [
   ...[34, 35, 36].map((z) => ({ value: `UTM${z}S`, label: `UTM ${z}S` })),
 ];
 
-/** Imports stands and buildings for a project and lists the buildings to check first. */
+/** Imports stands, buildings, roads, contours and the existing network for a project, and lists the buildings to check first. */
 @Component({
   selector: 'app-project-layout',
   imports: [FormsModule, PercentPipe, DecimalPipe],
@@ -49,6 +60,9 @@ const CRS_OPTIONS = [
             }
           }
           <li [class.warn]="s.lowConfidence > 0">{{ s.lowConfidence }} low confidence</li>
+          @if (s.roads) { <li>{{ s.roads }} road segments</li> }
+          @if (s.contours) { <li>{{ s.contours }} contours</li> }
+          @if (s.networkAssets) { <li>{{ s.networkAssets }} network assets</li> }
         </ul>
       }
 
@@ -57,14 +71,18 @@ const CRS_OPTIONS = [
           <legend>Import a file</legend>
           <div class="row">
             <label>What
-              <select [ngModel]="kind()" (ngModelChange)="kind.set($event); resetPreview()" name="kind">
-                <option value="stands">Stands (planner layout)</option>
-                <option value="buildings">Buildings (OpenStreetMap)</option>
+              <select [ngModel]="kind()" (ngModelChange)="kind.set($event); source.set('file'); resetPreview()" name="kind">
+                @for (k of kinds; track k.value) { <option [value]="k.value">{{ k.label }}</option> }
               </select>
             </label>
-            <label>File
-              <input type="file" accept=".kml,.kmz,.geojson,.json,.dxf" (change)="onFile($event)" />
+            <label>File <span class="muted">({{ kindInfo().files }})</span>
+              <input type="file" accept=".kml,.kmz,.geojson,.json,.dxf,.zip,.csv,.tif,.tiff" (change)="onFile($event)" />
             </label>
+            @if (kind() === 'contours') {
+              <label>Contour interval (m, for GeoTIFF)
+                <input type="number" min="0.1" step="0.5" [ngModel]="contourInterval()" (ngModelChange)="contourInterval.set($event); resetPreview()" name="interval" placeholder="Automatic" />
+              </label>
+            }
             <label>Coordinates
               <select [ngModel]="sourceCrs()" (ngModelChange)="sourceCrs.set($event); resetPreview()" name="crs">
                 @for (o of crsOptions; track o.value) { <option [value]="o.value">{{ o.label }}</option> }
@@ -75,14 +93,17 @@ const CRS_OPTIONS = [
                 <select [ngModel]="layer()" (ngModelChange)="layer.set($event); check()" name="layer">
                   <option value="">All layers</option>
                   @for (l of result()!.layers; track l.name) {
-                    <option [value]="l.name">{{ l.name }} ({{ l.closedPolylines }} closed, {{ l.texts }} texts)</option>
+                    <option [value]="l.name">{{ l.name }} ({{ l.closedPolylines }} closed, {{ l.openPolylines }} open, {{ l.texts }} texts@if (l.points) {, {{ l.points }} points})</option>
                   }
                 </select>
               </label>
             }
           </div>
           <div class="actions">
-            <button type="button" (click)="check()" [disabled]="!file() || busy()">Check file</button>
+            <button type="button" (click)="source.set('file'); check()" [disabled]="!file() || busy()">Check file</button>
+            @if (kindInfo().osm) {
+              <button type="button" (click)="source.set('osm'); check()" [disabled]="busy()">Fetch from OpenStreetMap</button>
+            }
             <button type="button" class="primary" (click)="commit()" [disabled]="!canCommit() || busy()">
               Import {{ result()?.featureCount ?? '' }} {{ kind() }}
             </button>
@@ -92,7 +113,7 @@ const CRS_OPTIONS = [
           @if (result(); as r) {
             <div class="result" aria-live="polite">
               <p>
-                {{ r.featureCount }} {{ kind() }} found in {{ r.format.toUpperCase() }}.
+                {{ r.featureCount }} {{ kind() }} found in {{ source() === 'osm' ? 'OpenStreetMap' : r.format.toUpperCase() }}.
                 Coordinates: <strong>{{ r.sourceCrs ?? 'unknown' }}</strong> ({{ r.crsReason }}).
               </p>
               @if (r.issues.length) {
@@ -173,12 +194,18 @@ export class ProjectLayout {
   protected readonly types = ['house', 'shop', 'school', 'other'];
   protected readonly colours = BUILDING_COLOURS;
   protected readonly crsOptions = CRS_OPTIONS;
+  protected readonly kinds = KINDS;
 
   protected readonly summary = signal<LayoutSummary | null>(null);
   private readonly stands = signal<FeatureCollection<StandProps> | null>(null);
   private readonly buildings = signal<FeatureCollection<BuildingProps, GeoJsonPolygon | GeoJsonPoint> | null>(null);
+  private readonly mapFeatures = signal<FeatureCollection<MapFeatureProps, AnyGeometry> | null>(null);
 
   protected readonly kind = signal<ImportKind>('stands');
+  protected readonly kindInfo = computed(() => KINDS.find((k) => k.value === this.kind())!);
+  /** Where the data comes from: the chosen file, or OpenStreetMap fetched for the project area. */
+  protected readonly source = signal<'file' | 'osm'>('file');
+  protected readonly contourInterval = signal<number | null>(null);
   protected readonly file = signal<File | null>(null);
   protected readonly sourceCrs = signal('');
   protected readonly layer = signal('');
@@ -248,13 +275,17 @@ export class ProjectLayout {
 
   private async send(dryRun: boolean): Promise<ImportResponse | null> {
     const file = this.file();
-    if (!file) return null;
+    const kind = this.kind();
+    const osm = this.source() === 'osm' && (kind === 'buildings' || kind === 'roads');
+    if (!file && !osm) return null;
     this.busy.set(true);
     this.problem.set(null);
     this.message.set(null);
     try {
       const r = await firstValueFrom(
-        this.api.import(this.projectId(), { kind: this.kind(), file, sourceCrs: this.sourceCrs(), layer: this.layer(), dryRun }),
+        osm
+          ? this.api.importOverpass(this.projectId(), kind, dryRun)
+          : this.api.import(this.projectId(), { kind, file: file!, sourceCrs: this.sourceCrs(), layer: this.layer(), contourInterval: this.contourInterval(), dryRun }),
       );
       this.result.set(r);
       return r;
@@ -274,21 +305,23 @@ export class ProjectLayout {
 
   private async reload(id: string): Promise<void> {
     try {
-      const [summary, stands, buildings] = await Promise.all([
+      const [summary, stands, buildings, mapFeatures] = await Promise.all([
         firstValueFrom(this.api.summary(id)),
         firstValueFrom(this.api.stands(id)),
         firstValueFrom(this.api.buildings(id)),
+        firstValueFrom(this.api.mapFeatures(id)),
       ]);
       this.summary.set(summary);
       this.stands.set(stands);
       this.buildings.set(buildings);
+      this.mapFeatures.set(mapFeatures);
       this.emitLayers(null);
     } catch (e) {
       this.problem.set(toApiProblem(e).message);
     }
   }
 
-  private emitLayers(preview: FeatureCollection<PreviewProps> | null): void {
-    this.layersChange.emit({ stands: this.stands(), buildings: this.buildings(), preview });
+  private emitLayers(preview: FeatureCollection<PreviewProps, AnyGeometry> | null): void {
+    this.layersChange.emit({ stands: this.stands(), buildings: this.buildings(), preview, mapFeatures: this.mapFeatures() });
   }
 }

@@ -11,7 +11,7 @@ namespace Reticula.Infrastructure.Layout;
 
 public sealed record ImportOutcome(CalcImportResult Result, ImportBatch? Batch);
 
-/// <summary>Stores imported stands and buildings, links buildings to stands and keeps predictions current.</summary>
+/// <summary>Stores imported stands, buildings and map layers, links buildings to stands and keeps predictions current.</summary>
 public sealed class LayoutService(ReticulaDbContext db, ICalcClient calc, TimeProvider time)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
@@ -23,10 +23,10 @@ public sealed class LayoutService(ReticulaDbContext db, ICalcClient calc, TimePr
     /// </summary>
     public async Task<ImportOutcome> ImportAsync(
         Project project, string kind, string fileName, byte[] data, string? sourceCrs, string? layer,
-        bool dryRun, Guid userId, CancellationToken ct)
+        bool dryRun, Guid userId, CancellationToken ct, double? contourInterval = null)
     {
         var area = JsonSerializer.Serialize(PolygonDto.From(project.Area), Json);
-        var result = await calc.ImportAsync(new CalcImportRequest(new MemoryStream(data), fileName, kind, sourceCrs, layer, area), ct);
+        var result = await calc.ImportAsync(new CalcImportRequest(new MemoryStream(data), fileName, kind, sourceCrs, layer, area, contourInterval), ct);
         if (dryRun || result.HasErrors) return new ImportOutcome(result, null);
 
         var now = time.GetUtcNow();
@@ -43,10 +43,23 @@ public sealed class LayoutService(ReticulaDbContext db, ICalcClient calc, TimePr
             await db.Stands.Where(s => s.ProjectId == project.Id).ExecuteDeleteAsync(ct);
             foreach (var f in result.Features)
             {
-                if (!f.Geometry.TryToPolygon(out var polygon, out _)) continue;
+                if (!f.Geometry.TryToPolygon(out var polygon)) continue;
                 db.Stands.Add(new Stand(Guid.CreateVersion7(), project.Id, batch.Id, f.Ref, f.Erf, f.Zoning, polygon!, f.AreaM2,
                     JsonSerializer.Serialize(f.Attributes, Json)));
             }
+        }
+        else if (MapLayers.All.Contains(kind))
+        {
+            await db.MapFeatures.Where(m => m.ProjectId == project.Id && m.Layer == kind).ExecuteDeleteAsync(ct);
+            foreach (var f in result.Features)
+            {
+                if (!f.Geometry.TryToAnyGeometry(out var geometry, out _)) continue;
+                db.MapFeatures.Add(new MapFeature(Guid.CreateVersion7(), project.Id, batch.Id, kind, f.Ref, f.Subtype, f.Name, f.ElevationM,
+                    geometry!, f.LengthM, JsonSerializer.Serialize(f.Attributes, Json)));
+            }
+            await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+            return new ImportOutcome(result, batch);
         }
         else
         {
@@ -54,7 +67,7 @@ public sealed class LayoutService(ReticulaDbContext db, ICalcClient calc, TimePr
             await db.Buildings.Where(b => b.ProjectId == project.Id && b.Status == BuildingStatus.Predicted).ExecuteDeleteAsync(ct);
             foreach (var f in result.Features)
             {
-                if (!f.Geometry.TryToPolygon(out var polygon, out _)) continue;
+                if (!f.Geometry.TryToPolygon(out var polygon)) continue;
                 db.Buildings.Add(new Building(Guid.CreateVersion7(), project.Id, batch.Id, f.Ref, f.OsmId, polygon!, f.AreaM2,
                     JsonSerializer.Serialize(f.Tags, Json), now));
             }

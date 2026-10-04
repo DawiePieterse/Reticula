@@ -11,7 +11,10 @@ const building = (id: string, confidence: number, low: boolean, erf: string): Fe
   properties: { predictedType: 'house', confidence, source: 'footprint:80 m²', lowConfidence: low, status: 'predicted', confirmedType: null, effectiveType: 'house', areaM2: 80, erf, zoning: null, signals: [], version: 1 },
 });
 
-const summary = { stands: 2, standsWithoutErf: 0, buildings: 3, lowConfidence: 2, inspected: 0, predictedByType: { house: 3 } };
+const summary = { stands: 2, standsWithoutErf: 0, buildings: 3, lowConfidence: 2, inspected: 0, predictedByType: { house: 3 }, roads: 4, contours: 0, networkAssets: 2 };
+
+const road = { type: 'Feature', id: 'r1', geometry: { type: 'LineString', coordinates: [[28.1, -25.52], [28.11, -25.52]] },
+  properties: { layer: 'roads', subtype: 'residential', name: 'Main', elevationM: null, lengthM: 1000, attributes: {} } };
 
 const preview = (issues: ImportResponse['issues'], featureCount = 2): ImportResponse => ({
   batchId: null, committed: false, format: 'kml', sourceCrs: 'WGS84', crsReason: 'KML is always longitude/latitude',
@@ -42,6 +45,7 @@ async function setup(canEdit = true) {
       type: 'FeatureCollection',
       features: [building('b-ok', 0.9, false, '3'), building('b-low2', 0.45, true, '2'), building('b-low1', 0.3, true, '1')],
     });
+    http.expectOne('/api/projects/p1/map-features').flush({ type: 'FeatureCollection', features: [road] });
   };
   flushLayout();
   await settle(fixture);
@@ -123,5 +127,53 @@ describe('ProjectLayout', () => {
     const { el } = await setup(false);
     expect(el.querySelector('fieldset.import')).toBeNull();
     expect(el.querySelector('table.low')).not.toBeNull();
+  });
+
+  it('shows roads, contours and network on the map and in the summary', async () => {
+    const { el, layers } = await setup();
+    expect(layers.at(-1)?.mapFeatures?.features).toEqual([road]);
+    expect(el.textContent).toContain('4 road segments');
+    expect(el.textContent).toContain('2 network assets');
+    expect(el.textContent).not.toContain('contours');
+  });
+
+  it('asks for a contour interval and sends it with the file', async () => {
+    const { fixture, http, el } = await setup();
+    const kind = el.querySelector<HTMLSelectElement>('select[name="kind"]')!;
+    kind.value = 'contours';
+    kind.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+    expect(button(el, 'Fetch from OpenStreetMap')).toBeUndefined();
+    const interval = el.querySelector<HTMLInputElement>('input[name="interval"]')!;
+    interval.value = '2';
+    interval.dispatchEvent(new Event('input'));
+    chooseFile(el, 'dem.tif');
+    await fixture.whenStable();
+    button(el, 'Check file').click();
+    const req = http.expectOne('/api/projects/p1/imports');
+    expect((req.request.body as FormData).get('kind')).toBe('contours');
+    expect((req.request.body as FormData).get('contourInterval')).toBe('2');
+  });
+
+  it('fetches roads from OpenStreetMap for the project area, then imports them', async () => {
+    const { fixture, http, el, flushLayout } = await setup();
+    const kind = el.querySelector<HTMLSelectElement>('select[name="kind"]')!;
+    kind.value = 'roads';
+    kind.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+    button(el, 'Fetch from OpenStreetMap').click();
+    const check = http.expectOne({ method: 'POST', url: '/api/projects/p1/imports/overpass' });
+    expect(check.request.body).toEqual({ kind: 'roads', dryRun: true });
+    check.flush({ ...preview([]), format: 'overpass' });
+    await settle(fixture);
+    expect(el.textContent).toContain('found in OpenStreetMap');
+    button(el, 'Import 2 roads').click();
+    const commit = http.expectOne('/api/projects/p1/imports/overpass');
+    expect(commit.request.body).toEqual({ kind: 'roads', dryRun: false });
+    commit.flush({ ...preview([]), committed: true, batchId: 'b2' });
+    await settle(fixture);
+    flushLayout();
+    await settle(fixture);
+    expect(el.textContent).toContain('Imported 2 roads.');
   });
 });

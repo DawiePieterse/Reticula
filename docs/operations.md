@@ -49,3 +49,7 @@ Offline base maps are built on the server from a raster XYZ tile source and down
 
 The tile provider's terms must allow downloading tiles for offline use. The public OpenStreetMap tile servers do not allow bulk downloads, so use a self-hosted tile server or a provider with an offline licence. The source shown to users drops the query string, so API keys stay on the server. Packs are kept in the file store under `projects/<id>/tiles/` and are covered by the file-store backup.
 
+## OpenStreetMap fetch
+
+Fetching buildings and roads uses the Overpass API at `Overpass:Url` (default `https://overpass-api.de/api/interpreter`). The public instance is shared and rate-limited; for heavy use, point this at a self-hosted Overpass server. When the server cannot be reached or refuses (for example 429), the import screen shows the reason and an export file can be imported instead.
+

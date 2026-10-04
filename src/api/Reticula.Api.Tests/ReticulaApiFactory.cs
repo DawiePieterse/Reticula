@@ -33,6 +33,7 @@ public sealed class ReticulaApiFactory : WebApplicationFactory<Program>, IAsyncL
     public FakeCalc Calc { get; } = new();
     public JobGate Gate { get; } = new();
     public FakeTileServer Tiles { get; } = new();
+    public FakeOverpass Overpass { get; } = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -54,6 +55,7 @@ public sealed class ReticulaApiFactory : WebApplicationFactory<Program>, IAsyncL
             s.AddJobHandler<GatedJob>();
             s.AddJobHandler<FailingJob>();
             s.AddHttpClient(TilePackJob.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => Tiles);
+            s.AddHttpClient<Reticula.Infrastructure.Layout.OverpassClient>().ConfigurePrimaryHttpMessageHandler(() => Overpass);
         });
     }
 
@@ -239,5 +241,22 @@ public sealed class FakeTileServer : HttpMessageHandler
     }
 
     // The client factory recycles handlers; this one lives as long as the test host.
+    protected override void Dispose(bool disposing) { }
+}
+
+/// <summary>Stands in for the Overpass API: records the query and answers with a fixed body.</summary>
+public sealed class FakeOverpass : HttpMessageHandler
+{
+    public string? LastQuery { get; private set; }
+    public System.Net.HttpStatusCode Status { get; set; } = System.Net.HttpStatusCode.OK;
+    public string Body { get; set; } = "{\"elements\":[]}";
+
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+    {
+        var form = await request.Content!.ReadAsStringAsync(ct);
+        LastQuery = Uri.UnescapeDataString(form.Replace('+', ' ')).Split("data=", 2)[^1];
+        return new HttpResponseMessage(Status) { Content = new StringContent(Body) };
+    }
+
     protected override void Dispose(bool disposing) { }
 }

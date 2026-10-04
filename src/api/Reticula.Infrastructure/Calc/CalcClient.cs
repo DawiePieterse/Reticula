@@ -50,6 +50,7 @@ public sealed class CalcClient(HttpClient http) : ICalcClient
         if (!string.IsNullOrWhiteSpace(request.SourceCrs)) form.Add(new StringContent(request.SourceCrs), "source_crs");
         if (!string.IsNullOrWhiteSpace(request.Layer)) form.Add(new StringContent(request.Layer), "layer");
         if (!string.IsNullOrWhiteSpace(request.AreaGeoJson)) form.Add(new StringContent(request.AreaGeoJson), "area");
+        if (request.ContourInterval is { } interval) form.Add(new StringContent(interval.ToString(System.Globalization.CultureInfo.InvariantCulture)), "contour_interval");
 
         using var r = await SendAsync(() => http.PostAsync("/geo/import", form, ct), ct);
         return await ReadAsync<CalcImportResult>(r, ct);

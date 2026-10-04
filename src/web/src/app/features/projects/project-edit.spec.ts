@@ -18,6 +18,7 @@ class AreaMapStub {
   readonly stands = input<unknown>(null);
   readonly buildings = input<unknown>(null);
   readonly preview = input<unknown>(null);
+  readonly mapFeatures = input<unknown>(null);
   readonly focusId = input<string | null>(null);
   readonly featureClick = output<string>();
 }

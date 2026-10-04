@@ -92,7 +92,7 @@ Deliverables: running skeleton, auth, project CRUD, map, CI.
 
 Deliverables: predicted building types, tablet inspection, income/ADMD tool, load schedule; all offline-capable.
 
-- [~] 1.1 Importers: CAD (DXF) and KML stand layouts; contours (DXF/SHP/GeoTIFF); OSM building/road extract for area; authority network data (CSV/SHP/GeoJSON with required fields). (Done: stands from KML/KMZ/GeoJSON/DXF, buildings from Overpass/GeoJSON; see docs/imports.md. To do: roads, contours, authority network, live Overpass fetch.)
+- [x] 1.1 Importers: CAD (DXF) and KML stand layouts; contours (DXF/SHP/GeoTIFF); OSM building/road extract for area; authority network data (CSV/SHP/GeoJSON with required fields). (docs/imports.md: stands, buildings, roads, contours and existing network from KML/KMZ/GeoJSON/DXF/zipped shapefile/CSV/GeoTIFF; live Overpass fetch for buildings and roads.)
 - [x] 1.2 Import validation: CRS detection, duplicate stands, missing erf numbers flagged early.
 - [~] 1.3 Building-type predictor: rules on OSM tags, zoning, footprint area; rooftop-image classifier behind licence flag; output type + confidence + source. (Done: tags, zoning, footprint from the rules file. To do: rooftop images, pending licence.)
 - [x] 1.4 Inspection UI (tablet): map-first, one-tap confirm, type picker (house/shop/school/other/not present/new), photo capture, notes, GPS, timestamp. (docs/field.md)
@@ -103,7 +103,7 @@ Deliverables: predicted building types, tablet inspection, income/ADMD tool, loa
 - [x] 1.9 Offline map tiles: PMTiles pack per project area, download/refresh. (Raster tiles from a configured source with an offline licence; docs/field.md, Offline map.)
 - [~] 1.10 Load schedule view and export (CSV/Excel). (Done: view and CSV. To do: Excel with the documents in Phase 6.)
 - [x] 1.11 Assumptions register v1: every estimate and override auto-registered.
-- [~] 1.12 Validation: ADMD hand-worked cases from NRS 034-1 examples in `/test-cases`. (Done: hand-worked ADMD and Herman-Beta cases, and a self-check of every load class against its α, β and c. ReticMaster's Herman-Beta example added. To do: compare with NRS 034-1 worked examples and ReticMaster results.)
+- [~] 1.12 Validation: ADMD hand-worked cases from NRS 034-1 examples in `/test-cases`. (Done: hand-worked ADMD and Herman-Beta cases, and a self-check of every load class against its α, β and c. ReticMaster's Herman-Beta example added. To do: compare with NRS 034-1 worked examples and ReticMaster project results; needs the standard's worked examples and a ReticMaster run for the same input.)
 
 ### Phase 2 – LV design
 

@@ -40,5 +40,8 @@ public static class ImportKinds
 {
     public const string Stands = "stands";
     public const string Buildings = "buildings";
-    public static readonly IReadOnlyList<string> All = [Stands, Buildings];
+    public const string Roads = MapLayers.Roads;
+    public const string Contours = MapLayers.Contours;
+    public const string Network = MapLayers.Network;
+    public static readonly IReadOnlyList<string> All = [Stands, Buildings, Roads, Contours, Network];
 }

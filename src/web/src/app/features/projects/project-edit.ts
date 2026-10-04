@@ -59,6 +59,7 @@ import { ProjectsApi } from './projects.api';
           [stands]="layers().stands"
           [buildings]="layers().buildings"
           [preview]="layers().preview"
+          [mapFeatures]="layers().mapFeatures"
           [focusId]="focusId()"
           (featureClick)="focusId.set($event)"
         />
@@ -102,7 +103,7 @@ export class ProjectEdit {
   protected readonly conflict = signal(false);
   protected readonly saving = signal(false);
   protected readonly isNew = computed(() => !this.id());
-  protected readonly layers = signal<LayoutLayers>({ stands: null, buildings: null, preview: null });
+  protected readonly layers = signal<LayoutLayers>({ stands: null, buildings: null, preview: null, mapFeatures: null });
   protected readonly focusId = signal<string | null>(null);
   private version: number | undefined;
 

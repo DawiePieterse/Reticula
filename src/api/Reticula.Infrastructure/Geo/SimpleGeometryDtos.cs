@@ -77,6 +77,33 @@ public sealed record GeometryInput(string Type, JsonElement Coordinates)
         }
     }
 
+    /// <summary>Any of Point, LineString or Polygon (imported features).</summary>
+    public bool TryToAnyGeometry(out Geometry? geometry, out string? error)
+    {
+        if (Type != "Polygon") return TryToGeometry(out geometry, out error);
+        geometry = null;
+        try
+        {
+            var poly = new PolygonDto(Type, Coordinates.Deserialize<double[][][]>() ?? []);
+            if (!poly.TryToPolygon(out var p, out error)) return false;
+            geometry = p;
+            return true;
+        }
+        catch (JsonException)
+        {
+            error = "Geometry coordinates are malformed.";
+            return false;
+        }
+    }
+
+    public bool TryToPolygon(out Polygon? polygon)
+    {
+        polygon = TryToAnyGeometry(out var g, out _) ? g as Polygon : null;
+        return polygon is not null;
+    }
+
+    public static implicit operator GeometryInput(PolygonDto p) => new(p.Type, JsonSerializer.SerializeToElement(p.Coordinates));
+
     public static object ToDto(Geometry g) => g switch
     {
         Point p => PointDto.From(p),

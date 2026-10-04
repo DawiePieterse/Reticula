@@ -41,6 +41,7 @@ const DRAW_SOURCE = 'area-draw';
 const STANDS = 'stands';
 const BUILDINGS = 'buildings';
 const PREVIEW = 'preview';
+const MAP_FEATURES = 'map-features';
 
 type AnyCollection = FeatureCollection<unknown, AnyGeometry> | null;
 
@@ -83,6 +84,8 @@ export class AreaMap implements OnDestroy {
   readonly stands = input<AnyCollection>(null);
   readonly buildings = input<AnyCollection>(null);
   readonly preview = input<AnyCollection>(null);
+  /** Roads, contours and existing network assets. */
+  readonly mapFeatures = input<AnyCollection>(null);
   /** Building to zoom to and highlight. */
   readonly focusId = input<string | null>(null);
   readonly featureClick = output<string>();
@@ -106,6 +109,7 @@ export class AreaMap implements OnDestroy {
 
     effect(() => this.setData(STANDS, this.stands()));
     effect(() => this.setData(BUILDINGS, this.buildings()));
+    effect(() => this.setData(MAP_FEATURES, this.mapFeatures()));
     effect(() => {
       const p = this.preview();
       untracked(() => {
@@ -124,7 +128,10 @@ export class AreaMap implements OnDestroy {
       const map = new Map({ container: this.mapEl().nativeElement, style: OSM_STYLE, center: SOUTH_AFRICA_CENTRE, zoom: 5 });
       map.addControl(new NavigationControl(), 'top-right');
       map.on('load', () => {
-        for (const id of [STANDS, BUILDINGS, PREVIEW]) map.addSource(id, { type: 'geojson', data: emptyCollection(), promoteId: 'id' });
+        for (const id of [STANDS, BUILDINGS, PREVIEW, MAP_FEATURES]) map.addSource(id, { type: 'geojson', data: emptyCollection(), promoteId: 'id' });
+        const layerIs = (l: string) => ['==', ['get', 'layer'], l] as never;
+        map.addLayer({ id: 'contours-line', type: 'line', source: MAP_FEATURES, filter: layerIs('contours'), paint: { 'line-color': '#a0703c', 'line-width': 0.8, 'line-opacity': 0.8 } });
+        map.addLayer({ id: 'roads-line', type: 'line', source: MAP_FEATURES, filter: layerIs('roads'), paint: { 'line-color': '#8c959f', 'line-width': 3, 'line-opacity': 0.7 } });
         map.addLayer({ id: 'stands-line', type: 'line', source: STANDS, paint: { 'line-color': '#6e7781', 'line-width': 1 } });
         map.addLayer({
           id: 'buildings-fill', type: 'fill', source: BUILDINGS,
@@ -135,7 +142,13 @@ export class AreaMap implements OnDestroy {
         });
         map.addLayer({ id: 'buildings-low', type: 'line', source: BUILDINGS, filter: ['==', ['get', 'lowConfidence'], true], paint: { 'line-color': '#cf222e', 'line-width': 1.5 } });
         map.addLayer({ id: 'buildings-focus', type: 'line', source: BUILDINGS, filter: ['==', ['id'], ''], paint: { 'line-color': '#fb8500', 'line-width': 4 } });
+        map.addLayer({ id: 'network-line', type: 'line', source: MAP_FEATURES, filter: ['all', layerIs('network'), ['==', ['geometry-type'], 'LineString']] as never,
+          paint: { 'line-color': ['match', ['get', 'subtype'], 'mv_line', '#cf222e', '#1f6feb'] as never, 'line-width': 2.5 } });
+        map.addLayer({ id: 'network-point', type: 'circle', source: MAP_FEATURES, filter: ['all', layerIs('network'), ['==', ['geometry-type'], 'Point']] as never,
+          paint: { 'circle-radius': ['match', ['get', 'subtype'], 'pole', 3, 6] as never, 'circle-color': ['match', ['get', 'subtype'], 'transformer', '#cf222e', 'minisub', '#8250df', 'connection_point', '#1a7f37', '#57606a'] as never,
+            'circle-stroke-color': '#fff', 'circle-stroke-width': 1.5 } });
         map.addLayer({ id: 'preview-line', type: 'line', source: PREVIEW, paint: { 'line-color': '#fb8500', 'line-width': 2, 'line-dasharray': [2, 1] } });
+        map.addLayer({ id: 'preview-point', type: 'circle', source: PREVIEW, filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-radius': 4, 'circle-color': '#fb8500' } });
         map.on('click', 'buildings-fill', (e) => {
           const id = e.features?.[0]?.id;
           if (id !== undefined && !this.drawing()) this.featureClick.emit(String(id));
@@ -149,6 +162,7 @@ export class AreaMap implements OnDestroy {
         this.setData(STANDS, this.stands());
         this.setData(BUILDINGS, this.buildings());
         this.setData(PREVIEW, this.preview());
+        this.setData(MAP_FEATURES, this.mapFeatures());
       });
       map.on('click', (e: MapMouseEvent) => {
         if (!this.drawing()) return;
