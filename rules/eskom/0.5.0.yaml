@@ -1,0 +1,31 @@
+# Eskom residential distribution rules – optimisation (plan Phase 5). STARTER VALUES.
+# Inherits everything from eskom/0.4.0. Values marked `status: unverified` are typical figures to be checked against
+# the standards in docs/standards-index.md before a design is submitted.
+base: eskom/0.4.0
+authority: eskom
+version: 0.5.0
+effective_date: 2026-10-04
+notes: >-
+  Adds the optimisation section: transformer losses for lifetime cost (SANS 780 / SANS 1029 maximum losses), the
+  residential load factor and loss load factor for energy losses, and the search limits for the option search.
+
+standards:
+  SANS780: "2024"       # TODO confirm edition
+  SANS1029: "2024"      # TODO confirm edition
+
+optimisation:
+  clause: "SANS780 / SANS1029 transformer losses; loss load factor (Buller-Woodrow); idx O-01"
+  status: unverified
+  load_factor: 0.35               # residential annual load factor (average / peak demand)
+  loss_load_factor: { a: 0.3, b: 0.7 }   # LLF = a·LF + b·LF²
+  transformer_losses:             # maximum no-load and load (copper) losses at rating, kW
+    - { kva: 50, no_load_kw: 0.19, load_kw: 1.10 }
+    - { kva: 100, no_load_kw: 0.32, load_kw: 1.75 }
+    - { kva: 200, no_load_kw: 0.50, load_kw: 2.90 }
+    - { kva: 315, no_load_kw: 0.70, load_kw: 3.90 }
+    - { kva: 500, no_load_kw: 0.95, load_kw: 5.50 }
+    - { kva: 630, no_load_kw: 1.10, load_kw: 6.50 }
+    - { kva: 1000, no_load_kw: 1.50, load_kw: 9.50 }
+  move_radius_m: 150              # how far the search may move the transformer from the marked site
+  max_evaluations: 120            # designs checked per option search
+  spare_ceiling_pct: 20           # without a capex ceiling, "most spare capacity" may cost this much more than the cheapest

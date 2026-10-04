@@ -5,7 +5,8 @@ or nothing can be made larger:
 
 1. a branch over its thermal rating moves up one size;
 2. otherwise, for the worst voltage drop, the branch on the path to it that contributes most (design current ×
-   impedance per size step) moves up one size;
+   impedance per size step) moves up one size, and likewise in the same round for failures on paths that share no
+   branch with one already changed;
 
 and conductors never get smaller towards the transformer (each branch is at least as large as any below it), so a
 feeder tapers outwards as built in practice. Services keep the rules' service conductor.
@@ -33,7 +34,8 @@ class SizingResult(BaseModel):
 
 
 def size_network(network: LvNetwork, rules: RuleSet, construction: Construction, transformer_kva: float | None = None,
-                 site: dict[str, float] | None = None, source: dict[str, float] | None = None) -> SizingResult:
+                 site: dict[str, float] | None = None, source: dict[str, float] | None = None, min_feeder: int = 0) -> SizingResult:
+    """`min_feeder` starts every feeder that many sizes up the list (the option search's "re-size" move)."""
     options = [c.code for c in feeder_options(rules, construction)]
     rank = {code: i for i, code in enumerate(options)}
     cfg = lv_config(rules)
@@ -43,7 +45,7 @@ def size_network(network: LvNetwork, rules: RuleSet, construction: Construction,
     r_of = {o.code: o.r_ohm_per_km for o in feeder_options(rules, construction)}
     net = network.model_copy(deep=True)
     for b in net.branches:
-        b.conductor = service if b.kind == "service" else options[0]
+        b.conductor = service if b.kind == "service" else options[min(max(min_feeder, 0), len(options) - 1)]
         b.construction = construction
     g = net.graph()
     by_id = {b.id: b for b in net.branches}
@@ -90,15 +92,23 @@ def size_network(network: LvNetwork, rules: RuleSet, construction: Construction,
                 b.conductor = service_options[s_rank[b.conductor] + 1]
             changed = True
         else:
-            worst = max((c for c in failing if c.code not in ("thermal", "service_vdrop", "fuse_protection")),
-                        key=lambda c: (c.value / c.limit) if c.code != "min_fault" else (c.limit / max(c.value, 1)), default=None)
-            if worst is not None:
+            # For the worst voltage or fault failure, the branch on its path that gains most moves up a size. Failures on
+            # other feeders, whose paths share no branch with one already changed this round, are treated the same way
+            # in the same round (the outcome is as if they were taken one round each).
+            current = {br.id: br.design_current_a for br in a.branches}
+            touched: set[str] = set()
+            ordered = sorted((c for c in failing if c.code not in ("thermal", "service_vdrop", "fuse_protection")),
+                             key=lambda c: (c.value / c.limit) if c.code != "min_fault" else (c.limit / max(c.value, 1)), reverse=True)
+            for worst in ordered:
                 node = next(cu.node_id for cu in net.customers if cu.id == worst.subject) if worst.code == "supply_vdrop" else worst.subject
-                current = {br.id: br.design_current_a for br in a.branches}
-                candidates = [by_id[i] for i in path_to(node) if by_id[i].kind == "feeder" and rank[by_id[i].conductor] < len(options) - 1]
+                path = path_to(node)
+                if touched.intersection(path):
+                    continue
+                candidates = [by_id[i] for i in path if by_id[i].kind == "feeder" and rank[by_id[i].conductor] < len(options) - 1]
                 if candidates:
                     best = max(candidates, key=lambda b, cur=current: cur[b.id] * b.length_m * (r_of[b.conductor] - r_of[options[rank[b.conductor] + 1]]))
                     best.conductor = options[rank[best.conductor] + 1]
+                    touched.update(path)
                     changed = True
         if not changed:
             return SizingResult(network=net, analysis=a, rounds=rounds, converged=False)

@@ -45,6 +45,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/design/mv-design-page').then((m) => m.MvDesignPage),
       },
       {
+        path: 'projects/:id/options',
+        canActivate: [onlineGuard],
+        loadComponent: () => import('./features/design/options-page').then((m) => m.OptionsPage),
+      },
+      {
         path: 'projects/:id/bulk',
         canActivate: [onlineGuard],
         loadComponent: () => import('./features/design/bulk-supply-page').then((m) => m.BulkSupplyPage),

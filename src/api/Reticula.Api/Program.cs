@@ -55,6 +55,7 @@ builder.Services.AddScoped<DesignInputs>();
 builder.Services.AddJobHandler<LvDesignJob>();
 builder.Services.AddJobHandler<MvDesignJob>();
 builder.Services.AddJobHandler<BulkStudyJob>();
+builder.Services.AddJobHandler<OptionSearchJob>();
 builder.Services.AddScoped<LayoutService>();
 builder.Services.AddHttpClient<OverpassClient>(c =>
 {

@@ -54,6 +54,8 @@ class BuildRequest(BaseModel):
     customers: list[CustomerIn]
     construction: Construction
     roads: list[list[tuple[float, float]]] = []
+    #: Start the phase rotation this many places along (the option search's "re-phase" move).
+    phase_offset: int = 0
 
 
 class BuildIssue(BaseModel):
@@ -208,7 +210,7 @@ def build_network(req: BuildRequest, rules: RuleSet) -> BuildResult:
         if n in want3:
             phase_of[n] = ["R", "W", "B"]
         else:
-            phase_of[n] = [rotation[single % len(rotation)]]
+            phase_of[n] = [rotation[(single + req.phase_offset) % len(rotation)]]
             single += 1
     for c in customers:
         c.phases = phase_of[c.node_id]  # type: ignore[assignment]

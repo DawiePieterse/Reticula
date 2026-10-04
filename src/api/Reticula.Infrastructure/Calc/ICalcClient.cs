@@ -31,6 +31,9 @@ public interface ICalcClient
     /// <summary>Places and sizes transformers and designs each site's LV network and the MV network.</summary>
     Task<JsonElement> DesignMvAsync(object request, CancellationToken ct = default);
 
+    /// <summary>Searches LV designs for one transformer site: lowest capex, lowest lifetime cost, most spare capacity.</summary>
+    Task<JsonElement> OptimiseLvAsync(object request, CancellationToken ct = default);
+
     /// <summary>Load flow, IEC 60909 faults, supply capacity and NMD for an MV design fed from the authority's connection point.</summary>
     Task<JsonElement> StudyBulkAsync(object request, CancellationToken ct = default);
 

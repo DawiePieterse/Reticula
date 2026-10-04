@@ -24,4 +24,5 @@ against the standard.
 | C-04 | ACSR overhead conductors | SANS 182 (2024) | TBD | `conductors` MV-SQUIRREL…MV-HARE | Unverified |
 | C-05 | 11 kV XLPE cables | SANS 97 / SANS 1339 (2024) | TBD | `conductors` MV-XLPE-* | Unverified |
 | B-01 | Bulk supply: MV voltage band, switchgear fault rating, NMD step and margin, source and zero-sequence assumptions | NRS 048-2 (2024), IEC 60909-0 (2016), NRS 034-1 (2024) / authority supply application | TBD | `bulk` | Unverified |
+| O-01 | Transformer losses, residential load factor and loss load factor for lifetime cost | SANS 780 (2024), SANS 1029 (2024); Buller-Woodrow LLF | TBD | `optimisation` | Unverified |
 | R-01 | Indicative installed costs | none (estimate) | n/a | `rates/indicative/2026-10.yaml` | Estimate only |

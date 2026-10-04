@@ -1,0 +1,482 @@
+{
+ "rules": "eskom/0.5.0",
+ "source": [
+  28.1001125,
+  -25.52
+ ],
+ "source_inspected": true,
+ "routes": [
+  {
+   "id": "s1",
+   "coordinates": [
+    [
+     28.1,
+     -25.52
+    ],
+    [
+     28.1045,
+     -25.52
+    ]
+   ]
+  }
+ ],
+ "customers": [
+  {
+   "building_id": "a0",
+   "lon": 28.1001125,
+   "lat": -25.52015,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a0"
+  },
+  {
+   "building_id": "a1",
+   "lon": 28.1001125,
+   "lat": -25.51985,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a1"
+  },
+  {
+   "building_id": "a2",
+   "lon": 28.1003375,
+   "lat": -25.52015,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a2"
+  },
+  {
+   "building_id": "a3",
+   "lon": 28.1003375,
+   "lat": -25.51985,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a3"
+  },
+  {
+   "building_id": "a4",
+   "lon": 28.1005625,
+   "lat": -25.52015,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a4"
+  },
+  {
+   "building_id": "a5",
+   "lon": 28.1005625,
+   "lat": -25.51985,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a5"
+  },
+  {
+   "building_id": "a6",
+   "lon": 28.1007875,
+   "lat": -25.52015,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a6"
+  },
+  {
+   "building_id": "a7",
+   "lon": 28.1007875,
+   "lat": -25.51985,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a7"
+  },
+  {
+   "building_id": "a8",
+   "lon": 28.1010125,
+   "lat": -25.52015,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a8"
+  },
+  {
+   "building_id": "a9",
+   "lon": 28.1010125,
+   "lat": -25.51985,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a9"
+  },
+  {
+   "building_id": "a10",
+   "lon": 28.1012375,
+   "lat": -25.52015,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a10"
+  },
+  {
+   "building_id": "a11",
+   "lon": 28.1012375,
+   "lat": -25.51985,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a11"
+  },
+  {
+   "building_id": "a12",
+   "lon": 28.1014625,
+   "lat": -25.52015,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a12"
+  },
+  {
+   "building_id": "a13",
+   "lon": 28.1014625,
+   "lat": -25.51985,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a13"
+  },
+  {
+   "building_id": "a14",
+   "lon": 28.1016875,
+   "lat": -25.52015,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a14"
+  },
+  {
+   "building_id": "a15",
+   "lon": 28.1016875,
+   "lat": -25.51985,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a15"
+  },
+  {
+   "building_id": "a16",
+   "lon": 28.1019125,
+   "lat": -25.52015,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a16"
+  },
+  {
+   "building_id": "a17",
+   "lon": 28.1019125,
+   "lat": -25.51985,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a17"
+  },
+  {
+   "building_id": "a18",
+   "lon": 28.1021375,
+   "lat": -25.52015,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a18"
+  },
+  {
+   "building_id": "a19",
+   "lon": 28.1021375,
+   "lat": -25.51985,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a19"
+  },
+  {
+   "building_id": "a20",
+   "lon": 28.1023625,
+   "lat": -25.52015,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a20"
+  },
+  {
+   "building_id": "a21",
+   "lon": 28.1023625,
+   "lat": -25.51985,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a21"
+  },
+  {
+   "building_id": "a22",
+   "lon": 28.1025875,
+   "lat": -25.52015,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a22"
+  },
+  {
+   "building_id": "a23",
+   "lon": 28.1025875,
+   "lat": -25.51985,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a23"
+  },
+  {
+   "building_id": "a24",
+   "lon": 28.1028125,
+   "lat": -25.52015,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a24"
+  },
+  {
+   "building_id": "a25",
+   "lon": 28.1028125,
+   "lat": -25.51985,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a25"
+  },
+  {
+   "building_id": "a26",
+   "lon": 28.1030375,
+   "lat": -25.52015,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a26"
+  },
+  {
+   "building_id": "a27",
+   "lon": 28.1030375,
+   "lat": -25.51985,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a27"
+  },
+  {
+   "building_id": "a28",
+   "lon": 28.1032625,
+   "lat": -25.52015,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a28"
+  },
+  {
+   "building_id": "a29",
+   "lon": 28.1032625,
+   "lat": -25.51985,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a29"
+  },
+  {
+   "building_id": "a30",
+   "lon": 28.1034875,
+   "lat": -25.52015,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a30"
+  },
+  {
+   "building_id": "a31",
+   "lon": 28.1034875,
+   "lat": -25.51985,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a31"
+  },
+  {
+   "building_id": "a32",
+   "lon": 28.1037125,
+   "lat": -25.52015,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a32"
+  },
+  {
+   "building_id": "a33",
+   "lon": 28.1037125,
+   "lat": -25.51985,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a33"
+  },
+  {
+   "building_id": "a34",
+   "lon": 28.1039375,
+   "lat": -25.52015,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a34"
+  },
+  {
+   "building_id": "a35",
+   "lon": 28.1039375,
+   "lat": -25.51985,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a35"
+  },
+  {
+   "building_id": "a36",
+   "lon": 28.1041625,
+   "lat": -25.52015,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a36"
+  },
+  {
+   "building_id": "a37",
+   "lon": 28.1041625,
+   "lat": -25.51985,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a37"
+  },
+  {
+   "building_id": "a38",
+   "lon": 28.1043875,
+   "lat": -25.52015,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a38"
+  },
+  {
+   "building_id": "a39",
+   "lon": 28.1043875,
+   "lat": -25.51985,
+   "phases": 1,
+   "kind": "residential",
+   "load_class": "township_area",
+   "special_kva": null,
+   "inspected": true,
+   "erf": "a39"
+  }
+ ],
+ "constructions": [
+  "overhead"
+ ],
+ "objectives": [
+  "capex"
+ ],
+ "capex_ceiling": null,
+ "lifetime": null,
+ "allow_move": true,
+ "move_radius_m": 2000.0,
+ "max_evaluations": 400,
+ "roads": [],
+ "site": null,
+ "area": null,
+ "rates": "indicative/2026-10",
+ "source_fault_mva_max": null,
+ "source_fault_mva_min": null
+}

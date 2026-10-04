@@ -31,7 +31,7 @@ from typing import Any
 
 import networkx as nx
 from pydantic import BaseModel
-from scipy.stats import beta as beta_dist
+from scipy.special import betaincinv
 
 from ..calcs.admd import AdmdInputError, _cfg, _load_class
 from ..rules import RuleSet
@@ -58,7 +58,7 @@ def bounded_beta_quantile(mean: float, var: float, lo: float, hi: float, q: floa
     k = m * (1 - m) / v - 1
     if k <= 0:  # variance at its theoretical maximum: a two-point distribution
         return lo + span * (1.0 if q > 1 - m else 0.0)
-    return lo + span * float(beta_dist.ppf(q, m * k, (1 - m) * k))
+    return lo + span * float(betaincinv(m * k, (1 - m) * k, q))  # the beta quantile, without scipy.stats overhead
 
 
 @dataclass

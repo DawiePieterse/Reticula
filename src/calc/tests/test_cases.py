@@ -15,6 +15,8 @@ from reticula_calc.lv.model import LvNetwork
 from reticula_calc.lv.overhead import check_overhead
 from reticula_calc.mv.network import MvNetwork, analyse_mv, choose_tap
 from reticula_calc.mv.placement import SiteIn, allocate
+from reticula_calc.opt.lifetime import lifetime_cost
+from reticula_calc.opt.search import OptimiseRequest, optimise
 from reticula_calc.rules import load_rules
 
 CASES_DIR = Path(__file__).resolve().parents[3] / "test-cases"
@@ -86,9 +88,22 @@ def _run_bulk(inp: dict) -> dict:
     return out
 
 
+def _run_opt_lifetime(inp: dict) -> dict:
+    r = lifetime_cost(LvNetwork(**inp["network"]), load_rules(inp["rules"]), inp["transformer_kva"], inp["capex"], inp["params"])
+    return {"line_losses_kw": r.line_losses_kw, "transformer_load_losses_kw": r.transformer_load_losses_kw, "annual_losses_kwh": r.annual_losses_kwh,
+            "pv_factor": r.pv_factor, "total": r.total.value}
+
+
+def _run_opt_bench(inp: dict) -> dict:
+    r = optimise(OptimiseRequest(**inp), load_rules(inp["rules"]))
+    o = next(x for x in r.options if x.objective == "capex")
+    return {"capex": o.option.cost.total, "moved_m": o.design.moved_m, "passed": int(o.option.passed)}
+
+
 RUNNERS = {"voltage_drop": _run_voltage_drop, "admd": _run_admd, "admd_group": _run_admd_group, "hb_group": _run_hb_group,
            "lv_vdrop": _run_lv, "lv_fault": _run_lv, "oh_sag": _run_oh_sag, "ug_derating": _run_ug_derating,
-           "mv_sizing": _run_mv_sizing, "mv_vdrop": _run_mv_vdrop, "mv_tap": _run_mv_tap, "bulk_sc": _run_bulk, "bulk_lf": _run_bulk}
+           "mv_sizing": _run_mv_sizing, "mv_vdrop": _run_mv_vdrop, "mv_tap": _run_mv_tap, "bulk_sc": _run_bulk, "bulk_lf": _run_bulk,
+           "opt_lifetime": _run_opt_lifetime, "opt_bench": _run_opt_bench}
 
 
 def _cases():

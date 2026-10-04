@@ -10,6 +10,7 @@ using Reticula.Api.Layout;
 using Reticula.Api.Projects;
 using Reticula.Domain.Auth;
 using Reticula.Infrastructure.Calc;
+using Reticula.Infrastructure.Design;
 using Reticula.Infrastructure.Geo;
 
 namespace Reticula.Api.Tests;
@@ -310,5 +311,47 @@ public class DesignTests(ReticulaApiFactory factory)
         stop = await ctx.Engineer.PostAsJsonAsync(studies, new BulkStudyRequest(null));
         Assert.Equal(HttpStatusCode.BadRequest, stop.StatusCode);
         Assert.Contains("run the MV design again", await stop.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Option_search_is_validated_runs_with_the_field_data_and_summarises_the_options()
+    {
+        var ctx = await SetupAsync(rules: "eskom/0.5.0");
+        var url = $"/api/projects/{ctx.ProjectId}/option-searches";
+        var bad = await ctx.Engineer.PostAsJsonAsync(url, new OptionSearchRequest(Guid.NewGuid(), ["aerial"], ["cheapest"], -1, new LifetimeParameters(0, 50, -1, 30), null, 5000, 0));
+        Assert.Equal(HttpStatusCode.BadRequest, bad.StatusCode);
+        var errors = (await bad.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors");
+        foreach (var key in new[] { "constructions", "objectives", "transformerCandidateId", "capexCeiling", "moveRadiusM", "maxEvaluations",
+                     "lifetime.periodYears", "lifetime.discountRatePct", "lifetime.energyCostPerKwh", "lifetime.loadGrowthPct" })
+            Assert.True(errors.TryGetProperty(key, out _), key);
+
+        (await ctx.Engineer.PutAsJsonAsync($"/api/projects/{ctx.ProjectId}/connection-point", new ConnectionPointRequest(Lon, Lat, 11, 500, 120, null, null, null, null))).EnsureSuccessStatusCode();
+        var r = await ctx.Engineer.PostAsJsonAsync(url, new OptionSearchRequest(ctx.Transformer, null, ["capex", "lifetime"], 900000, new LifetimeParameters(20, null, 2.1, null), false, null, 60));
+        Assert.Equal(HttpStatusCode.Accepted, r.StatusCode);
+        var started = await r.Content.ReadFromJsonAsync<StartedDesign>();
+        Assert.Equal("design.options", started!.Job.Kind);
+        DesignRunDetail? done = null;
+        for (var i = 0; i < 200 && done?.Run.Status is not ("succeeded" or "failed"); i++)
+        {
+            await Task.Delay(100);
+            done = await ctx.Engineer.GetFromJsonAsync<DesignRunDetail>($"{url}/{started.Run.Id}");
+        }
+        Assert.Equal("succeeded", done!.Run.Status);
+        Assert.True(done.Run.Passed);
+        var summary = done.Run.Summary!.Value;
+        Assert.Equal(42, summary.GetProperty("evaluations").GetInt32());
+        Assert.Equal("underground", summary.GetProperty("options")[1].GetProperty("construction").GetString());
+
+        var sent = factory.Calc.LastOptionSearch!.Value;
+        Assert.Equal("eskom/0.5.0", sent.GetProperty("rules").GetString());
+        Assert.Equal(["overhead", "underground"], sent.GetProperty("constructions").EnumerateArray().Select(x => x.GetString()));
+        Assert.Equal(["capex", "lifetime"], sent.GetProperty("objectives").EnumerateArray().Select(x => x.GetString()));
+        Assert.Equal(900000, sent.GetProperty("capex_ceiling").GetDouble());
+        Assert.False(sent.GetProperty("allow_move").GetBoolean());
+        Assert.Equal(20, sent.GetProperty("lifetime").GetProperty("period_years").GetInt32());
+        Assert.Equal(JsonValueKind.Null, sent.GetProperty("lifetime").GetProperty("discount_rate_pct").ValueKind);
+        Assert.Equal(3, sent.GetProperty("customers").GetArrayLength());
+        Assert.Equal(120, sent.GetProperty("source_fault_mva_max").GetDouble());
+        Assert.Single((await ctx.Engineer.GetFromJsonAsync<List<DesignRunDto>>(url))!);
     }
 }

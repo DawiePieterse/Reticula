@@ -21,16 +21,16 @@ conductor_per_m:          # supply and install, per metre of route
   SC-10CU: 95
   SC-16CU: 125
   SC-25CU: 170
-pole_each:
-  WP-7-140: 3800
-  WP-9-160: 5200
-  WP-9-180: 6100
-  WP-11-180: 7600
-stay_each: 1900
+pole_each:                # erected LV pole assemblies (plan 5.1): see assemblies below
+  WP-7-140: { assembly: OH-POLE-7-140 }
+  WP-9-160: { assembly: OH-POLE-9-160 }
+  WP-9-180: { assembly: OH-POLE-9-180 }
+  WP-11-180: { assembly: OH-POLE-11-180 }
+stay_each: { assembly: OH-STAY }
 trench_per_m: 420         # excavate, bed, backfill, reinstate (soft ground)
-kiosk_each: 18500
-service_overhead_each: 650    # fittings, meter box connection
-service_underground_each: 1400
+kiosk_each: { assembly: UG-KIOSK }
+service_overhead_each: { assembly: OH-SERVICE }      # fittings, meter box connection
+service_underground_each: { assembly: UG-SERVICE }
 transformer_each:
   "50": 95000
   "100": 128000
@@ -57,3 +57,41 @@ minisub_each:
   "630": 640000
   "1000": 860000
 mv_pole_per_km: 92000     # MV poles, stays and hardware per km of overhead line
+
+# Material library (plan 5.1): supply prices per unit. Assemblies are built from materials and labour.
+materials:
+  POLE-7-140: { description: "Wood pole 7 m, 140 mm top (SANS 754)", unit: each, rate: 2100 }
+  POLE-9-160: { description: "Wood pole 9 m, 160 mm top (SANS 754)", unit: each, rate: 3300 }
+  POLE-9-180: { description: "Wood pole 9 m, 180 mm top (SANS 754)", unit: each, rate: 4100 }
+  POLE-11-180: { description: "Wood pole 11 m, 180 mm top (SANS 754)", unit: each, rate: 5400 }
+  LV-POLE-HW: { description: "LV ABC pole hardware set (suspension or strain, bolts)", unit: set, rate: 700 }
+  STAY-SET: { description: "Stay set (rod, wire, anchor, insulator)", unit: set, rate: 1100 }
+  KIOSK-LV: { description: "LV distribution kiosk, 6-way", unit: each, rate: 14000 }
+  KIOSK-PLINTH: { description: "Kiosk concrete plinth", unit: each, rate: 2000 }
+  SVC-OH-FIT: { description: "Overhead service fittings and meter-box connection", unit: set, rate: 350 }
+  SVC-UG-TERM: { description: "Underground service termination kit", unit: set, rate: 800 }
+  LAB-POLE-7: { description: "Labour: plant and dress 7 m pole", unit: each, rate: 1000 }
+  LAB-POLE-9: { description: "Labour: plant and dress 9 m pole", unit: each, rate: 1200 }
+  LAB-POLE-9H: { description: "Labour: plant and dress 9 m heavy pole", unit: each, rate: 1300 }
+  LAB-POLE-11: { description: "Labour: plant and dress 11 m pole", unit: each, rate: 1500 }
+  LAB-STAY: { description: "Labour: install stay", unit: each, rate: 800 }
+  LAB-KIOSK: { description: "Labour: install and connect kiosk", unit: each, rate: 2500 }
+  LAB-SVC-OH: { description: "Labour: overhead service connection", unit: each, rate: 300 }
+  LAB-SVC-UG: { description: "Labour: underground service connection", unit: each, rate: 600 }
+assemblies:
+  OH-POLE-7-140: { description: "LV pole 7 m erected and dressed", components: [{ material: POLE-7-140, qty: 1 }, { material: LV-POLE-HW, qty: 1 }, { material: LAB-POLE-7, qty: 1 }] }
+  OH-POLE-9-160: { description: "LV pole 9 m erected and dressed", components: [{ material: POLE-9-160, qty: 1 }, { material: LV-POLE-HW, qty: 1 }, { material: LAB-POLE-9, qty: 1 }] }
+  OH-POLE-9-180: { description: "LV pole 9 m heavy erected and dressed", components: [{ material: POLE-9-180, qty: 1 }, { material: LV-POLE-HW, qty: 1 }, { material: LAB-POLE-9H, qty: 1 }] }
+  OH-POLE-11-180: { description: "LV pole 11 m erected and dressed", components: [{ material: POLE-11-180, qty: 1 }, { material: LV-POLE-HW, qty: 1 }, { material: LAB-POLE-11, qty: 1 }] }
+  OH-STAY: { description: "Stay installed", components: [{ material: STAY-SET, qty: 1 }, { material: LAB-STAY, qty: 1 }] }
+  UG-KIOSK: { description: "Distribution kiosk on plinth, connected", components: [{ material: KIOSK-LV, qty: 1 }, { material: KIOSK-PLINTH, qty: 1 }, { material: LAB-KIOSK, qty: 1 }] }
+  OH-SERVICE: { description: "Overhead service connection", components: [{ material: SVC-OH-FIT, qty: 1 }, { material: LAB-SVC-OH, qty: 1 }] }
+  UG-SERVICE: { description: "Underground service connection", components: [{ material: SVC-UG-TERM, qty: 1 }, { material: LAB-SVC-UG, qty: 1 }] }
+
+# Lifetime cost defaults (plan 5.1); a run may override them.
+lifetime:
+  period_years: 25
+  discount_rate_pct: 8          # real discount rate
+  energy_cost_per_kwh: 1.85     # cost of losses, R/kWh
+  load_growth_pct: 0            # annual growth of peak demand after year 1 (the NRS 034 15-year ADMD already includes growth)
+uncertainty_pct: 15             # rate uncertainty band: options closer than this are "too close to call"

@@ -20,6 +20,7 @@ import { ProjectsApi } from './projects.api';
           <a class="button primary" [routerLink]="['/projects', projectId, 'field']">Field inspection</a>
           <a class="button" [routerLink]="['/projects', projectId, 'loads']">Loads</a>
           <a class="button" [routerLink]="['/projects', projectId, 'lv']">LV design</a>
+          <a class="button" [routerLink]="['/projects', projectId, 'options']">Options</a>
           <a class="button" [routerLink]="['/projects', projectId, 'mv']">MV design</a>
           <a class="button" [routerLink]="['/projects', projectId, 'bulk']">Bulk supply</a>
         }

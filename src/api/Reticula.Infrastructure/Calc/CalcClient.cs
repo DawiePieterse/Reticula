@@ -77,6 +77,13 @@ public sealed class CalcClient(HttpClient http) : ICalcClient
         return await ReadAsync<JsonElement>(r, ct);
     }
 
+    public async Task<JsonElement> OptimiseLvAsync(object request, CancellationToken ct = default)
+    {
+        using var content = JsonContent.Create(request, options: Json);
+        using var r = await SendAsync(() => http.PostAsync("/calc/lv/optimise", content, ct), ct);
+        return await ReadAsync<JsonElement>(r, ct);
+    }
+
     public async Task<JsonElement> StudyBulkAsync(object request, CancellationToken ct = default)
     {
         using var content = JsonContent.Create(request, options: Json);
@@ -149,8 +156,8 @@ public static class CalcServiceCollectionExtensions
         services.AddHttpClient<ICalcClient, CalcClient>(c =>
         {
             c.BaseAddress = new Uri(baseUrl);
-            // Imports of large layouts can take a while; health checks pass their own short token.
-            c.Timeout = TimeSpan.FromSeconds(120);
+            // Imports of large layouts and option searches (background jobs) take a while; health checks pass their own short token.
+            c.Timeout = TimeSpan.FromMinutes(15);
         });
         return services;
     }

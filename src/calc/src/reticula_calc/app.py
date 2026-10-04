@@ -26,6 +26,7 @@ from .geo.predict import PredictRequest, PredictResponse, predict
 from .logging_setup import configure_logging, log_requests
 from .lv.design import LvDesignRequest, LvDesignResult, design_lv
 from .mv.design import MvDesignRequest, MvDesignResult, design_mv
+from .opt.search import OptimiseRequest, OptimiseResult, optimise
 from .rules import RulesError, list_rules, load_rules
 
 configure_logging()
@@ -133,6 +134,14 @@ def mv_design(req: MvDesignRequest) -> MvDesignResult:
         rules = load_rules(req.rules)
         return design_mv(req, rules)
     except (RulesError, AdmdInputError, ValueError) as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+@app.post("/calc/lv/optimise")
+def lv_optimise(req: OptimiseRequest) -> OptimiseResult:
+    try:
+        return optimise(req, load_rules(req.rules))
+    except (RulesError, AdmdInputError, ValueError, FileNotFoundError) as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
 

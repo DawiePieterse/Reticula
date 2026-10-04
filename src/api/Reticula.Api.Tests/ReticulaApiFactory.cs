@@ -165,6 +165,18 @@ public sealed class FakeCalc : ICalcClient
             "\"mv_network\":{\"supply_id\":\"SUPPLY\",\"nodes\":[],\"branches\":[]}}").RootElement.Clone());
     }
 
+    public JsonElement? LastOptionSearch { get; private set; }
+
+    public Task<JsonElement> OptimiseLvAsync(object request, CancellationToken ct = default)
+    {
+        Throw();
+        LastOptionSearch = JsonSerializer.SerializeToElement(request, new JsonSerializerOptions(JsonSerializerDefaults.Web) { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower });
+        return Task.FromResult(JsonDocument.Parse(
+            "{\"rules\":\"eskom/0.5.0\",\"rules_hash\":\"5555555555555555\",\"evaluations\":42,\"options\":[" +
+            "{\"objective\":\"capex\",\"design\":{\"construction\":\"overhead\"},\"option\":{\"passed\":true,\"cost\":{\"total\":1000}},\"lifetime\":{\"total\":{\"value\":1500}}}," +
+            "{\"objective\":\"lifetime\",\"design\":{\"construction\":\"underground\"},\"option\":{\"passed\":true,\"cost\":{\"total\":1200}},\"lifetime\":{\"total\":{\"value\":1400}}}]}").RootElement.Clone());
+    }
+
     public JsonElement? LastBulkStudy { get; private set; }
 
     public Task<JsonElement> StudyBulkAsync(object request, CancellationToken ct = default)

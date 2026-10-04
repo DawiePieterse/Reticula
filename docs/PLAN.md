@@ -140,12 +140,12 @@ Deliverables: LV layout, phasing, conductor sizing, voltage drop, fault level, O
 
 ### Phase 5 – Optimisation and comparison
 
-- [ ] 5.1 Cost model: material library, assemblies, estimated dated rates, losses cost, lifetime NPV (period, discount rate, energy cost, growth).
-- [ ] 5.2 Objective runners: lowest capex, lowest lifetime cost, most spare capacity under ceiling.
-- [ ] 5.3 Heuristic engine: constructive placement + local search (move transformer, re-route, re-size, re-phase, OH/UG flip); every candidate re-checked against all rules.
-- [ ] 5.4 Compare view: three options side by side; "too close to call" flag using rate uncertainty band.
-- [ ] 5.5 Run parameter UI and run history.
-- [ ] 5.6 Validation: small benchmark networks with known optimum.
+- [x] 5.1 Cost model: material library, assemblies, estimated dated rates, losses cost, lifetime NPV (period, discount rate, energy cost, growth). (docs/optimisation.md; rules eskom/0.5.0.)
+- [x] 5.2 Objective runners: lowest capex, lowest lifetime cost, most spare capacity under ceiling.
+- [x] 5.3 Heuristic engine: constructive placement + local search (move transformer, re-route, re-size, re-phase, OH/UG flip); every candidate re-checked against all rules. (Per transformer site; multi-site MV-level search later.)
+- [x] 5.4 Compare view: three options side by side; "too close to call" flag using rate uncertainty band.
+- [x] 5.5 Run parameter UI and run history.
+- [x] 5.6 Validation: small benchmark networks with known optimum. (test-cases/opt_bench, opt_lifetime.)
 
 ### Phase 6 – Documents
 
@@ -214,7 +214,7 @@ F. **Performance targets.** Field UI usable on mid-range Android tablet; 2,000-s
 - [x] Phase 2 LV design – checks pass on validation cases (engine values pending verification against the standards)
 - [x] Phase 3 MV network – checks pass on validation cases (engine values pending verification against the standards)
 - [x] Phase 4 Bulk supply – load flow and IEC 60909 validated (against hand-worked cases; authority sample pending)
-- [ ] Phase 5 Optimisation – three options + compare view
+- [x] Phase 5 Optimisation – three options + compare view
 - [ ] Phase 6 Documents – one-step full document set
 - [ ] Phase 7 Review and sign-off – revision, audit, export
 - [ ] Phase 8 Design assistant – flagged, optional, tested

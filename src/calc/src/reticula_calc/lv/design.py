@@ -9,7 +9,7 @@ from shapely.geometry import LineString, shape
 
 from ..rules import RuleSet
 from .analysis import Analysis, Check
-from .build import BuildIssue, BuildRequest, CustomerIn, RouteIn, build_network
+from .build import BuildIssue, BuildRequest, BuildResult, CustomerIn, RouteIn, build_network
 from .costs import CostEstimate, estimate
 from .library import Construction
 from .model import LvNetwork
@@ -70,6 +70,30 @@ class LvDesignResult(BaseModel):
     unverified: list[str]
 
 
+def design_option(built: BuildResult, construction: Construction, rules: RuleSet, transformer_kva: float | None, site: dict[str, float] | None,
+                  source: dict[str, float] | None, rates: str, min_feeder: int = 0) -> tuple[OptionResult, set[str]]:
+    """Size, check and cost one laid-out network; returns the option and the unverified rules sections it used."""
+    unverified: set[str] = set()
+    # A layout error (a building that cannot be connected) fails the design like any check.
+    layout_checks = [Check(code=i.code, subject=sample, passed=False, value=1, limit=0, unit="", message=i.message, clause="")
+                     for i in built.issues if i.severity == "error" for sample in (i.samples or ["network"])]
+    sized = size_network(built.network, rules, construction, transformer_kva, site, source, min_feeder)
+    net = sized.network
+    checks: list[Check] = [*layout_checks, *sized.analysis.checks]
+    oh = None
+    if construction == "overhead":
+        oh = check_overhead(net, rules)
+        checks += oh.checks
+        if rules.data["overhead"].get("status") == "unverified":
+            unverified.add("overhead rules")
+    unverified.update(sized.analysis.unverified)
+    cost = estimate(net, sized.analysis.transformer_kva, rates)
+    failed = [c for c in checks if not c.passed]
+    analysis = sized.analysis.model_copy(update={"checks": checks})
+    return OptionResult(construction=construction, network=net, analysis=analysis, overhead=oh, cost=cost, converged=sized.converged,
+                        passed=not failed, failed_checks=len(failed)), unverified
+
+
 def design_lv(req: LvDesignRequest, rules: RuleSet) -> LvDesignResult:
     issues: list[BuildIssue] = []
     if not req.source_inspected:
@@ -77,31 +101,15 @@ def design_lv(req: LvDesignRequest, rules: RuleSet) -> LvDesignResult:
                                  message="The transformer is not at a site marked during the field visit."))
     options: list[OptionResult] = []
     unverified: set[str] = set()
+    source = {"fault_mva_max": req.source_fault_mva_max, "fault_mva_min": req.source_fault_mva_min} if req.source_fault_mva_max else None
     for construction in dict.fromkeys(req.constructions):
         built = build_network(BuildRequest(source=req.source, routes=req.routes, customers=req.customers,
                                            construction=construction, roads=req.roads), rules)
         if not options:
             issues += built.issues
-        # A layout error (a building that cannot be connected) fails the design like any check.
-        layout_checks = [Check(code=i.code, subject=sample, passed=False, value=1, limit=0, unit="",
-                               message=i.message, clause="")
-                         for i in built.issues if i.severity == "error" for sample in (i.samples or ["network"])]
-        source = {"fault_mva_max": req.source_fault_mva_max, "fault_mva_min": req.source_fault_mva_min} if req.source_fault_mva_max else None
-        sized = size_network(built.network, rules, construction, req.transformer_kva, req.site, source)
-        net = sized.network
-        checks: list[Check] = [*layout_checks, *sized.analysis.checks]
-        oh = None
-        if construction == "overhead":
-            oh = check_overhead(net, rules)
-            checks += oh.checks
-            if rules.data["overhead"].get("status") == "unverified":
-                unverified.add("overhead rules")
-        unverified.update(sized.analysis.unverified)
-        cost = estimate(net, sized.analysis.transformer_kva, req.rates)
-        failed = [c for c in checks if not c.passed]
-        analysis = sized.analysis.model_copy(update={"checks": checks})
-        options.append(OptionResult(construction=construction, network=net, analysis=analysis, overhead=oh, cost=cost,
-                                    converged=sized.converged, passed=not failed, failed_checks=len(failed)))
+        option, used = design_option(built, construction, rules, req.transformer_kva, req.site, source, req.rates)
+        unverified.update(used)
+        options.append(option)
 
     if req.area and options:
         area = shape(req.area)
