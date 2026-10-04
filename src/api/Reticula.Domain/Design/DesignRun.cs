@@ -71,4 +71,5 @@ public sealed class DesignRun
 public static class DesignKinds
 {
     public const string Lv = "lv";
+    public const string Mv = "mv";
 }

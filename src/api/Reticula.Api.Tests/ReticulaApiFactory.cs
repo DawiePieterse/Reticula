@@ -152,6 +152,16 @@ public sealed class FakeCalc : ICalcClient
         return Task.FromResult(OnDesignLv(json));
     }
 
+    public JsonElement? LastMvDesign { get; private set; }
+
+    public Task<JsonElement> DesignMvAsync(object request, CancellationToken ct = default)
+    {
+        Throw();
+        LastMvDesign = JsonSerializer.SerializeToElement(request, new JsonSerializerOptions(JsonSerializerDefaults.Web) { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower });
+        return Task.FromResult(JsonDocument.Parse(
+            "{\"rules\":\"eskom/0.4.0\",\"rules_hash\":\"0011223344556677\",\"passed\":true,\"issues\":[],\"sites\":[{}],\"checks\":[{\"passed\":true}],\"cost_total\":5000,\"unverified\":[]}").RootElement.Clone());
+    }
+
     public Task<JsonElement> GetAdmdFormAsync(string rulesRef, CancellationToken ct = default) =>
         Task.FromResult(JsonDocument.Parse("{\"indicators\":[{\"key\":\"dwelling\",\"options\":[\"rdp\",\"brick_small\"]}],\"special_loads\":{\"school\":25}}").RootElement.Clone());
 

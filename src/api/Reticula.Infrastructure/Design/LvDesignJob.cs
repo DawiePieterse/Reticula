@@ -20,7 +20,7 @@ public sealed record LvDesignParameters(Guid TransformerCandidateId, IReadOnlyLi
 /// with its load and connection phases and the imported roads, sends them to the calc service, and stores the result
 /// on the design run.
 /// </summary>
-public sealed class LvDesignJob(ReticulaDbContext db, ICalcClient calc, TimeProvider time) : IJobHandler
+public sealed class LvDesignJob(ReticulaDbContext db, ICalcClient calc, DesignInputs inputs, TimeProvider time) : IJobHandler
 {
     public const string JobKind = "design.lv";
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
@@ -67,44 +67,20 @@ public sealed class LvDesignJob(ReticulaDbContext db, ICalcClient calc, TimeProv
         var site = await db.Candidates.AsNoTracking().FirstOrDefaultAsync(c => c.Id == p.TransformerCandidateId && c.ProjectId == run.ProjectId
             && c.ArchivedAt == null && (c.Kind == CandidateKinds.Transformer || c.Kind == CandidateKinds.MiniSub), ct)
             ?? throw new InvalidOperationException("The transformer site is not a transformer or mini-sub candidate of this project.");
-        var routes = await db.Candidates.AsNoTracking()
-            .Where(c => c.ProjectId == run.ProjectId && c.ArchivedAt == null && c.Kind == CandidateKinds.LvRoute).ToListAsync(ct);
+        var routes = await inputs.RoutesAsync(run.ProjectId, CandidateKinds.LvRoute, ct);
         if (routes.Count == 0) throw new InvalidOperationException("Mark at least one LV route on the field screen before designing.");
-
-        var rows = await (
-            from b in db.Buildings.AsNoTracking()
-            where b.ProjectId == run.ProjectId && b.Status != BuildingStatus.NotPresent
-            join l in db.LoadPoints.AsNoTracking() on b.Id equals l.BuildingId into lps
-            from l in lps.DefaultIfEmpty()
-            join s in db.Stands.AsNoTracking() on b.StandId equals s.Id into stands
-            from s in stands.DefaultIfEmpty()
-            select new { b, l, Erf = s == null ? null : s.ErfNumber }).ToListAsync(ct);
-        var missing = rows.Where(x => x.l is null).Select(x => x.Erf ?? x.b.Id.ToString()).ToList();
-        if (missing.Count > 0)
-            throw new InvalidOperationException($"{missing.Count} buildings have no load recorded (e.g. {string.Join(", ", missing.Take(5))}); record them first.");
-
-        var roads = await db.MapFeatures.AsNoTracking().Where(m => m.ProjectId == run.ProjectId && m.Layer == MapLayers.Roads).Select(m => m.Geometry).ToListAsync(ct);
+        var customers = await inputs.CustomersAsync(run.ProjectId, ct);
+        var roads = await inputs.RoadsAsync(run.ProjectId, ct);
         var sitePoint = (Point)site.Geometry;
         return new
         {
             Rules = project.RulesRef,
             Source = new[] { sitePoint.X, sitePoint.Y },
             SourceInspected = true,
-            Routes = routes.Select(r => new { Id = r.Id.ToString(), Coordinates = ((LineString)r.Geometry).Coordinates.Select(c => new[] { c.X, c.Y }) }),
-            Customers = rows.Select(x => new
-            {
-                BuildingId = x.b.Id.ToString(),
-                Lon = x.b.Location.X,
-                Lat = x.b.Location.Y,
-                Phases = x.l!.Kind == LoadKinds.Residential ? x.l.Phases : 1,
-                Kind = x.l.Kind,
-                LoadClass = x.l.Kind == LoadKinds.Residential ? x.l.Category : null,
-                SpecialKva = x.l.Kind == LoadKinds.Special ? x.l.Kva : (double?)null,
-                Inspected = x.b.Status is BuildingStatus.Confirmed or BuildingStatus.New,
-                Erf = x.Erf,
-            }),
+            Routes = routes,
+            Customers = customers,
             Constructions = p.Constructions,
-            Roads = roads.OfType<LineString>().Select(l => l.Coordinates.Select(c => new[] { c.X, c.Y })),
+            Roads = roads,
             TransformerKva = p.TransformerKva,
             p.Site,
             Area = PolygonDto.From(project.Area),

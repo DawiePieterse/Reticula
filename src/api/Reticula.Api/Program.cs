@@ -51,7 +51,9 @@ builder.Services.AddSingleton<IJobNotifier, SignalRJobNotifier>();
 builder.Services.AddReticulaJobs();
 builder.Services.AddJobHandler<DiagnosticsJob>();
 builder.Services.AddTilePacks();
+builder.Services.AddScoped<DesignInputs>();
 builder.Services.AddJobHandler<LvDesignJob>();
+builder.Services.AddJobHandler<MvDesignJob>();
 builder.Services.AddScoped<LayoutService>();
 builder.Services.AddHttpClient<OverpassClient>(c =>
 {

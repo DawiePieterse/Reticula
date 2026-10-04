@@ -28,6 +28,9 @@ public interface ICalcClient
     /// <exception cref="CalcRejectedException">The input cannot be designed (rules without LV data, no routes, missing loads).</exception>
     Task<JsonElement> DesignLvAsync(object request, CancellationToken ct = default);
 
+    /// <summary>Places and sizes transformers and designs each site's LV network and the MV network.</summary>
+    Task<JsonElement> DesignMvAsync(object request, CancellationToken ct = default);
+
     /// <exception cref="CalcRejectedException">Unknown option, bad number or missing rules section.</exception>
     Task<AdmdEstimate> EstimateAdmdAsync(AdmdEstimateRequest request, CancellationToken ct = default);
 

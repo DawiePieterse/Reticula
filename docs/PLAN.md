@@ -122,12 +122,12 @@ Deliverables: LV layout, phasing, conductor sizing, voltage drop, fault level, O
 
 ### Phase 3 – MV network
 
-- [ ] 3.1 Transformer placement from candidates; sizing to SANS 780/1019 standard ratings with growth allowance.
-- [ ] 3.2 Mini-sub vs pole-mount selection per rules.
-- [ ] 3.3 MV routing along candidate routes; MV cable/conductor library (SANS 97, OH).
-- [ ] 3.4 MV loading and voltage checks; transformer tap setting.
-- [ ] 3.5 MV results UI and checks table.
-- [ ] 3.6 Validation: hand-worked transformer sizing and MV voltage cases.
+- [x] 3.1 Transformer placement from candidates; sizing to SANS 780/1019 standard ratings with growth allowance. (Nearest site along the LV routes; Herman-Beta demand to SANS 780/1029 ratings; docs/mv-design.md.)
+- [x] 3.2 Mini-sub vs pole-mount selection per rules. (Pole-mount when overhead LV and within pole_mount_max_kva, else mini-sub; reason shown.)
+- [x] 3.3 MV routing along candidate routes; MV cable/conductor library (SANS 97, OH). (Radial on the MV routes from the connection point or stated assumption; ACSR and 11 kV XLPE library, unverified.)
+- [x] 3.4 MV loading and voltage checks; transformer tap setting. (Herman-Beta MV loading with diversity, voltage drop, sizing, per-site LV design, tap against NRS 048-2 band.)
+- [x] 3.5 MV results UI and checks table. (Project → MV design: map, transformer table, MV branches, checks with clauses, cost.)
+- [x] 3.6 Validation: hand-worked transformer sizing and MV voltage cases. (test-cases/mv_sizing, mv_vdrop, mv_tap.)
 
 ### Phase 4 – Bulk supply
 
@@ -212,7 +212,7 @@ F. **Performance targets.** Field UI usable on mid-range Android tablet; 2,000-s
 ### Build
 - [ ] Phase 1 Field capture – usable offline on tablet
 - [x] Phase 2 LV design – checks pass on validation cases (engine values pending verification against the standards)
-- [ ] Phase 3 MV network – checks pass on validation cases
+- [x] Phase 3 MV network – checks pass on validation cases (engine values pending verification against the standards)
 - [ ] Phase 4 Bulk supply – load flow and IEC 60909 validated
 - [ ] Phase 5 Optimisation – three options + compare view
 - [ ] Phase 6 Documents – one-step full document set

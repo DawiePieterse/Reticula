@@ -27,11 +27,11 @@ public class DesignTests(ReticulaApiFactory factory)
 
     private sealed record Ctx(HttpClient Engineer, Guid ProjectId, List<Guid> Buildings, Guid Transformer);
 
-    private async Task<Ctx> SetupAsync(bool loads = true)
+    private async Task<Ctx> SetupAsync(bool loads = true, string rules = "eskom/0.3.0")
     {
-        factory.Calc.Rules.Add("eskom/0.3.0");
+        factory.Calc.Rules.Add(rules);
         var client = await factory.EngineerClientAsync();
-        var p = await (await client.PostAsJsonAsync("/api/projects", new SaveProjectRequest($"Design {Guid.NewGuid():N}", "eskom/0.3.0", Square(28.09, -25.53, 0.03), null)))
+        var p = await (await client.PostAsJsonAsync("/api/projects", new SaveProjectRequest($"Design {Guid.NewGuid():N}", rules, Square(28.09, -25.53, 0.03), null)))
             .Content.ReadFromJsonAsync<ProjectDto>();
         factory.Calc.OnImport = r => new CalcImportResult(r.Kind, "kml", "WGS84", "test",
             [new CalcFeature("s1", Square(Lon, Lat, 0.001), 5000, "7001", "Residential 1", null, [], [])], [], []);
@@ -149,6 +149,76 @@ public class DesignTests(ReticulaApiFactory factory)
         await ctx.Engineer.GetAsync($"/api/projects/{ctx.ProjectId}/load-schedule");
         Assert.Contains(factory.Calc.LastGroupLoads, l => l.Phases == 3);
         var bad = await ctx.Engineer.PutAsJsonAsync($"/api/projects/{ctx.ProjectId}/buildings/{ctx.Buildings[1]}/load", new LoadRequest("residential", [], null, null, null, null, null, 2));
+        Assert.Equal(HttpStatusCode.BadRequest, bad.StatusCode);
+    }
+
+    private static async Task<DesignRunDetail> WaitMvAsync(HttpClient client, Guid projectId, Guid runId)
+    {
+        for (var i = 0; i < 200; i++)
+        {
+            var d = await client.GetFromJsonAsync<DesignRunDetail>($"/api/projects/{projectId}/mv-designs/{runId}");
+            if (d!.Run.Status is "succeeded" or "failed") return d;
+            await Task.Delay(100);
+        }
+        throw new TimeoutException();
+    }
+
+    private static async Task AddMvRouteAsync(HttpClient client, Guid projectId)
+    {
+        var line = new GeometryInput("LineString", JsonSerializer.SerializeToElement(new[] { new[] { Lon - 0.005, Lat + 0.002 }, new[] { Lon, Lat + 0.0001 } }));
+        (await client.PutAsJsonAsync($"/api/projects/{projectId}/candidates/{Guid.NewGuid()}", new CandidateRequest("mv_route", line, null, null, null, null))).EnsureSuccessStatusCode();
+    }
+
+    [Fact]
+    public async Task Mv_design_uses_the_authority_connection_point_when_one_is_imported()
+    {
+        var ctx = await SetupAsync(rules: "eskom/0.4.0");
+        await AddMvRouteAsync(ctx.Engineer, ctx.ProjectId);
+        var attrs = new Dictionary<string, JsonElement> { ["asset_type"] = JsonSerializer.SerializeToElement("connection_point") };
+        factory.Calc.OnImport = r => new CalcImportResult(r.Kind, "geojson", "WGS84", "test",
+            [new CalcFeature("CP-1", Point(Lon - 0.005, Lat + 0.002), 0, null, null, null, [], attrs, 0, "Mabopane CP", "connection_point")], [], []);
+        await UploadAsync(ctx.Engineer, ctx.ProjectId, "network");
+
+        var r = await ctx.Engineer.PostAsJsonAsync($"/api/projects/{ctx.ProjectId}/mv-designs", new MvDesignRequest(null, "overhead", "overhead", null));
+        Assert.Equal(HttpStatusCode.Accepted, r.StatusCode);
+        var started = await r.Content.ReadFromJsonAsync<StartedDesign>();
+        Assert.Equal("design.mv", started!.Job.Kind);
+        var done = await WaitMvAsync(ctx.Engineer, ctx.ProjectId, started.Run.Id);
+        Assert.Equal("succeeded", done.Run.Status);
+        Assert.True(done.Run.Passed);
+
+        var sent = factory.Calc.LastMvDesign!.Value;
+        Assert.Equal("eskom/0.4.0", sent.GetProperty("rules").GetString());
+        Assert.Equal(Lon - 0.005, sent.GetProperty("supply")[0].GetDouble(), 9);
+        Assert.Contains("Mabopane CP", sent.GetProperty("supply_note").GetString());
+        Assert.Equal(1, sent.GetProperty("sites").GetArrayLength());
+        Assert.Equal("transformer", sent.GetProperty("sites")[0].GetProperty("kind").GetString());
+        Assert.Equal(1, sent.GetProperty("mv_routes").GetArrayLength());
+        Assert.Equal(3, sent.GetProperty("customers").GetArrayLength());
+        Assert.Single((await ctx.Engineer.GetFromJsonAsync<List<DesignRunDto>>($"/api/projects/{ctx.ProjectId}/mv-designs"))!);
+        Assert.Empty((await ctx.Engineer.GetFromJsonAsync<List<DesignRunDto>>($"/api/projects/{ctx.ProjectId}/lv-designs"))!);
+    }
+
+    [Fact]
+    public async Task Mv_design_without_an_mv_route_fails_and_a_given_supply_point_is_used_as_is()
+    {
+        var ctx = await SetupAsync(rules: "eskom/0.4.0");
+        var started = await (await ctx.Engineer.PostAsJsonAsync($"/api/projects/{ctx.ProjectId}/mv-designs", new MvDesignRequest(null, null, null, null)))
+            .Content.ReadFromJsonAsync<StartedDesign>();
+        var failed = await WaitMvAsync(ctx.Engineer, ctx.ProjectId, started!.Run.Id);
+        Assert.Equal("failed", failed.Run.Status);
+        Assert.Contains("MV route", failed.Run.Error);
+
+        await AddMvRouteAsync(ctx.Engineer, ctx.ProjectId);
+        started = await (await ctx.Engineer.PostAsJsonAsync($"/api/projects/{ctx.ProjectId}/mv-designs", new MvDesignRequest([ctx.Transformer], "underground", "underground", [28.08, -25.51])))
+            .Content.ReadFromJsonAsync<StartedDesign>();
+        Assert.Equal("succeeded", (await WaitMvAsync(ctx.Engineer, ctx.ProjectId, started!.Run.Id)).Run.Status);
+        var sent = factory.Calc.LastMvDesign!.Value;
+        Assert.Equal(28.08, sent.GetProperty("supply")[0].GetDouble());
+        Assert.Equal(JsonValueKind.Null, sent.GetProperty("supply_note").ValueKind);
+        Assert.Equal("underground", sent.GetProperty("lv_construction").GetString());
+
+        var bad = await ctx.Engineer.PostAsJsonAsync($"/api/projects/{ctx.ProjectId}/mv-designs", new MvDesignRequest([Guid.NewGuid()], "aerial", null, [1]));
         Assert.Equal(HttpStatusCode.BadRequest, bad.StatusCode);
     }
 }
