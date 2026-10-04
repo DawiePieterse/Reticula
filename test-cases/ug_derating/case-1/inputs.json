@@ -1,0 +1,10 @@
+{
+ "rules": "eskom/0.3.0",
+ "conductor": "CU-PVC-70",
+ "site": {
+  "soil_resistivity_kmw": 2.0,
+  "depth_m": 1.0,
+  "ground_temp_c": 30,
+  "circuits_in_trench": 2
+ }
+}

@@ -1,0 +1,144 @@
+{
+ "rules": "eskom/0.3.0",
+ "network": {
+  "source_id": "S",
+  "nodes": [
+   {
+    "id": "S",
+    "kind": "source",
+    "lon": 28.1,
+    "lat": -25.52
+   },
+   {
+    "id": "A",
+    "kind": "pole",
+    "lon": 28.101,
+    "lat": -25.52
+   }
+  ],
+  "branches": [
+   {
+    "id": "B1",
+    "from_id": "S",
+    "to_id": "A",
+    "kind": "feeder",
+    "construction": "overhead",
+    "conductor": "ABC-70",
+    "length_m": 100,
+    "geometry": [
+     [
+      28.1,
+      -25.52
+     ],
+     [
+      28.101,
+      -25.52
+     ]
+    ],
+    "route_id": "r1"
+   }
+  ],
+  "customers": [
+   {
+    "id": "h0",
+    "building_id": "h0",
+    "node_id": "A",
+    "phases": [
+     "R"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "h1",
+    "building_id": "h1",
+    "node_id": "A",
+    "phases": [
+     "R"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "h2",
+    "building_id": "h2",
+    "node_id": "A",
+    "phases": [
+     "R"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "h3",
+    "building_id": "h3",
+    "node_id": "A",
+    "phases": [
+     "R"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "h4",
+    "building_id": "h4",
+    "node_id": "A",
+    "phases": [
+     "R"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "h5",
+    "building_id": "h5",
+    "node_id": "A",
+    "phases": [
+     "R"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "h6",
+    "building_id": "h6",
+    "node_id": "A",
+    "phases": [
+     "R"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "h7",
+    "building_id": "h7",
+    "node_id": "A",
+    "phases": [
+     "R"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "h8",
+    "building_id": "h8",
+    "node_id": "A",
+    "phases": [
+     "R"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "h9",
+    "building_id": "h9",
+    "node_id": "A",
+    "phases": [
+     "R"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   }
+  ]
+ }
+}

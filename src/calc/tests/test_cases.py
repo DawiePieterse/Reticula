@@ -7,6 +7,10 @@ import pytest
 
 from reticula_calc.calcs.admd import EstimateRequest, GroupRequest, estimate, group
 from reticula_calc.calcs.voltage_drop import VoltageDropRequest, voltage_drop
+from reticula_calc.lv.analysis import analyse, derating
+from reticula_calc.lv.library import library
+from reticula_calc.lv.model import LvNetwork
+from reticula_calc.lv.overhead import check_overhead
 from reticula_calc.rules import load_rules
 
 CASES_DIR = Path(__file__).resolve().parents[3] / "test-cases"
@@ -31,7 +35,28 @@ def _run_hb_group(inp: dict) -> dict:
     return {"design_current_a": r.design_current_a.value, "residential_kva": r.residential_kva.value}
 
 
-RUNNERS = {"voltage_drop": _run_voltage_drop, "admd": _run_admd, "admd_group": _run_admd_group, "hb_group": _run_hb_group}
+def _run_lv(inp: dict) -> dict:
+    a = analyse(LvNetwork(**inp["network"]), load_rules(inp["rules"]), inp.get("transformer_kva"))
+    out: dict = {f"{n.id}.{p}": v for n in a.nodes for p, v in n.vdrop_v.items()}
+    out["max_fault_ka"] = a.max_fault_ka.value
+    out.update({f"min_fault_a.{e.node_id}": e.min_fault_a for e in a.feeder_ends})
+    return out
+
+
+def _run_oh_sag(inp: dict) -> dict:
+    r = check_overhead(LvNetwork(**inp["network"]), load_rules(inp["rules"]))
+    return r.spans[0].model_dump()
+
+
+def _run_ug_derating(inp: dict) -> dict:
+    rules = load_rules(inp["rules"])
+    cable = library(rules)[inp["conductor"]]
+    f, _ = derating(rules, cable, inp["site"])
+    return {"factor": f, "rating_a": cable.rating_a * f}
+
+
+RUNNERS = {"voltage_drop": _run_voltage_drop, "admd": _run_admd, "admd_group": _run_admd_group, "hb_group": _run_hb_group,
+           "lv_vdrop": _run_lv, "lv_fault": _run_lv, "oh_sag": _run_oh_sag, "ug_derating": _run_ug_derating}
 
 
 def _cases():

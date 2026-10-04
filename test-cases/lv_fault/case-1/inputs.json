@@ -1,0 +1,55 @@
+{
+ "rules": "eskom/0.3.0",
+ "transformer_kva": 315,
+ "network": {
+  "source_id": "S",
+  "nodes": [
+   {
+    "id": "S",
+    "kind": "source",
+    "lon": 28.1,
+    "lat": -25.52
+   },
+   {
+    "id": "A",
+    "kind": "pole",
+    "lon": 28.102,
+    "lat": -25.52
+   }
+  ],
+  "branches": [
+   {
+    "id": "B1",
+    "from_id": "S",
+    "to_id": "A",
+    "kind": "feeder",
+    "construction": "overhead",
+    "conductor": "ABC-95",
+    "length_m": 200,
+    "geometry": [
+     [
+      28.1,
+      -25.52
+     ],
+     [
+      28.101,
+      -25.52
+     ]
+    ],
+    "route_id": "r1"
+   }
+  ],
+  "customers": [
+   {
+    "id": "h0",
+    "building_id": "h0",
+    "node_id": "A",
+    "phases": [
+     "R"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   }
+  ]
+ }
+}

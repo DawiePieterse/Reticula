@@ -1,0 +1,344 @@
+{
+ "rules": "eskom/0.3.0",
+ "network": {
+  "source_id": "S",
+  "nodes": [
+   {
+    "id": "S",
+    "kind": "source",
+    "lon": 28.1,
+    "lat": -25.52
+   },
+   {
+    "id": "A",
+    "kind": "pole",
+    "lon": 28.101,
+    "lat": -25.52
+   }
+  ],
+  "branches": [
+   {
+    "id": "B1",
+    "from_id": "S",
+    "to_id": "A",
+    "kind": "feeder",
+    "construction": "overhead",
+    "conductor": "ABC-70",
+    "length_m": 100,
+    "geometry": [
+     [
+      28.1,
+      -25.52
+     ],
+     [
+      28.101,
+      -25.52
+     ]
+    ],
+    "route_id": "r1"
+   }
+  ],
+  "customers": [
+   {
+    "id": "hR0",
+    "building_id": "hR0",
+    "node_id": "A",
+    "phases": [
+     "R"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "hR1",
+    "building_id": "hR1",
+    "node_id": "A",
+    "phases": [
+     "R"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "hR2",
+    "building_id": "hR2",
+    "node_id": "A",
+    "phases": [
+     "R"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "hR3",
+    "building_id": "hR3",
+    "node_id": "A",
+    "phases": [
+     "R"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "hR4",
+    "building_id": "hR4",
+    "node_id": "A",
+    "phases": [
+     "R"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "hR5",
+    "building_id": "hR5",
+    "node_id": "A",
+    "phases": [
+     "R"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "hR6",
+    "building_id": "hR6",
+    "node_id": "A",
+    "phases": [
+     "R"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "hR7",
+    "building_id": "hR7",
+    "node_id": "A",
+    "phases": [
+     "R"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "hR8",
+    "building_id": "hR8",
+    "node_id": "A",
+    "phases": [
+     "R"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "hR9",
+    "building_id": "hR9",
+    "node_id": "A",
+    "phases": [
+     "R"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "hW0",
+    "building_id": "hW0",
+    "node_id": "A",
+    "phases": [
+     "W"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "hW1",
+    "building_id": "hW1",
+    "node_id": "A",
+    "phases": [
+     "W"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "hW2",
+    "building_id": "hW2",
+    "node_id": "A",
+    "phases": [
+     "W"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "hW3",
+    "building_id": "hW3",
+    "node_id": "A",
+    "phases": [
+     "W"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "hW4",
+    "building_id": "hW4",
+    "node_id": "A",
+    "phases": [
+     "W"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "hW5",
+    "building_id": "hW5",
+    "node_id": "A",
+    "phases": [
+     "W"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "hW6",
+    "building_id": "hW6",
+    "node_id": "A",
+    "phases": [
+     "W"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "hW7",
+    "building_id": "hW7",
+    "node_id": "A",
+    "phases": [
+     "W"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "hW8",
+    "building_id": "hW8",
+    "node_id": "A",
+    "phases": [
+     "W"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "hW9",
+    "building_id": "hW9",
+    "node_id": "A",
+    "phases": [
+     "W"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "hB0",
+    "building_id": "hB0",
+    "node_id": "A",
+    "phases": [
+     "B"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "hB1",
+    "building_id": "hB1",
+    "node_id": "A",
+    "phases": [
+     "B"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "hB2",
+    "building_id": "hB2",
+    "node_id": "A",
+    "phases": [
+     "B"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "hB3",
+    "building_id": "hB3",
+    "node_id": "A",
+    "phases": [
+     "B"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "hB4",
+    "building_id": "hB4",
+    "node_id": "A",
+    "phases": [
+     "B"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "hB5",
+    "building_id": "hB5",
+    "node_id": "A",
+    "phases": [
+     "B"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "hB6",
+    "building_id": "hB6",
+    "node_id": "A",
+    "phases": [
+     "B"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "hB7",
+    "building_id": "hB7",
+    "node_id": "A",
+    "phases": [
+     "B"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "hB8",
+    "building_id": "hB8",
+    "node_id": "A",
+    "phases": [
+     "B"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   },
+   {
+    "id": "hB9",
+    "building_id": "hB9",
+    "node_id": "A",
+    "phases": [
+     "B"
+    ],
+    "kind": "residential",
+    "load_class": "township_area"
+   }
+  ]
+ }
+}

@@ -105,6 +105,72 @@
           },
           "clause": {
             "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "feeder",
+              "service",
+              "mv"
+            ]
+          },
+          "material": {
+            "type": "string",
+            "enum": [
+              "Al",
+              "Cu",
+              "AlSt"
+            ]
+          },
+          "area_mm2": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "neutral_r_ohm_per_km": {
+            "type": "number",
+            "minimum": 0
+          },
+          "neutral_x_ohm_per_km": {
+            "type": "number",
+            "minimum": 0
+          },
+          "k": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "fuse_a": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "mass_kg_per_m": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "diameter_mm": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "uts_kn": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "e_gpa": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "alpha_per_c": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "unverified"
+            ]
+          },
+          "note": {
+            "type": "string"
           }
         }
       }
@@ -552,6 +618,404 @@
                 "note": {
                   "type": "string"
                 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "lv_design": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "phase_voltage_v",
+        "power_factor",
+        "confidence_pct",
+        "feeder_max_drop_pct",
+        "service_max_drop_pct",
+        "phase_rotation",
+        "max_service_length_m",
+        "service_conductor",
+        "feeder_conductors"
+      ],
+      "properties": {
+        "clause": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "verified",
+            "unverified"
+          ]
+        },
+        "phase_voltage_v": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "power_factor": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "confidence_pct": {
+          "type": "number",
+          "exclusiveMinimum": 50,
+          "exclusiveMaximum": 100
+        },
+        "feeder_max_drop_pct": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "service_max_drop_pct": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "phase_rotation": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "string",
+            "enum": [
+              "R",
+              "W",
+              "B"
+            ]
+          }
+        },
+        "three_phase_counts_per_phase": {
+          "type": "boolean"
+        },
+        "max_service_length_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "service_conductor": {
+          "type": "string"
+        },
+        "feeder_conductors": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "overhead": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "underground": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "service_conductors": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "kiosk_spacing_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "overhead": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_span_m",
+        "min_ground_clearance_m",
+        "min_road_clearance_m",
+        "everyday",
+        "max_load",
+        "max_sag",
+        "stay_angle_deg",
+        "poles"
+      ],
+      "properties": {
+        "clause": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "verified",
+            "unverified"
+          ]
+        },
+        "max_span_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "min_ground_clearance_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "min_road_clearance_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "attachment_below_top_m": {
+          "type": "number",
+          "minimum": 0
+        },
+        "everyday": {
+          "type": "object",
+          "required": [
+            "temp_c",
+            "wind_pa"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "temp_c": {
+              "type": "number"
+            },
+            "wind_pa": {
+              "type": "number",
+              "minimum": 0
+            },
+            "max_pct_uts": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "max_load": {
+          "type": "object",
+          "required": [
+            "temp_c",
+            "wind_pa"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "temp_c": {
+              "type": "number"
+            },
+            "wind_pa": {
+              "type": "number",
+              "minimum": 0
+            },
+            "max_pct_uts": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "max_sag": {
+          "type": "object",
+          "required": [
+            "temp_c",
+            "wind_pa"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "temp_c": {
+              "type": "number"
+            },
+            "wind_pa": {
+              "type": "number",
+              "minimum": 0
+            },
+            "max_pct_uts": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "stay_angle_deg": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "stay_capacity_kn": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "poles": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "code",
+              "length_m",
+              "max_tip_load_kn"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "length_m": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "top_diameter_mm": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "max_tip_load_kn": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    "underground": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "design",
+        "soil_resistivity_factor",
+        "depth_factor",
+        "ground_temp_factor",
+        "grouping_factor"
+      ],
+      "properties": {
+        "clause": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "verified",
+            "unverified"
+          ]
+        },
+        "design": {
+          "type": "object",
+          "required": [
+            "depth_m",
+            "soil_resistivity_kmw",
+            "ground_temp_c",
+            "circuits_in_trench"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "depth_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "soil_resistivity_kmw": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "ground_temp_c": {
+              "type": "number"
+            },
+            "circuits_in_trench": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "soil_resistivity_factor": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "minProperties": 1
+        },
+        "depth_factor": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "minProperties": 1
+        },
+        "ground_temp_factor": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "minProperties": 1
+        },
+        "grouping_factor": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "minProperties": 1
+        }
+      }
+    },
+    "fault": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mv_fault_mva",
+        "voltage_factor_max",
+        "voltage_factor_min",
+        "min_fault_multiple_of_fuse",
+        "transformers"
+      ],
+      "properties": {
+        "clause": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "verified",
+            "unverified"
+          ]
+        },
+        "mv_fault_mva": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "voltage_factor_max": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "voltage_factor_min": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "contact_resistance_ohm": {
+          "type": "number",
+          "minimum": 0
+        },
+        "min_fault_multiple_of_fuse": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "max_lv_terminal_fault_ka": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "transformers": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "kva",
+              "z_pct"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "kva": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "z_pct": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "x_r": {
+                "type": "number",
+                "exclusiveMinimum": 0
               }
             }
           }

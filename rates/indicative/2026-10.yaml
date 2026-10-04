@@ -1,0 +1,39 @@
+# Indicative installed costs for comparing options (plan 2.7). ESTIMATES ONLY, not tender prices.
+# Rand, excluding VAT, rate date 2026-10. Replace with the authority's or contractor's current rates (plan 5.1/6.1).
+name: indicative
+rate_date: 2026-10-01
+currency: ZAR
+status: estimate
+conductor_per_m:          # supply and install, per metre of route
+  ABC-35: 165
+  ABC-50: 195
+  ABC-70: 240
+  ABC-95: 300
+  CU-PVC-16: 260
+  CU-PVC-25: 330
+  CU-PVC-35: 410
+  CU-PVC-50: 520
+  CU-PVC-70: 690
+  CU-PVC-95: 880
+  CU-PVC-120: 1080
+  CU-PVC-150: 1330
+  CU-PVC-185: 1620
+  SC-10CU: 95
+  SC-16CU: 125
+  SC-25CU: 170
+pole_each:
+  WP-7-140: 3800
+  WP-9-160: 5200
+  WP-9-180: 6100
+  WP-11-180: 7600
+stay_each: 1900
+trench_per_m: 420         # excavate, bed, backfill, reinstate (soft ground)
+kiosk_each: 18500
+service_overhead_each: 650    # fittings, meter box connection
+service_underground_each: 1400
+transformer_each:
+  "50": 95000
+  "100": 128000
+  "200": 185000
+  "315": 240000
+  "500": 330000
