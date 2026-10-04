@@ -16,7 +16,7 @@ public sealed record AdmdEstimate(
     string Kind, IReadOnlyList<string> Missing, string? IncomeBand, string? Category, TracedValue AdmdKva,
     double EstimatedKva, bool Overridden, string RulesHash, string Raw, AdmdLoadClass? LoadClass = null);
 
-public sealed record AdmdGroupLoad(string Id, string Kind, double Kva, string? LoadClass = null);
+public sealed record AdmdGroupLoad(string Id, string Kind, double Kva, string? LoadClass = null, int Phases = 1);
 
 public sealed record AdmdGroup(int ResidentialCount, int SpecialCount, TracedValue? DiversityFactor, TracedValue ResidentialKva,
     double SpecialKva, TracedValue TotalKva, string RulesHash, string Method = "admd_factor", int? Phases = null,

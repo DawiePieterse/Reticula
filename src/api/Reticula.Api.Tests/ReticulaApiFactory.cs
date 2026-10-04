@@ -137,6 +137,21 @@ public sealed class FakeCalc : ICalcClient
         return Task.FromResult(new PredictionResult("0123456789abcdef", "test", predictions));
     }
 
+    /// <summary>The last LV design request, as the calc service would receive it (snake_case JSON).</summary>
+    public JsonElement? LastLvDesign { get; private set; }
+
+    public Func<JsonElement, JsonElement> OnDesignLv { get; set; } = _ => JsonDocument.Parse(
+        "{\"rules\":\"eskom/0.3.0\",\"rules_hash\":\"abcdef0123456789\",\"issues\":[],\"options\":[],\"unverified\":[\"lv_design\"]," +
+        "\"comparison\":[{\"construction\":\"overhead\",\"passed\":true,\"worst_vdrop_pct\":6.1,\"max_loading_pct\":70,\"transformer_kva\":100,\"cost_total\":1000}]}").RootElement.Clone();
+
+    public Task<JsonElement> DesignLvAsync(object request, CancellationToken ct = default)
+    {
+        Throw();
+        var json = JsonSerializer.SerializeToElement(request, new JsonSerializerOptions(JsonSerializerDefaults.Web) { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower });
+        LastLvDesign = json;
+        return Task.FromResult(OnDesignLv(json));
+    }
+
     public Task<JsonElement> GetAdmdFormAsync(string rulesRef, CancellationToken ct = default) =>
         Task.FromResult(JsonDocument.Parse("{\"indicators\":[{\"key\":\"dwelling\",\"options\":[\"rdp\",\"brick_small\"]}],\"special_loads\":{\"school\":25}}").RootElement.Clone());
 

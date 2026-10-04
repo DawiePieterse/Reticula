@@ -24,6 +24,12 @@ The tools add possible transformer, mini-sub and pole sites as points, and MV an
 - `eskom/0.1.0` keeps placeholder bands and a placeholder diversity formula, and is not for design use.
 - Each load point keeps the calc service's full traced result. Records are kept per load point, never per person.
 
+### Three-phase connections
+
+A dwelling's load can be marked **Three-phase connection** in the load tool. Group demand diversifies single-phase and
+three-phase connections separately and adds them (engineer decision 2026-10-04); the LV design connects a three-phase
+dwelling to all three phases, where it counts as one consumer on each.
+
 ## Assumptions register
 
 Each load estimate opens register entries:

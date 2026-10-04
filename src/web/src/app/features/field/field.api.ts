@@ -99,6 +99,8 @@ export interface LoadPoint {
   status: 'estimated' | 'confirmed';
   updatedAt: string;
   version: number;
+  /** 1 for a single-phase connection, 3 for a three-phase one. */
+  phases: 1 | 3;
   /** Saved on the device but not yet sent: the kVA shown is the last calculated value, if any. */
   pendingSync?: boolean;
 }
@@ -111,6 +113,7 @@ export interface LoadRequest {
   overrideReason?: string | null;
   version?: number | null;
   loadClass?: string | null;
+  phases?: 1 | 3;
 }
 
 /** The observation form, passed through from the calc service (snake_case). */

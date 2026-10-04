@@ -104,6 +104,8 @@ fault:
   voltage_factor_min: 0.95    # IEC 60909 c for LV, minimum fault
   contact_resistance_ohm: 0.0
   min_fault_multiple_of_fuse: 4.0   # end-of-feeder phase-neutral fault must clear the feeder fuse quickly
+  fuse_ratings_a: [63, 80, 100, 125, 160, 200, 250, 315]   # the feeder fuse is the smallest carrying the design current;
+                                                            # it may not exceed the conductor's fuse_a (largest that protects it)
   max_lv_terminal_fault_ka: 25
   transformers:               # rating kVA -> impedance %
     - { kva: 50, z_pct: 4.0, x_r: 1.5 }

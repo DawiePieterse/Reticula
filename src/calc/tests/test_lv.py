@@ -146,3 +146,22 @@ def test_design_endpoint(client):
     assert r.json()["comparison"][0]["passed"] is True
     body["rules"] = "eskom/0.1.0"
     assert client.post("/calc/lv/design", json=body).status_code == 422
+
+
+def test_a_route_drawn_to_end_on_another_joins_it():
+    # As drawn on the map: the spur's end lies on the street in lon/lat, but misses it slightly once projected.
+    street_route = RouteIn(id="street", coordinates=[(28.0998, -25.51968), (28.1012, -25.51968)])
+    spur = RouteIn(id="spur", coordinates=[(28.1003, -25.5195), (28.1003, -25.51968)])
+    houses = [CustomerIn(building_id=f"h{i}", lon=28.0999 + i * 0.0002, lat=-25.51968 - 0.00012, load_class="township_area") for i in range(6)]
+    r = build([street_route, spur], houses, source=(28.1003, -25.5195))
+    assert not [i for i in r.issues if i.code in ("routes_not_connected", "customer_unconnected")]
+    assert len(r.network.customers) == 6
+
+
+def test_an_unconnected_building_fails_the_design():
+    route, houses = street(n_houses=4)
+    far = CustomerIn(building_id="far", lon=LON + 2 * D, lat=LAT + 0.002, load_class="township_area", erf="999")
+    res = design_lv(LvDesignRequest(rules="eskom/0.3.0", source=(LON, LAT), routes=[route], customers=[*houses, far]), RULES)
+    assert res.comparison[0].passed is False
+    failed = [c for c in res.options[0].analysis.checks if not c.passed]
+    assert [(c.code, c.subject) for c in failed] == [("customer_unconnected", "999")]

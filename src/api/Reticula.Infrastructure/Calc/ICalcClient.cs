@@ -24,6 +24,10 @@ public interface ICalcClient
     /// <summary>The observation form for the income and ADMD tool, from the rules file.</summary>
     Task<JsonElement> GetAdmdFormAsync(string rulesRef, CancellationToken ct = default);
 
+    /// <summary>Designs, checks and costs an LV network. The result is stored as given.</summary>
+    /// <exception cref="CalcRejectedException">The input cannot be designed (rules without LV data, no routes, missing loads).</exception>
+    Task<JsonElement> DesignLvAsync(object request, CancellationToken ct = default);
+
     /// <exception cref="CalcRejectedException">Unknown option, bad number or missing rules section.</exception>
     Task<AdmdEstimate> EstimateAdmdAsync(AdmdEstimateRequest request, CancellationToken ct = default);
 

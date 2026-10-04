@@ -22,7 +22,7 @@ from .library import Construction, feeder_options, lv_config
 from .model import LvNetwork
 
 MAX_ROUNDS = 400
-SIZING_CODES = ("thermal", "feeder_vdrop", "supply_vdrop", "service_vdrop", "min_fault")
+SIZING_CODES = ("thermal", "feeder_vdrop", "supply_vdrop", "service_vdrop", "min_fault", "fuse_protection")
 
 
 class SizingResult(BaseModel):
@@ -75,21 +75,22 @@ def size_network(network: LvNetwork, rules: RuleSet, construction: Construction,
         failing = [c for c in a.checks if not c.passed and c.code in SIZING_CODES]
         if not failing:
             return SizingResult(network=net, analysis=a, rounds=rounds - 1, converged=True)
-        thermal = [c for c in failing if c.code == "thermal" and by_id[c.subject].kind == "feeder"
+        # An overloaded feeder branch, or a feeder whose fuse would be too big for its first conductor, moves up a size.
+        thermal = [c for c in failing if c.code in ("thermal", "fuse_protection") and by_id[c.subject].kind == "feeder"
                    and rank[by_id[c.subject].conductor] < len(options) - 1]
         services = {service_of[c.subject].id: service_of[c.subject] for c in failing
                     if c.code == "service_vdrop" or (c.code == "thermal" and by_id[c.subject].kind == "service")}
         services = [b for b in services.values() if s_rank.get(b.conductor, len(service_options)) < len(service_options) - 1]
         changed = False
         if thermal or services:
-            for c in thermal:
-                b = by_id[c.subject]
+            for bid in dict.fromkeys(c.subject for c in thermal):
+                b = by_id[bid]
                 b.conductor = options[rank[b.conductor] + 1]
             for b in services:
                 b.conductor = service_options[s_rank[b.conductor] + 1]
             changed = True
         else:
-            worst = max((c for c in failing if c.code not in ("thermal", "service_vdrop")),
+            worst = max((c for c in failing if c.code not in ("thermal", "service_vdrop", "fuse_protection")),
                         key=lambda c: (c.value / c.limit) if c.code != "min_fault" else (c.limit / max(c.value, 1)), default=None)
             if worst is not None:
                 node = next(cu.node_id for cu in net.customers if cu.id == worst.subject) if worst.code == "supply_vdrop" else worst.subject

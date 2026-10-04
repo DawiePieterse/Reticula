@@ -1019,6 +1019,14 @@
               }
             }
           }
+        },
+        "fuse_ratings_a": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
         }
       }
     }

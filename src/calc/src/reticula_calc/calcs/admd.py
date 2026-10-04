@@ -83,6 +83,8 @@ class GroupLoad(BaseModel):
     kind: Literal["residential", "special"]
     kva: float = Field(gt=0)
     load_class: str | None = None
+    #: 3 for a three-phase domestic connection: diversified separately and added (engineer decision 2026-10-04).
+    phases: Literal[1, 3] = 1
 
 
 class GroupRequest(BaseModel):
@@ -300,36 +302,47 @@ def _group_herman_beta(req: GroupRequest, rules: RuleSet, cfg: dict[str, Any], d
     if missing:
         raise AdmdInputError(f"Herman-Beta needs a load class for every residential load; missing for {', '.join(missing[:5])}")
 
+    one = [load for load in res if load.phases == 1]
+    three = [load for load in res if load.phases == 3]
+    classes = {code: _load_class(cfg, rules, code, "score") for code in {load.load_class for load in res}}  # type: ignore[arg-type]
+
+    def per_phase_current(loads: list[GroupLoad], share: float) -> tuple[float, float, float, float]:
+        """Beta quantile of one phase's current when each load puts `share` consumers on that phase."""
+        mean = var = cap = 0.0
+        for load in loads:
+            lc = classes[load.load_class]  # type: ignore[index]
+            mu, sd = _moments(lc.alpha, lc.beta, lc.c_amps)
+            mean += share * mu
+            var += share * sd * sd
+            cap += share * lc.c_amps
+        if not loads:
+            return 0.0, mean, var, cap
+        m, v = mean / cap, var / (cap * cap)
+        k = m * (1 - m) / v - 1
+        return cap * float(beta_dist.ppf(conf / 100, m * k, (1 - m) * k)), mean, var, cap
+
+    n = len(res)
+    phases = int(div.get("phases", 3)) if len(one) >= 3 or three else 1
+    # Single-phase connections share the phases; a three-phase connection is one consumer on each phase.
+    i_one, mean, var, cap = per_phase_current(one, 1 / phases)
+    i_three, mean3, var3, cap3 = per_phase_current(three, 1.0)
+    current = i_one + i_three
     counts: dict[str, int] = {}
     for load in res:
         counts[load.load_class] = counts.get(load.load_class, 0) + 1  # type: ignore[index]
-    classes = {code: _load_class(cfg, rules, code, "score") for code in counts}
-
-    n = len(res)
-    phases = int(div.get("phases", 3)) if n >= 3 else 1
-    mean = var = cap = 0.0
-    for code, count in counts.items():
-        lc = classes[code]
-        mu, sd = _moments(lc.alpha, lc.beta, lc.c_amps)
-        share = count / phases
-        mean += share * mu
-        var += share * sd * sd
-        cap += share * lc.c_amps
 
     inputs: dict[str, Any] = {f"n_{code}": (count, "loads", classes[code].description) for code, count in counts.items()}
     inputs.update({"phases": (phases, "", "balanced allocation" if phases > 1 else "single phase (fewer than 3 loads)"),
                    "confidence": (conf, "%", f"rules {rules.ref} diversity"), "V": (voltage, "V", table["source"])})
+    if three:
+        inputs.update({"n_three_phase": (len(three), "loads", "diversified separately and added"),
+                       "I_single_phase_group": (round(i_one, 4), "A", "per phase"), "I_three_phase_group": (round(i_three, 4), "A", "per phase")})
+        mean, var, cap = mean + mean3, var + var3, cap + cap3
 
-    if n == 0:
-        current = 0.0
-    else:
-        m, v = mean / cap, var / (cap * cap)
-        k = m * (1 - m) / v - 1
-        current = cap * float(beta_dist.ppf(conf / 100, m * k, (1 - m) * k))
     design = traced(current, "A", formula_id=HB_FORMULA_ID, formula=HB_FORMULA, clause=clause, rules_hash=rules.hash,
                     inputs={**inputs, "mean_per_phase": (round(mean, 4), "A", "Σ n·μ"), "sd_per_phase": (round(math.sqrt(var), 4), "A", "√Σ n·σ²"),
                             "c_per_phase": (cap, "A", "Σ n·c")})
-    res_kva_value = phases * voltage * current / 1000
+    res_kva_value = (phases * voltage * i_one + 3 * voltage * i_three) / 1000
     res_kva = traced(res_kva_value, "kVA", formula_id=HB_FORMULA_ID, formula=HB_FORMULA, clause=clause, rules_hash=rules.hash,
                      inputs={**inputs, "I_design": (round(current, 4), "A", "per phase")})
     sum_admd = sum(classes[c].admd_kva * k for c, k in counts.items())

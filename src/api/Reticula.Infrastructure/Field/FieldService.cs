@@ -18,7 +18,7 @@ public sealed class FieldService(ReticulaDbContext db, ICalcClient calc, TimePro
     /// <summary>Estimates (or re-estimates) the building's load and keeps its assumptions in step.</summary>
     /// <exception cref="CalcRejectedException">Observations the rules file does not accept.</exception>
     public async Task<LoadPoint> EstimateLoadAsync(Project project, Building building, AdmdEstimateRequest request, string? erf,
-        uint? expectedVersion, Guid userId, CancellationToken ct)
+        uint? expectedVersion, Guid userId, CancellationToken ct, int? phases = null)
     {
         var estimate = await calc.EstimateAdmdAsync(request with { Rules = project.RulesRef }, ct);
 
@@ -38,6 +38,7 @@ public sealed class FieldService(ReticulaDbContext db, ICalcClient calc, TimePro
             estimate.LoadClass?.ChosenBy == "engineer" ? estimate.LoadClass.Code : null, estimate.IncomeBand, estimate.Category, estimate.EstimatedKva, estimate.AdmdKva.Value, estimate.Overridden,
             estimate.Overridden ? request.OverrideReason : null, JsonSerializer.Serialize(estimate.Missing, Json),
             estimate.Raw, estimate.RulesHash, userId, now);
+        if (phases is not null) lp.SetPhases(phases.Value);
 
         var label = erf is null ? "building without an erf" : $"erf {erf}";
         var kva = Kva(estimate.AdmdKva.Value);

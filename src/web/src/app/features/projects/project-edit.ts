@@ -19,6 +19,7 @@ import { ProjectsApi } from './projects.api';
         @if (id(); as projectId) {
           <a class="button primary" [routerLink]="['/projects', projectId, 'field']">Field inspection</a>
           <a class="button" [routerLink]="['/projects', projectId, 'loads']">Loads</a>
+          <a class="button" [routerLink]="['/projects', projectId, 'lv']">LV design</a>
         }
         <a routerLink="/projects">Back to projects</a>
       </div>

@@ -402,20 +402,41 @@ def analyse(network: LvNetwork, rules: RuleSet, transformer_kva: float | None = 
         zne = complex(cable.neutral_r_ohm_per_km, cable.neutral_x_ohm_per_km) * b.length_m / 1000
         z1[n] = z1[b.from_id] + zph
         z0[n] = z0[b.from_id] + zph + 3 * zne
-    ends: list[FeederEnd] = []
+    # Feeder fuses: the smallest standard rating that carries the feeder's design current, no larger than the
+    # largest fuse that still protects the feeder's first conductor.
     mult = float(fault["min_fault_multiple_of_fuse"])
+    ratings = sorted(float(x) for x in fault.get("fuse_ratings_a", []))
+    design_of = {br.id: br.design_current_a for br in branches}
+    fuse_of: dict[str, float | None] = {}
+    by_id = {x.id: x for x in network.branches}
+    for name, ids in feeder_map.items():
+        if name == "link" or not ids:
+            continue
+        first_b = by_id[ids[0]]
+        cable = lib[first_b.conductor]
+        need_i = design_of[first_b.id]
+        fuse = next((r for r in ratings if r >= need_i), None) if ratings else cable.fuse_a
+        fuse_of[name] = fuse
+        if ratings:
+            ok = fuse is not None and (cable.fuse_a is None or fuse <= cable.fuse_a)
+            checks.append(Check(code="fuse_protection", subject=first_b.id, passed=ok, value=fuse or need_i, limit=cable.fuse_a or (fuse or 0), unit="A",
+                                message=(f"Feeder {name}: {fuse:.0f} A fuse for {need_i:.0f} A design current on {cable.code}"
+                                         + (f" (largest protecting fuse {cable.fuse_a:.0f} A)" if cable.fuse_a else ""))
+                                if fuse else f"Feeder {name}: no fuse in the rules carries {need_i:.0f} A",
+                                clause=fault.get("clause", "")))
+    ends: list[FeederEnd] = []
     for n in order:
         b = branch_of.get(n)
         if b is None or b.kind != "feeder" or any(g.edges[n, ch]["branch"].kind == "feeder" for ch in g.successors(n)):
             continue
         name = feeder_of.get(b.id, "link")
-        first = next((lib[x.conductor] for x in network.branches if x.id == feeder_map.get(name, [b.id])[0]), lib[b.conductor])
+        fuse = fuse_of.get(name)
         ik1 = math.sqrt(3) * c_min * un / abs(2 * z1[n] + z0[n] + 3 * rc)
-        need = mult * first.fuse_a if first.fuse_a else None
-        ends.append(FeederEnd(node_id=n, feeder=name, min_fault_a=round(ik1, 1), fuse_a=first.fuse_a, required_a=need))
+        need = mult * fuse if fuse else None
+        ends.append(FeederEnd(node_id=n, feeder=name, min_fault_a=round(ik1, 1), fuse_a=fuse, required_a=need))
         if need is not None:
             checks.append(Check(code="min_fault", subject=n, passed=ik1 >= need, value=round(ik1, 0), limit=round(need, 0), unit="A",
-                                message=f"Minimum phase-neutral fault at the end of {name} ({n}) is {ik1:.0f} A; the {first.fuse_a:.0f} A fuse needs {need:.0f} A",
+                                message=f"Minimum phase-neutral fault at the end of {name} ({n}) is {ik1:.0f} A; the {fuse:.0f} A fuse needs {need:.0f} A",
                                 clause=fault.get("clause", "")))
 
     return Analysis(branches=branches, nodes=nodes, customers=customers, feeder_ends=ends, demand_kva=demand_t,

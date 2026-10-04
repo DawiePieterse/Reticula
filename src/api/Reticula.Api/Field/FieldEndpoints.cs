@@ -287,6 +287,7 @@ public static class FieldEndpoints
         if (req.OverrideKva is not null && string.IsNullOrWhiteSpace(req.OverrideReason)) errors["overrideReason"] = ["Give a reason for the override."];
         if (req.OverrideKva is <= 0) errors["overrideKva"] = ["Override must be more than 0 kVA."];
         if (building.Status == BuildingStatus.NotPresent) errors["building"] = ["The building was marked not present."];
+        if (req.Phases is not (null or 1 or 3)) errors["phases"] = ["A connection is single-phase (1) or three-phase (3)."];
         if (errors.Count > 0) return TypedResults.ValidationProblem(errors);
 
         var erf = building.StandId is null ? null : await db.Stands.Where(s => s.Id == building.StandId).Select(s => s.ErfNumber).FirstOrDefaultAsync(ct);
@@ -295,7 +296,7 @@ public static class FieldEndpoints
             var lp = await field.EstimateLoadAsync(project, building,
                 new AdmdEstimateRequest(project.RulesRef, req.Kind, req.Observations ?? [], req.SpecialLoad, req.OverrideKva, Trim(req.OverrideReason, 1000),
                     req.Kind == LoadKinds.Residential && !string.IsNullOrWhiteSpace(req.LoadClass) ? req.LoadClass : null),
-                erf, req.Version, UserId(user), ct);
+                erf, req.Version, UserId(user), ct, req.Phases);
             return TypedResults.Ok(ToDto(lp));
         }
         catch (CalcRejectedException e)
@@ -413,7 +414,8 @@ public static class FieldEndpoints
             x.l?.Status.ToString().ToLowerInvariant())).ToList();
 
         var loads = rows.Where(x => x.l is not null)
-            .Select(x => new AdmdGroupLoad(x.l!.Id.ToString(), x.l.Kind, x.l.Kva, x.l.Kind == LoadKinds.Residential ? x.l.Category : null)).ToList();
+            .Select(x => new AdmdGroupLoad(x.l!.Id.ToString(), x.l.Kind, x.l.Kva, x.l.Kind == LoadKinds.Residential ? x.l.Category : null,
+                x.l.Kind == LoadKinds.Residential ? x.l.Phases : 1)).ToList();
         LoadScheduleTotals? totals = null;
         var rulesHash = rows.FirstOrDefault(x => x.l is not null)?.l!.RulesHash ?? "";
         if (loads.Count > 0)
@@ -468,7 +470,7 @@ public static class FieldEndpoints
     private static LoadPointDto ToDto(LoadPoint l) => new(
         l.Id, l.BuildingId, l.Kind, l.SpecialLoad, JsonDocument.Parse(l.ObservationsJson).RootElement.Clone(), l.ClassOverride, l.IncomeBand, l.Category,
         l.EstimatedKva, l.Kva, l.Overridden, l.OverrideReason, JsonSerializer.Deserialize<List<string>>(l.MissingJson, Json) ?? [],
-        l.Status.ToString().ToLowerInvariant(), l.UpdatedAt, l.Version);
+        l.Status.ToString().ToLowerInvariant(), l.UpdatedAt, l.Version, l.Phases);
 
     private static PhotoDto ToDto(Photo p) => new(p.Id, p.BuildingId, p.CandidateId, p.ContentType, p.SizeBytes, p.CapturedAt);
 

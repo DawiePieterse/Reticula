@@ -63,6 +63,13 @@ public sealed class CalcClient(HttpClient http) : ICalcClient
         return await ReadAsync<PredictionResult>(r, ct);
     }
 
+    public async Task<JsonElement> DesignLvAsync(object request, CancellationToken ct = default)
+    {
+        using var content = JsonContent.Create(request, options: Json);
+        using var r = await SendAsync(() => http.PostAsync("/calc/lv/design", content, ct), ct);
+        return await ReadAsync<JsonElement>(r, ct);
+    }
+
     public async Task<JsonElement> GetAdmdFormAsync(string rulesRef, CancellationToken ct = default)
     {
         var parts = rulesRef.Split('/');

@@ -20,7 +20,7 @@ const FORM: AdmdForm = {
 
 const lp = (over: Partial<LoadPoint> = {}): LoadPoint => ({
   id: 'lp1', buildingId: 'b1', kind: 'residential', specialLoad: null, observations: {}, classOverride: null, incomeBand: 'low', category: 'township_area',
-  estimatedKva: 1.5, kva: 1.5, overridden: false, overrideReason: null, missing: ['roof'], status: 'estimated', updatedAt: '', version: 3, ...over,
+  estimatedKva: 1.5, kva: 1.5, overridden: false, overrideReason: null, missing: ['roof'], status: 'estimated', updatedAt: '', version: 3, phases: 1, ...over,
 });
 
 async function setup(type = 'house', existing: LoadPoint | null = null) {
@@ -61,7 +61,7 @@ describe('LoadTool', () => {
     const req = http.expectOne({ method: 'PUT', url: '/api/projects/p1/buildings/b1/load' });
     expect(req.request.body).toEqual({
       kind: 'residential', observations: { dwelling: 'brick_small', appliances: ['fridge'], stand_size_m2: 450 },
-      specialLoad: null, overrideKva: null, overrideReason: null, version: null, loadClass: null,
+      specialLoad: null, overrideKva: null, overrideReason: null, version: null, loadClass: null, phases: 1,
     });
     req.flush(lp());
     await settle(fixture);
@@ -126,5 +126,22 @@ describe('LoadTool', () => {
     await settle(fixture);
     expect(el.querySelector('[role="alert"]')?.textContent).toContain('Someone else changed this load');
     expect(el.textContent).toContain('3 kVA');
+  });
+});
+
+describe('LoadTool three-phase connection', () => {
+  it('sends a three-phase connection and shows it', async () => {
+    const { fixture, http, el } = await setup('house');
+    const box = el.querySelector<HTMLInputElement>('input[name="threePhase"]')!;
+    box.checked = true;
+    box.dispatchEvent(new Event('change'));
+    await settle(fixture);
+    [...el.querySelectorAll('button')].find((b) => b.textContent?.includes('Save load'))!.click();
+    await idle();
+    const req = http.expectOne('/api/projects/p1/buildings/b1/load');
+    expect(req.request.body.phases).toBe(3);
+    req.flush(lp({ phases: 3 }));
+    await settle(fixture);
+    expect(el.textContent).toContain('three-phase');
   });
 });

@@ -79,9 +79,13 @@ def design_lv(req: LvDesignRequest, rules: RuleSet) -> LvDesignResult:
                                            construction=construction, roads=req.roads), rules)
         if not options:
             issues += built.issues
+        # A layout error (a building that cannot be connected) fails the design like any check.
+        layout_checks = [Check(code=i.code, subject=sample, passed=False, value=1, limit=0, unit="",
+                               message=i.message, clause="")
+                         for i in built.issues if i.severity == "error" for sample in (i.samples or ["network"])]
         sized = size_network(built.network, rules, construction, req.transformer_kva, req.site)
         net = sized.network
-        checks: list[Check] = list(sized.analysis.checks)
+        checks: list[Check] = [*layout_checks, *sized.analysis.checks]
         oh = None
         if construction == "overhead":
             oh = check_overhead(net, rules)

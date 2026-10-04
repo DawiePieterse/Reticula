@@ -109,16 +109,16 @@ Deliverables: predicted building types, tablet inspection, income/ADMD tool, loa
 
 Deliverables: LV layout, phasing, conductor sizing, voltage drop, fault level, OH and UG checks.
 
-- [ ] 2.1 Network model in Python (networkx graph + shapely geometry), serialisation to/from Postgres.
-- [ ] 2.2 Load allocation to candidate LV routes; phase balancing (3-phase/1-phase per rules). (1-phase and 3-phase domestic connections diversified separately and added; ReticMaster paired rotation W W R R B B. See docs/calc-methods.md.)
-- [ ] 2.3 Conductor/cable library from rules file (SANS 1507 LV cables, ABC/bare OH conductors) with ratings.
-- [ ] 2.4 Voltage drop calc (NRS 048-2 limits), thermal loading, LV fault level at ends. (Herman-Beta voltage drop at 90 %, no empirical method; fault formulas checked against IEC 60909. See docs/calc-methods.md.)
-- [ ] 2.5 Overhead checks: span, sag/tension, clearances, pole class, stays.
-- [ ] 2.6 Underground checks: derating for soil thermal resistivity, depth, grouping.
-- [ ] 2.7 OH vs UG side-by-side where both allowed: cost + voltage.
-- [ ] 2.8 "Not inspected" flagging for any element outside marked sites/routes.
-- [ ] 2.9 LV results UI: map overlay, per-segment table, check pass/fail with clause refs.
-- [ ] 2.10 Validation: hand-worked LV feeder cases (voltage drop, derating, sag).
+- [x] 2.1 Network model in Python (networkx graph + shapely geometry), serialisation to/from Postgres. (reticula_calc/lv/model.py; stored with every design run in design_runs, docs/lv-design.md)
+- [x] 2.2 Load allocation to candidate LV routes; phase balancing (3-phase/1-phase per rules). (1-phase and 3-phase domestic connections diversified separately and added; ReticMaster paired rotation W W R R B B. See docs/calc-methods.md.) (Shortest-path radial tree on the LV routes, poles/kiosks by span, nearest-pole services, ReticMaster paired rotation, 3-phase connections.)
+- [x] 2.3 Conductor/cable library from rules file (SANS 1507 LV cables, ABC/bare OH conductors) with ratings. (rules eskom/0.3.0 conductors; values unverified, docs/standards-index.md.)
+- [x] 2.4 Voltage drop calc (NRS 048-2 limits), thermal loading, LV fault level at ends. (Herman-Beta voltage drop at 90 %, no empirical method; fault formulas checked against IEC 60909. See docs/calc-methods.md.) (Herman-Beta voltage drop with the neutral, branch loading, IEC 60909 max and min fault, load-sized feeder fuses, conductor sizing.)
+- [x] 2.5 Overhead checks: span, sag/tension, clearances, pole class, stays. (Change-of-state tension and sag, ground and road clearance, pole choice, stays.)
+- [x] 2.6 Underground checks: derating for soil thermal resistivity, depth, grouping. (Soil, depth, ground temperature and grouping factors from the rules.)
+- [x] 2.7 OH vs UG side-by-side where both allowed: cost + voltage. (Both constructions in one run; indicative cost from rates/indicative/2026-10.yaml.)
+- [x] 2.8 "Not inspected" flagging for any element outside marked sites/routes. (Uninspected buildings, transformer not at a marked site, branches outside the area.)
+- [x] 2.9 LV results UI: map overlay, per-segment table, check pass/fail with clause refs. (Project → LV design: map overlay, comparison, checks with clause refs, branches, cost.)
+- [x] 2.10 Validation: hand-worked LV feeder cases (voltage drop, derating, sag). (test-cases/lv_vdrop, lv_fault, oh_sag, ug_derating.)
 
 ### Phase 3 – MV network
 
@@ -206,12 +206,12 @@ F. **Performance targets.** Field UI usable on mid-range Android tablet; 2,000-s
 ### Setup
 - [ ] Decisions A–I confirmed by engineer
 - [ ] Open items resolved or explicitly deferred
-- [ ] Standards clause index drafted
+- [x] Standards clause index drafted (docs/standards-index.md; editions still to confirm)
 - [x] Phase 0 complete
 
 ### Build
 - [ ] Phase 1 Field capture – usable offline on tablet
-- [ ] Phase 2 LV design – checks pass on validation cases
+- [x] Phase 2 LV design – checks pass on validation cases (engine values pending verification against the standards)
 - [ ] Phase 3 MV network – checks pass on validation cases
 - [ ] Phase 4 Bulk supply – load flow and IEC 60909 validated
 - [ ] Phase 5 Optimisation – three options + compare view

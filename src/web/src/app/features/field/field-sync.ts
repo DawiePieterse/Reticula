@@ -157,7 +157,7 @@ export class FieldSync {
         observations: req.observations ?? {}, classOverride: req.loadClass ?? null, incomeBand: null, category: req.loadClass ?? null,
         estimatedKva: previous?.estimatedKva ?? 0, kva: req.overrideKva ?? previous?.kva ?? 0, overridden: req.overrideKva != null,
         overrideReason: req.overrideReason ?? null, missing: [], status: 'estimated', updatedAt: new Date().toISOString(),
-        version: req.version ?? 0, pendingSync: true,
+        version: req.version ?? 0, phases: req.phases ?? previous?.phases ?? 1, pendingSync: true,
       }), [`building:${buildingId}`]);
   }
 

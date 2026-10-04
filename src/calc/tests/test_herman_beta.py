@@ -100,3 +100,17 @@ def test_reticmaster_example():
     # rounding the mean to 0.183; unrounded it is 11.00 A.
     mean, _ = _moments(1.65, 7.35, 60)
     assert mean == pytest.approx(11.0, abs=1e-9)
+
+
+def test_three_phase_connections_are_diversified_separately_and_added():
+    # Engineer decision 2026-10-04: 1-phase and 3-phase domestic connections are separate groups whose currents add.
+    single = res(30, "township_area")
+    three = [GroupLoad(id=f"t{i}", kind="residential", kva=2.37, load_class="township_area", phases=3) for i in range(3)]
+    alone = grp(single)
+    both = grp(single + three)
+    only3 = grp(three)
+    assert alone.design_current_a.value == pytest.approx(136.72, abs=0.01)
+    # Three 3-phase consumers put 3 consumers on each phase.
+    assert only3.design_current_a.value == pytest.approx(grp(res(9, "township_area")).design_current_a.value, rel=1e-9)
+    assert both.design_current_a.value == pytest.approx(alone.design_current_a.value + only3.design_current_a.value, rel=1e-9)
+    assert both.residential_kva.value == pytest.approx(3 * 230 * both.design_current_a.value / 1000, rel=1e-9)

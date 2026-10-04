@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Reticula.Domain.Design;
 using Reticula.Domain.Field;
 using Reticula.Domain.Maps;
 using Reticula.Domain.Jobs;
@@ -25,6 +26,7 @@ public sealed class ReticulaDbContext(DbContextOptions<ReticulaDbContext> option
     public DbSet<Assumption> Assumptions => Set<Assumption>();
     public DbSet<TilePack> TilePacks => Set<TilePack>();
     public DbSet<MapFeature> MapFeatures => Set<MapFeature>();
+    public DbSet<DesignRun> DesignRuns => Set<DesignRun>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -183,6 +185,7 @@ public sealed class ReticulaDbContext(DbContextOptions<ReticulaDbContext> option
         b.Entity<LoadPoint>(e =>
         {
             e.ToTable("load_points");
+            e.Property(x => x.Phases).HasDefaultValue(1);
             e.HasKey(x => x.Id);
             e.HasIndex(x => x.BuildingId).IsUnique();
             e.Property(x => x.Kind).HasMaxLength(20).IsRequired();
@@ -229,6 +232,23 @@ public sealed class ReticulaDbContext(DbContextOptions<ReticulaDbContext> option
             e.HasIndex(x => x.Geometry).HasMethod("gist");
             e.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne<ImportBatch>().WithMany().HasForeignKey(x => x.ImportBatchId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<DesignRun>(e =>
+        {
+            e.ToTable("design_runs");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Kind).HasMaxLength(20).IsRequired();
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.ParametersJson).HasColumnType("jsonb").IsRequired();
+            e.Property(x => x.RulesRef).HasMaxLength(50).IsRequired();
+            e.Property(x => x.RulesHash).HasMaxLength(16);
+            e.Property(x => x.InputJson).HasColumnType("jsonb");
+            e.Property(x => x.ResultJson).HasColumnType("jsonb");
+            e.Property(x => x.SummaryJson).HasColumnType("jsonb");
+            e.Property(x => x.Error).HasMaxLength(2000);
+            e.HasIndex(x => new { x.ProjectId, x.Kind, x.CreatedAt });
+            e.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
         });
 
         b.Entity<TilePack>(e =>

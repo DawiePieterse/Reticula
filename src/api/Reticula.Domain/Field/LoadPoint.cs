@@ -59,6 +59,11 @@ public sealed class LoadPoint
     public DateTimeOffset? ConfirmedAt { get; private set; }
     public uint Version { get; private set; }
 
+    /// <summary>1 for a single-phase domestic connection, 3 for a three-phase one.</summary>
+    public int Phases { get; private set; } = 1;
+
+    public void SetPhases(int phases) => Phases = phases == 3 ? 3 : 1;
+
     public void SetEstimate(string kind, string? specialLoad, string observationsJson, string? classOverride, string? incomeBand, string? category,
         double estimatedKva, double kva, bool overridden, string? overrideReason, string missingJson, string traceJson,
         string rulesHash, Guid by, DateTimeOffset now)

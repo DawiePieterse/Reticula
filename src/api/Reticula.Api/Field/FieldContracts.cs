@@ -23,12 +23,12 @@ public sealed record CandidateProps(string Kind, string? Notes, DateTimeOffset C
 /// <param name="LoadClass">A class the engineer chooses instead of the score; null to use the score.</param>
 public sealed record LoadRequest(
     string Kind, Dictionary<string, JsonElement>? Observations, string? SpecialLoad, double? OverrideKva, string? OverrideReason, uint? Version,
-    string? LoadClass = null);
+    string? LoadClass = null, int? Phases = null);
 
 public sealed record LoadPointDto(
     Guid Id, Guid BuildingId, string Kind, string? SpecialLoad, JsonElement Observations, string? ClassOverride, string? IncomeBand, string? Category,
     double EstimatedKva, double Kva, bool Overridden, string? OverrideReason, IReadOnlyList<string> Missing, string Status,
-    DateTimeOffset UpdatedAt, uint Version);
+    DateTimeOffset UpdatedAt, uint Version, int Phases = 1);
 
 public sealed record AssumptionDto(Guid Id, string SubjectType, Guid SubjectId, string Code, string Text, string Status,
     DateTimeOffset CreatedAt, DateTimeOffset? ClearedAt, string? ClearNote);

@@ -31,6 +31,7 @@ const SPECIAL_FOR_TYPE: Record<string, string> = { school: 'school', shop: 'shop
             </select>
           </label>
         }
+        <label class="inline"><input type="checkbox" [ngModel]="threePhase()" (ngModelChange)="threePhase.set($event)" name="threePhase" /> Three-phase connection</label>
         @for (f of choiceFields(); track f.key) {
           <label>{{ f.label }}
             <select [ngModel]="value(f.key)" (ngModelChange)="setValue(f.key, $event)" [attr.name]="f.key">
@@ -86,6 +87,7 @@ const SPECIAL_FOR_TYPE: Record<string, string> = { school: 'school', shop: 'shop
           @if (lp.kind === 'residential') {
             · {{ classLabel(lp.category) }}
             @if (lp.classOverride) { (chosen) } @else { · {{ lp.incomeBand }} score band }
+            @if (lp.phases === 3) { · three-phase }
           }
           @else { · {{ pretty(lp.specialLoad ?? '') }} }
           @if (lp.overridden) { <span class="warn"> · overridden (method gave {{ lp.estimatedKva | number: '1.0-2' }} kVA)</span> }
@@ -128,6 +130,7 @@ export class LoadTool {
 
   protected readonly kind = signal<'residential' | 'special'>('residential');
   protected readonly loadClass = signal('');
+  protected readonly threePhase = signal(false);
   protected readonly observations = signal<Record<string, unknown>>({});
   protected readonly specialLoad = signal('other');
   protected readonly overrideOn = signal(false);
@@ -156,6 +159,7 @@ export class LoadTool {
         this.kind.set(lp?.kind ?? (type === 'house' ? 'residential' : 'special'));
         this.observations.set({ ...(lp?.observations ?? {}) });
         this.loadClass.set(lp?.classOverride ?? '');
+        this.threePhase.set(lp?.phases === 3);
         this.specialLoad.set(lp?.specialLoad ?? SPECIAL_FOR_TYPE[type] ?? 'other');
         this.overrideOn.set(!!lp?.overridden);
         this.overrideKva.set(lp?.overridden ? lp.kva : null);
@@ -219,6 +223,7 @@ export class LoadTool {
         overrideReason: this.overrideOn() ? this.overrideReason().trim() : null,
         version: this.current()?.version ?? null,
         loadClass: residential && this.loadClass() ? this.loadClass() : null,
+        phases: residential && this.threePhase() ? 3 : 1,
       }, this.current(), this.label());
       this.current.set(lp);
       this.saved.emit(lp);

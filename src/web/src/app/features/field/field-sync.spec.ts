@@ -18,7 +18,7 @@ const inspectReq = (version: number, action: 'confirm' | 'correct' | 'not_presen
 const load = (over: Partial<LoadPoint> = {}): LoadPoint => ({
   id: 'lp1', buildingId: 'b1', kind: 'residential', specialLoad: null, observations: { dwelling: 'rdp' }, classOverride: null,
   incomeBand: 'b2', category: 'township_area', estimatedKva: 2.37, kva: 2.37, overridden: false, overrideReason: null, missing: [],
-  status: 'estimated', updatedAt: '', version: 3, ...over,
+  status: 'estimated', updatedAt: '', version: 3, phases: 1, ...over,
 });
 
 function setup(online = true) {

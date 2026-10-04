@@ -34,6 +34,11 @@ export const routes: Routes = [
         canActivate: [onlineGuard],
         loadComponent: () => import('./features/field/loads-page').then((m) => m.LoadsPage),
       },
+      {
+        path: 'projects/:id/lv',
+        canActivate: [onlineGuard],
+        loadComponent: () => import('./features/design/lv-design-page').then((m) => m.LvDesignPage),
+      },
       { path: 'system', loadComponent: () => import('./features/system/system-status').then((m) => m.SystemStatus) },
     ],
   },

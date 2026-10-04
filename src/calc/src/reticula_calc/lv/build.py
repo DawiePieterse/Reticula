@@ -99,7 +99,7 @@ def build_network(req: BuildRequest, rules: RuleSet) -> BuildResult:
     lat0 = sum(p[1] for p in pts) / len(pts)
     pr = _Projector(lon0, lat0)
 
-    routes = {r.id: LineString([pr.xy(*c) for c in r.coordinates]) for r in req.routes if len(r.coordinates) >= 2}
+    routes = _snap_routes({r.id: LineString([pr.xy(*c) for c in r.coordinates]) for r in req.routes if len(r.coordinates) >= 2})
     if not routes:
         raise ValueError("No LV routes to lay the network on; mark LV routes on the field screen first")
     route_tree = STRtree(list(routes.values()))
@@ -297,6 +297,34 @@ def build_network(req: BuildRequest, rules: RuleSet) -> BuildResult:
 def _dist(net: nx.DiGraph, a: str, b: str) -> float:
     (x1, y1), (x2, y2) = net.nodes[a]["xy"], net.nodes[b]["xy"]
     return math.hypot(x2 - x1, y2 - y1)
+
+
+def _snap_routes(routes: dict[str, LineString], tol: float = 1.0) -> dict[str, LineString]:
+    """Join routes drawn to end on (or near) another route: a hand-drawn T-junction misses by millimetres once
+    projected. Each end within `tol` of another route moves onto it, and that route gets a vertex there."""
+    lines = {k: list(v.coords) for k, v in routes.items()}
+    for rid, coords in lines.items():
+        for end in (0, -1):
+            pt = Point(coords[end])
+            for oid, other in lines.items():
+                if oid == rid or len(other) < 2:
+                    continue
+                line = LineString(other)
+                if 1e-9 < line.distance(pt) <= tol or (line.distance(pt) <= 1e-9 and coords[end] not in other):
+                    d = line.project(pt)
+                    snap = tuple(line.interpolate(d).coords[0])
+                    coords[end] = snap
+                    # Insert the junction as a vertex of the other route, in order along it.
+                    acc = 0.0
+                    for i in range(len(other) - 1):
+                        seg = LineString([other[i], other[i + 1]])
+                        if acc - 1e-9 <= d <= acc + seg.length + 1e-9:
+                            if snap not in (other[i], other[i + 1]):
+                                other.insert(i + 1, snap)
+                            break
+                        acc += seg.length
+                    break
+    return {k: LineString(v) for k, v in lines.items()}
 
 
 def deviation_deg(a, b, c) -> float:
