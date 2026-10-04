@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Reticula.Domain.Field;
 using Reticula.Domain.Jobs;
 using Reticula.Domain.Layout;
 using Reticula.Domain.Projects;
@@ -16,6 +17,11 @@ public sealed class ReticulaDbContext(DbContextOptions<ReticulaDbContext> option
     public DbSet<Stand> Stands => Set<Stand>();
     public DbSet<Building> Buildings => Set<Building>();
     public DbSet<ImportBatch> ImportBatches => Set<ImportBatch>();
+    public DbSet<Inspection> Inspections => Set<Inspection>();
+    public DbSet<Photo> Photos => Set<Photo>();
+    public DbSet<Candidate> Candidates => Set<Candidate>();
+    public DbSet<LoadPoint> LoadPoints => Set<LoadPoint>();
+    public DbSet<Assumption> Assumptions => Set<Assumption>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -105,7 +111,10 @@ public sealed class ReticulaDbContext(DbContextOptions<ReticulaDbContext> option
             e.HasKey(x => x.Id);
             e.Property(x => x.SourceRef).HasMaxLength(200).IsRequired();
             e.Property(x => x.OsmId).HasMaxLength(50);
-            e.Property(x => x.Footprint).HasColumnType($"geometry(Polygon,{ProjectRules.Srid})").IsRequired();
+            e.Property(x => x.Footprint).HasColumnType($"geometry(Polygon,{ProjectRules.Srid})");
+            e.Property(x => x.Location).HasColumnType($"geometry(Point,{ProjectRules.Srid})").IsRequired();
+            e.Property(x => x.Version).IsRowVersion();
+            e.Ignore(x => x.EffectiveType);
             e.Property(x => x.TagsJson).HasColumnType("jsonb").IsRequired();
             e.Property(x => x.Zoning).HasMaxLength(100);
             e.Property(x => x.PredictedType).HasMaxLength(20).IsRequired();
@@ -115,10 +124,91 @@ public sealed class ReticulaDbContext(DbContextOptions<ReticulaDbContext> option
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
             e.Property(x => x.ConfirmedType).HasMaxLength(20);
             e.HasIndex(x => x.Footprint).HasMethod("gist");
+            e.HasIndex(x => x.Location).HasMethod("gist");
             e.HasIndex(x => new { x.ProjectId, x.Status, x.PredictedConfidence });
             e.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne<ImportBatch>().WithMany().HasForeignKey(x => x.ImportBatchId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne<Stand>().WithMany().HasForeignKey(x => x.StandId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        b.Entity<Inspection>(e =>
+        {
+            e.ToTable("inspections");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Action).HasMaxLength(30).IsRequired();
+            e.Property(x => x.Value).HasMaxLength(50);
+            e.Property(x => x.Position).HasColumnType($"geometry(Point,{ProjectRules.Srid})");
+            e.Property(x => x.Notes).HasMaxLength(2000);
+            e.HasIndex(x => new { x.ProjectId, x.CapturedAt });
+            e.HasIndex(x => x.BuildingId);
+            e.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<Building>().WithMany().HasForeignKey(x => x.BuildingId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne<Candidate>().WithMany().HasForeignKey(x => x.CandidateId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.InspectorId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<Photo>(e =>
+        {
+            e.ToTable("photos");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.ContentType).HasMaxLength(50).IsRequired();
+            e.Property(x => x.Sha256).HasMaxLength(64).IsRequired();
+            e.Property(x => x.StorageKey).HasMaxLength(300).IsRequired();
+            e.HasIndex(x => x.BuildingId);
+            e.HasIndex(x => x.CandidateId);
+            e.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<Building>().WithMany().HasForeignKey(x => x.BuildingId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne<Candidate>().WithMany().HasForeignKey(x => x.CandidateId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne<Inspection>().WithMany().HasForeignKey(x => x.InspectionId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.UploadedBy).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<Candidate>(e =>
+        {
+            e.ToTable("candidates");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Kind).HasMaxLength(20).IsRequired();
+            e.Property(x => x.Geometry).HasColumnType($"geometry(Geometry,{ProjectRules.Srid})").IsRequired();
+            e.Property(x => x.Notes).HasMaxLength(2000);
+            e.Property(x => x.Version).IsRowVersion();
+            e.HasIndex(x => x.Geometry).HasMethod("gist");
+            e.HasIndex(x => new { x.ProjectId, x.Kind });
+            e.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.CreatedBy).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<LoadPoint>(e =>
+        {
+            e.ToTable("load_points");
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.BuildingId).IsUnique();
+            e.Property(x => x.Kind).HasMaxLength(20).IsRequired();
+            e.Property(x => x.SpecialLoad).HasMaxLength(50);
+            e.Property(x => x.ObservationsJson).HasColumnType("jsonb").IsRequired();
+            e.Property(x => x.IncomeBand).HasMaxLength(50);
+            e.Property(x => x.Category).HasMaxLength(50);
+            e.Property(x => x.OverrideReason).HasMaxLength(1000);
+            e.Property(x => x.MissingJson).HasColumnType("jsonb").IsRequired();
+            e.Property(x => x.TraceJson).HasColumnType("jsonb").IsRequired();
+            e.Property(x => x.RulesHash).HasMaxLength(16).IsRequired();
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Version).IsRowVersion();
+            e.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<Building>().WithMany().HasForeignKey(x => x.BuildingId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<Assumption>(e =>
+        {
+            e.ToTable("assumptions");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.SubjectType).HasMaxLength(30).IsRequired();
+            e.Property(x => x.Code).HasMaxLength(50).IsRequired();
+            e.Property(x => x.Text).HasMaxLength(1000).IsRequired();
+            e.Property(x => x.ClearNote).HasMaxLength(1000);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.HasIndex(x => new { x.ProjectId, x.SubjectType, x.SubjectId, x.Code }).IsUnique();
+            e.HasIndex(x => new { x.ProjectId, x.Status });
+            e.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

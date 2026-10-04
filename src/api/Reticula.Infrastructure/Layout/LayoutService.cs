@@ -74,9 +74,9 @@ public sealed class LayoutService(ReticulaDbContext db, ICalcClient calc, TimePr
             FROM (
                 SELECT DISTINCT ON (b2.id) b2.id AS building_id, s.id AS stand_id, s.zoning
                 FROM buildings b2
-                JOIN stands s ON s.project_id = b2.project_id AND ST_Intersects(s.geometry, b2.footprint)
+                JOIN stands s ON s.project_id = b2.project_id AND ST_Intersects(s.geometry, COALESCE(b2.footprint, b2.location))
                 WHERE b2.project_id = {project.Id}
-                ORDER BY b2.id, ST_Area(ST_Intersection(s.geometry, b2.footprint)) DESC
+                ORDER BY b2.id, ST_Area(ST_Intersection(s.geometry, COALESCE(b2.footprint, b2.location))) DESC
             ) m
             WHERE b.id = m.building_id
             """, ct);

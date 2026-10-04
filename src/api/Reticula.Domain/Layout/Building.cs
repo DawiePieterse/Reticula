@@ -37,6 +37,8 @@ public sealed class Building
         SourceRef = sourceRef;
         OsmId = osmId;
         Footprint = footprint;
+        Location = footprint.Centroid;
+        Location.SRID = footprint.SRID;
         AreaM2 = areaM2;
         TagsJson = tagsJson;
         Status = BuildingStatus.Predicted;
@@ -49,7 +51,11 @@ public sealed class Building
     public Guid? ImportBatchId { get; private set; }
     public string SourceRef { get; private set; } = "";
     public string? OsmId { get; private set; }
-    public Polygon Footprint { get; private set; } = null!;
+    /// <summary>Outline from map data. Null for buildings added in the field, which only have a location.</summary>
+    public Polygon? Footprint { get; private set; }
+
+    /// <summary>Representative point: footprint centroid, or the GPS position for a building added in the field.</summary>
+    public Point Location { get; private set; } = null!;
     public double AreaM2 { get; private set; }
     public string TagsJson { get; private set; } = "{}";
 
@@ -66,7 +72,53 @@ public sealed class Building
 
     public BuildingStatus Status { get; private set; }
     public string? ConfirmedType { get; private set; }
+    public Guid? InspectedBy { get; private set; }
+    public DateTimeOffset? InspectedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
+
+    /// <summary>Optimistic concurrency token (Postgres xmin).</summary>
+    public uint Version { get; private set; }
+
+    /// <summary>The type to design with: the confirmed type once inspected, otherwise the prediction.</summary>
+    public string EffectiveType => ConfirmedType ?? PredictedType;
+
+    /// <summary>A building found on site that the map data did not have.</summary>
+    public static Building CreateNew(Guid id, Guid projectId, Point location, string type, Guid inspectedBy, DateTimeOffset now) => new()
+    {
+        Id = id,
+        ProjectId = projectId,
+        SourceRef = "field",
+        Location = location,
+        TagsJson = "{}",
+        Status = BuildingStatus.New,
+        PredictedType = type,
+        PredictionSource = "field",
+        LowConfidence = false,
+        PredictedConfidence = 1,
+        ConfirmedType = type,
+        InspectedBy = inspectedBy,
+        InspectedAt = now,
+        UpdatedAt = now,
+    };
+
+    /// <summary>Inspector confirmed the building and its type (the predicted type, or a correction).</summary>
+    public void Confirm(string type, Guid inspectedBy, DateTimeOffset now)
+    {
+        if (Status != BuildingStatus.New) Status = BuildingStatus.Confirmed;
+        ConfirmedType = type;
+        InspectedBy = inspectedBy;
+        InspectedAt = now;
+        UpdatedAt = now;
+    }
+
+    public void MarkNotPresent(Guid inspectedBy, DateTimeOffset now)
+    {
+        Status = BuildingStatus.NotPresent;
+        ConfirmedType = null;
+        InspectedBy = inspectedBy;
+        InspectedAt = now;
+        UpdatedAt = now;
+    }
 
     public void SetPrediction(string type, double confidence, string source, bool lowConfidence, string signalsJson, string rulesHash, DateTimeOffset now)
     {

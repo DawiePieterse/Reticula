@@ -1,18 +1,30 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { GeoJsonPolygon } from './geo';
+import { GeoJsonPolygon, Position } from './geo';
 
-export interface Feature<P> {
+export interface GeoJsonPoint {
+  type: 'Point';
+  coordinates: Position;
+}
+
+export interface GeoJsonLineString {
+  type: 'LineString';
+  coordinates: Position[];
+}
+
+export type AnyGeometry = GeoJsonPolygon | GeoJsonPoint | GeoJsonLineString;
+
+export interface Feature<P, G extends AnyGeometry = GeoJsonPolygon> {
   type: 'Feature';
   id: string;
-  geometry: GeoJsonPolygon;
+  geometry: G;
   properties: P;
 }
 
-export interface FeatureCollection<P> {
+export interface FeatureCollection<P, G extends AnyGeometry = GeoJsonPolygon> {
   type: 'FeatureCollection';
-  features: Feature<P>[];
+  features: Feature<P, G>[];
 }
 
 export interface StandProps {
@@ -27,17 +39,21 @@ export interface PredictionSignal {
   confidence: number;
 }
 
+export type BuildingStatus = 'predicted' | 'confirmed' | 'notpresent' | 'new';
+
 export interface BuildingProps {
   predictedType: string;
   confidence: number;
   source: string;
   lowConfidence: boolean;
-  status: 'predicted' | 'confirmed' | 'notpresent' | 'new';
+  status: BuildingStatus;
   confirmedType: string | null;
+  effectiveType: string;
   areaM2: number;
   erf: string | null;
   zoning: string | null;
   signals: PredictionSignal[];
+  version: number;
 }
 
 export interface PreviewProps {
@@ -111,8 +127,8 @@ export class LayoutApi {
     return this.http.get<FeatureCollection<StandProps>>(`${this.base(projectId)}/stands`);
   }
 
-  buildings(projectId: string): Observable<FeatureCollection<BuildingProps>> {
-    return this.http.get<FeatureCollection<BuildingProps>>(`${this.base(projectId)}/buildings`);
+  buildings(projectId: string): Observable<FeatureCollection<BuildingProps, GeoJsonPolygon | GeoJsonPoint>> {
+    return this.http.get<FeatureCollection<BuildingProps, GeoJsonPolygon | GeoJsonPoint>>(`${this.base(projectId)}/buildings`);
   }
 
   import(projectId: string, o: ImportOptions): Observable<ImportResponse> {

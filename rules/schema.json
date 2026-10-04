@@ -235,6 +235,171 @@
           "maximum": 1
         }
       }
+    },
+    "income_admd": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Income and ADMD estimation from what an inspector can see on site.",
+      "required": [
+        "clause",
+        "indicators",
+        "income_bands",
+        "diversity",
+        "special_loads"
+      ],
+      "properties": {
+        "clause": {
+          "type": "string"
+        },
+        "indicators": {
+          "type": "object",
+          "description": "Single-choice observables: option -> points",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "options"
+            ],
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "options": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "minProperties": 1
+              }
+            }
+          }
+        },
+        "multi_indicators": {
+          "type": "object",
+          "description": "Multi-choice observables: each chosen option adds its points",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "options"
+            ],
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "options": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "minProperties": 1
+              }
+            }
+          }
+        },
+        "band_indicators": {
+          "type": "object",
+          "description": "Numeric observables scored by band (upper bound exclusive)",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "bands"
+            ],
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "unit": {
+                "type": "string"
+              },
+              "bands": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "points"
+                  ],
+                  "properties": {
+                    "max": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "points": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "income_bands": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "band",
+              "category",
+              "max_points",
+              "admd_kva"
+            ],
+            "properties": {
+              "band": {
+                "type": "string"
+              },
+              "category": {
+                "type": "string"
+              },
+              "max_points": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "admd_kva": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            }
+          }
+        },
+        "diversity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "formula",
+            "k"
+          ],
+          "properties": {
+            "formula": {
+              "const": "admd_n = admd_inf * (1 + k / n)"
+            },
+            "k": {
+              "type": "number",
+              "minimum": 0
+            },
+            "clause": {
+              "type": "string"
+            }
+          }
+        },
+        "special_loads": {
+          "type": "object",
+          "description": "Default kVA per special load, always overridable",
+          "additionalProperties": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "minProperties": 1
+        }
+      }
     }
   }
 }

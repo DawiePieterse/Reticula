@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from reticula_calc.calcs.admd import EstimateRequest, GroupRequest, estimate, group
 from reticula_calc.calcs.voltage_drop import VoltageDropRequest, voltage_drop
 from reticula_calc.rules import load_rules
 
@@ -15,7 +16,17 @@ def _run_voltage_drop(inp: dict) -> dict:
     return {"drop_v": r.drop_v.value, "drop_pct": r.drop_pct.value, "passes": r.passes}
 
 
-RUNNERS = {"voltage_drop": _run_voltage_drop}
+def _run_admd(inp: dict) -> dict:
+    r = estimate(EstimateRequest(**inp), load_rules(inp["rules"]))
+    return {"points": r.points.value, "admd_kva": r.admd_kva.value, "category": r.category}
+
+
+def _run_admd_group(inp: dict) -> dict:
+    r = group(GroupRequest(**inp), load_rules(inp["rules"]))
+    return {"diversity_factor": r.diversity_factor.value, "residential_kva": r.residential_kva.value, "total_kva": r.total_kva.value}
+
+
+RUNNERS = {"voltage_drop": _run_voltage_drop, "admd": _run_admd, "admd_group": _run_admd_group}
 
 
 def _cases():
@@ -31,7 +42,7 @@ def test_hand_worked_case(runner, case: Path):
     tol = expected.pop("tolerance_pct", 0.5) / 100
     got = runner(inputs)
     for key, exp in expected.items():
-        if isinstance(exp, bool):
+        if isinstance(exp, (bool, str)):
             assert got[key] == exp, key
         else:
             assert got[key] == pytest.approx(exp, rel=tol), key

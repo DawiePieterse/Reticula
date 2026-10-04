@@ -13,7 +13,7 @@ import {
 import type { Feature as GjFeature, FeatureCollection as GjCollection } from 'geojson';
 import type { GeoJSONSource, Map as MlMap, MapMouseEvent, StyleSpecification } from 'maplibre-gl';
 import { GeoJsonPolygon, Position, bounds } from './geo';
-import { BUILDING_COLOURS, FeatureCollection } from './layout.api';
+import { AnyGeometry, BUILDING_COLOURS, FeatureCollection } from './layout.api';
 import { PolygonDraw } from './polygon-draw';
 
 const OSM_STYLE: StyleSpecification = {
@@ -42,7 +42,7 @@ const STANDS = 'stands';
 const BUILDINGS = 'buildings';
 const PREVIEW = 'preview';
 
-type AnyCollection = FeatureCollection<unknown> | null;
+type AnyCollection = FeatureCollection<unknown, AnyGeometry> | null;
 
 /** MapLibre map that shows a project area and, when editable, lets the user tap out a polygon. */
 @Component({
@@ -217,9 +217,9 @@ export class AreaMap implements OnDestroy {
     src?.setData((data ?? emptyCollection()) as never);
   }
 
-  private fitCollection(fc: FeatureCollection<unknown>): void {
+  private fitCollection(fc: FeatureCollection<unknown, AnyGeometry>): void {
     if (!this.map) return;
-    const all = fc.features.flatMap((f) => f.geometry.coordinates[0]);
+    const all = fc.features.flatMap((f) => positionsOf(f.geometry));
     if (!all.length) return;
     this.map.fitBounds(bounds({ type: 'Polygon', coordinates: [all] }), { padding: 40, duration: 0, maxZoom: 18 });
   }
@@ -228,7 +228,7 @@ export class AreaMap implements OnDestroy {
     if (!this.map) return;
     this.map.setFilter('buildings-focus', ['==', ['id'], id ?? '']);
     const f = (this.buildings()?.features ?? []).find((x) => x.id === id);
-    if (f) this.map.fitBounds(bounds(f.geometry), { padding: 80, duration: 300, maxZoom: 19 });
+    if (f) this.map.fitBounds(bounds({ type: 'Polygon', coordinates: [positionsOf(f.geometry)] }), { padding: 80, duration: 300, maxZoom: 19 });
   }
 
   private fit(): void {
@@ -236,6 +236,10 @@ export class AreaMap implements OnDestroy {
     if (!this.map || !polygon) return;
     this.map.fitBounds(bounds(polygon), { padding: 40, duration: 0, maxZoom: 17 });
   }
+}
+
+function positionsOf(g: AnyGeometry): Position[] {
+  return g.type === 'Polygon' ? g.coordinates[0] : g.type === 'LineString' ? g.coordinates : [g.coordinates];
 }
 
 function emptyCollection(): GjCollection {

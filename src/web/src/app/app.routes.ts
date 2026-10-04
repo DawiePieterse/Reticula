@@ -24,6 +24,17 @@ export const routes: Routes = [
         canActivate: [onlineGuard],
         loadComponent: () => import('./features/projects/project-edit').then((m) => m.ProjectEdit),
       },
+      {
+        // Online-only until offline sync (plan item 1.8) lands.
+        path: 'projects/:id/field',
+        canActivate: [onlineGuard],
+        loadComponent: () => import('./features/field/field-page').then((m) => m.FieldPage),
+      },
+      {
+        path: 'projects/:id/loads',
+        canActivate: [onlineGuard],
+        loadComponent: () => import('./features/field/loads-page').then((m) => m.LoadsPage),
+      },
       { path: 'system', loadComponent: () => import('./features/system/system-status').then((m) => m.SystemStatus) },
     ],
   },

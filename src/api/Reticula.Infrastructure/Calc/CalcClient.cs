@@ -62,6 +62,29 @@ public sealed class CalcClient(HttpClient http) : ICalcClient
         return await ReadAsync<PredictionResult>(r, ct);
     }
 
+    public async Task<JsonElement> GetAdmdFormAsync(string rulesRef, CancellationToken ct = default)
+    {
+        var parts = rulesRef.Split('/');
+        using var r = await SendAsync($"/calc/admd/form/{Uri.EscapeDataString(parts[0])}/{Uri.EscapeDataString(parts.ElementAtOrDefault(1) ?? "")}", ct);
+        return await ReadAsync<JsonElement>(r, ct);
+    }
+
+    public async Task<AdmdEstimate> EstimateAdmdAsync(AdmdEstimateRequest request, CancellationToken ct = default)
+    {
+        using var content = JsonContent.Create(request, options: Json);
+        using var r = await SendAsync(() => http.PostAsync("/calc/admd/estimate", content, ct), ct);
+        var raw = await ReadAsync<JsonElement>(r, ct);
+        var typed = raw.Deserialize<AdmdEstimate>(Json) ?? throw new CalcUnavailableException("Calc service returned an empty body.");
+        return typed with { Raw = raw.GetRawText() };
+    }
+
+    public async Task<AdmdGroup> GroupAdmdAsync(string rulesRef, IReadOnlyList<AdmdGroupLoad> loads, CancellationToken ct = default)
+    {
+        using var content = JsonContent.Create(new { rules = rulesRef, loads }, options: Json);
+        using var r = await SendAsync(() => http.PostAsync("/calc/admd/group", content, ct), ct);
+        return await ReadAsync<AdmdGroup>(r, ct);
+    }
+
     private static async Task<T> ReadAsync<T>(HttpResponseMessage r, CancellationToken ct)
     {
         if (r.StatusCode is HttpStatusCode.UnprocessableEntity or HttpStatusCode.RequestEntityTooLarge)

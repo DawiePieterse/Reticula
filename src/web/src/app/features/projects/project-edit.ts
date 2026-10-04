@@ -15,7 +15,13 @@ import { ProjectsApi } from './projects.api';
   template: `
     <div class="page-head">
       <h2>{{ isNew() ? 'New project' : form.controls.name.value || 'Project' }}</h2>
-      <a routerLink="/projects">Back to projects</a>
+      <div class="row">
+        @if (id(); as projectId) {
+          <a class="button primary" [routerLink]="['/projects', projectId, 'field']">Field inspection</a>
+          <a class="button" [routerLink]="['/projects', projectId, 'loads']">Loads</a>
+        }
+        <a routerLink="/projects">Back to projects</a>
+      </div>
     </div>
 
     @if (conflict()) {

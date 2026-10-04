@@ -95,15 +95,15 @@ Deliverables: predicted building types, tablet inspection, income/ADMD tool, loa
 - [~] 1.1 Importers: CAD (DXF) and KML stand layouts; contours (DXF/SHP/GeoTIFF); OSM building/road extract for area; authority network data (CSV/SHP/GeoJSON with required fields). (Done: stands from KML/KMZ/GeoJSON/DXF, buildings from Overpass/GeoJSON; see docs/imports.md. To do: roads, contours, authority network, live Overpass fetch.)
 - [x] 1.2 Import validation: CRS detection, duplicate stands, missing erf numbers flagged early.
 - [~] 1.3 Building-type predictor: rules on OSM tags, zoning, footprint area; rooftop-image classifier behind licence flag; output type + confidence + source. (Done: tags, zoning, footprint from the rules file. To do: rooftop images, pending licence.)
-- [ ] 1.4 Inspection UI (tablet): map-first, one-tap confirm, type picker (house/shop/school/other/not present/new), photo capture, notes, GPS, timestamp.
-- [ ] 1.5 Candidate marking: transformer, mini-sub, MV route, pole site, LV route.
-- [~] 1.6 Progress panel: confirmed / outstanding / low-confidence-first list. (Done: summary and low-confidence-first list. To do: confirmation progress with 1.4.)
-- [ ] 1.7 Income and ADMD tool: observable inputs → income band → category → ADMD (per NRS 034-1 tables in rules file); group after-diversity demand; special loads at own kVA; override with reason.
+- [x] 1.4 Inspection UI (tablet): map-first, one-tap confirm, type picker (house/shop/school/other/not present/new), photo capture, notes, GPS, timestamp. (docs/field.md; offline in 1.8)
+- [x] 1.5 Candidate marking: transformer, mini-sub, MV route, pole site, LV route.
+- [x] 1.6 Progress panel: confirmed / outstanding / low-confidence-first list.
+- [x] 1.7 Income and ADMD tool: observable inputs → income band → category → ADMD (per NRS 034-1 tables in rules file); group after-diversity demand; special loads at own kVA; override with reason. (Method in place; rules values are placeholders until the authority's NRS 034-1 values are encoded.)
 - [ ] 1.8 Offline: IndexedDB store, cached rules tables, photo queue, sync engine with conflict detection and side-by-side resolution UI (never auto-overwrite).
 - [ ] 1.9 Offline map tiles: PMTiles pack per project area, download/refresh.
-- [ ] 1.10 Load schedule view and export (CSV/Excel).
-- [ ] 1.11 Assumptions register v1: every estimate and override auto-registered.
-- [ ] 1.12 Validation: ADMD hand-worked cases from NRS 034-1 examples in `/test-cases`.
+- [~] 1.10 Load schedule view and export (CSV/Excel). (Done: view and CSV. To do: Excel with the documents in Phase 6.)
+- [x] 1.11 Assumptions register v1: every estimate and override auto-registered.
+- [~] 1.12 Validation: ADMD hand-worked cases from NRS 034-1 examples in `/test-cases`. (Done: hand-worked cases against the placeholder rules. To do: NRS 034-1 worked examples once real values are encoded.)
 
 ### Phase 2 – LV design
 
