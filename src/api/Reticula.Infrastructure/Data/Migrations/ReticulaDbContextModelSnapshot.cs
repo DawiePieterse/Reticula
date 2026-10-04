@@ -186,6 +186,411 @@ namespace Reticula.Infrastructure.Data.Migrations
                     b.ToTable("user_tokens", (string)null);
                 });
 
+            modelBuilder.Entity("Reticula.Domain.Field.Assumption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ClearNote")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("clear_note");
+
+                    b.Property<DateTimeOffset?>("ClearedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("cleared_at");
+
+                    b.Property<Guid?>("ClearedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("cleared_by");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("code");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_id");
+
+                    b.Property<string>("SubjectType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("subject_type");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("text");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_assumptions");
+
+                    b.HasIndex("ProjectId", "Status")
+                        .HasDatabaseName("ix_assumptions_project_id_status");
+
+                    b.HasIndex("ProjectId", "SubjectType", "SubjectId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_assumptions_project_id_subject_type_subject_id_code");
+
+                    b.ToTable("assumptions", (string)null);
+                });
+
+            modelBuilder.Entity("Reticula.Domain.Field.Candidate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("ArchivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("archived_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<Geometry>("Geometry")
+                        .IsRequired()
+                        .HasColumnType("geometry(Geometry,4326)")
+                        .HasColumnName("geometry");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("notes");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_candidates");
+
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("ix_candidates_created_by");
+
+                    b.HasIndex("Geometry")
+                        .HasDatabaseName("ix_candidates_geometry");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Geometry"), "gist");
+
+                    b.HasIndex("ProjectId", "Kind")
+                        .HasDatabaseName("ix_candidates_project_id_kind");
+
+                    b.ToTable("candidates", (string)null);
+                });
+
+            modelBuilder.Entity("Reticula.Domain.Field.Inspection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<double?>("AccuracyM")
+                        .HasColumnType("double precision")
+                        .HasColumnName("accuracy_m");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("action");
+
+                    b.Property<Guid?>("BuildingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("building_id");
+
+                    b.Property<Guid?>("CandidateId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("candidate_id");
+
+                    b.Property<DateTimeOffset>("CapturedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("captured_at");
+
+                    b.Property<Guid>("InspectorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("inspector_id");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("notes");
+
+                    b.Property<Point>("Position")
+                        .HasColumnType("geometry(Point,4326)")
+                        .HasColumnName("position");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("recorded_at");
+
+                    b.Property<string>("Value")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("value");
+
+                    b.HasKey("Id")
+                        .HasName("pk_inspections");
+
+                    b.HasIndex("BuildingId")
+                        .HasDatabaseName("ix_inspections_building_id");
+
+                    b.HasIndex("CandidateId")
+                        .HasDatabaseName("ix_inspections_candidate_id");
+
+                    b.HasIndex("InspectorId")
+                        .HasDatabaseName("ix_inspections_inspector_id");
+
+                    b.HasIndex("ProjectId", "CapturedAt")
+                        .HasDatabaseName("ix_inspections_project_id_captured_at");
+
+                    b.ToTable("inspections", (string)null);
+                });
+
+            modelBuilder.Entity("Reticula.Domain.Field.LoadPoint", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BuildingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("building_id");
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("category");
+
+                    b.Property<DateTimeOffset?>("ConfirmedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("confirmed_at");
+
+                    b.Property<Guid?>("ConfirmedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("confirmed_by");
+
+                    b.Property<double>("EstimatedKva")
+                        .HasColumnType("double precision")
+                        .HasColumnName("estimated_kva");
+
+                    b.Property<string>("IncomeBand")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("income_band");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("kind");
+
+                    b.Property<double>("Kva")
+                        .HasColumnType("double precision")
+                        .HasColumnName("kva");
+
+                    b.Property<string>("MissingJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("missing_json");
+
+                    b.Property<string>("ObservationsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("observations_json");
+
+                    b.Property<bool>("Overridden")
+                        .HasColumnType("boolean")
+                        .HasColumnName("overridden");
+
+                    b.Property<string>("OverrideReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("override_reason");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<string>("RulesHash")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("rules_hash");
+
+                    b.Property<string>("SpecialLoad")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("special_load");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("TraceJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("trace_json");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_load_points");
+
+                    b.HasIndex("BuildingId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_load_points_building_id");
+
+                    b.HasIndex("ProjectId")
+                        .HasDatabaseName("ix_load_points_project_id");
+
+                    b.ToTable("load_points", (string)null);
+                });
+
+            modelBuilder.Entity("Reticula.Domain.Field.Photo", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("BuildingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("building_id");
+
+                    b.Property<Guid?>("CandidateId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("candidate_id");
+
+                    b.Property<DateTimeOffset>("CapturedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("captured_at");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("content_type");
+
+                    b.Property<Guid?>("InspectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("inspection_id");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("sha256");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("size_bytes");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("storage_key");
+
+                    b.Property<DateTimeOffset>("UploadedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("uploaded_at");
+
+                    b.Property<Guid>("UploadedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("uploaded_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_photos");
+
+                    b.HasIndex("BuildingId")
+                        .HasDatabaseName("ix_photos_building_id");
+
+                    b.HasIndex("CandidateId")
+                        .HasDatabaseName("ix_photos_candidate_id");
+
+                    b.HasIndex("InspectionId")
+                        .HasDatabaseName("ix_photos_inspection_id");
+
+                    b.HasIndex("ProjectId")
+                        .HasDatabaseName("ix_photos_project_id");
+
+                    b.HasIndex("UploadedBy")
+                        .HasDatabaseName("ix_photos_uploaded_by");
+
+                    b.ToTable("photos", (string)null);
+                });
+
             modelBuilder.Entity("Reticula.Domain.Jobs.JobRun", b =>
                 {
                     b.Property<Guid>("Id")
@@ -284,13 +689,25 @@ namespace Reticula.Infrastructure.Data.Migrations
                         .HasColumnName("confirmed_type");
 
                     b.Property<Polygon>("Footprint")
-                        .IsRequired()
                         .HasColumnType("geometry(Polygon,4326)")
                         .HasColumnName("footprint");
 
                     b.Property<Guid?>("ImportBatchId")
                         .HasColumnType("uuid")
                         .HasColumnName("import_batch_id");
+
+                    b.Property<DateTimeOffset?>("InspectedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("inspected_at");
+
+                    b.Property<Guid?>("InspectedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("inspected_by");
+
+                    b.Property<Point>("Location")
+                        .IsRequired()
+                        .HasColumnType("geometry(Point,4326)")
+                        .HasColumnName("location");
 
                     b.Property<bool>("LowConfidence")
                         .HasColumnType("boolean")
@@ -356,6 +773,12 @@ namespace Reticula.Infrastructure.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
                     b.Property<string>("Zoning")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
@@ -371,6 +794,11 @@ namespace Reticula.Infrastructure.Data.Migrations
 
                     b.HasIndex("ImportBatchId")
                         .HasDatabaseName("ix_buildings_import_batch_id");
+
+                    b.HasIndex("Location")
+                        .HasDatabaseName("ix_buildings_location");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Location"), "gist");
 
                     b.HasIndex("StandId")
                         .HasDatabaseName("ix_buildings_stand_id");
@@ -728,6 +1156,114 @@ namespace Reticula.Infrastructure.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_user_tokens_asp_net_users_user_id");
+                });
+
+            modelBuilder.Entity("Reticula.Domain.Field.Assumption", b =>
+                {
+                    b.HasOne("Reticula.Domain.Projects.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_assumptions_projects_project_id");
+                });
+
+            modelBuilder.Entity("Reticula.Domain.Field.Candidate", b =>
+                {
+                    b.HasOne("Reticula.Infrastructure.Identity.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_candidates_users_created_by");
+
+                    b.HasOne("Reticula.Domain.Projects.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_candidates_projects_project_id");
+                });
+
+            modelBuilder.Entity("Reticula.Domain.Field.Inspection", b =>
+                {
+                    b.HasOne("Reticula.Domain.Layout.Building", null)
+                        .WithMany()
+                        .HasForeignKey("BuildingId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_inspections_buildings_building_id");
+
+                    b.HasOne("Reticula.Domain.Field.Candidate", null)
+                        .WithMany()
+                        .HasForeignKey("CandidateId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_inspections_candidates_candidate_id");
+
+                    b.HasOne("Reticula.Infrastructure.Identity.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("InspectorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_inspections_users_inspector_id");
+
+                    b.HasOne("Reticula.Domain.Projects.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_inspections_projects_project_id");
+                });
+
+            modelBuilder.Entity("Reticula.Domain.Field.LoadPoint", b =>
+                {
+                    b.HasOne("Reticula.Domain.Layout.Building", null)
+                        .WithMany()
+                        .HasForeignKey("BuildingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_load_points_buildings_building_id");
+
+                    b.HasOne("Reticula.Domain.Projects.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_load_points_projects_project_id");
+                });
+
+            modelBuilder.Entity("Reticula.Domain.Field.Photo", b =>
+                {
+                    b.HasOne("Reticula.Domain.Layout.Building", null)
+                        .WithMany()
+                        .HasForeignKey("BuildingId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_photos_buildings_building_id");
+
+                    b.HasOne("Reticula.Domain.Field.Candidate", null)
+                        .WithMany()
+                        .HasForeignKey("CandidateId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_photos_candidates_candidate_id");
+
+                    b.HasOne("Reticula.Domain.Field.Inspection", null)
+                        .WithMany()
+                        .HasForeignKey("InspectionId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_photos_inspections_inspection_id");
+
+                    b.HasOne("Reticula.Domain.Projects.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_photos_projects_project_id");
+
+                    b.HasOne("Reticula.Infrastructure.Identity.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("UploadedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_photos_users_uploaded_by");
                 });
 
             modelBuilder.Entity("Reticula.Domain.Jobs.JobRun", b =>

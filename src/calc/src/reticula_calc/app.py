@@ -8,6 +8,16 @@ from typing import Annotated
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 
 from . import __version__
+from .calcs.admd import (
+    AdmdInputError,
+    EstimateRequest,
+    EstimateResult,
+    GroupRequest,
+    GroupResult,
+    estimate,
+    form_definition,
+    group,
+)
 from .calcs.voltage_drop import VoltageDropRequest, VoltageDropResult, voltage_drop
 from .geo import crs as crs_mod
 from .geo.importers import ImportResult, UnreadableFileError, import_file
@@ -74,5 +84,29 @@ async def geo_import(
 def predict_building_types(req: PredictRequest) -> PredictResponse:
     try:
         return predict(req, load_rules(req.rules))
+    except RulesError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+@app.get("/calc/admd/form/{authority}/{version}")
+def admd_form(authority: str, version: str) -> dict:
+    try:
+        return form_definition(load_rules(f"{authority}/{version}"))
+    except RulesError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+
+@app.post("/calc/admd/estimate")
+def admd_estimate(req: EstimateRequest) -> EstimateResult:
+    try:
+        return estimate(req, load_rules(req.rules))
+    except (RulesError, AdmdInputError) as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+@app.post("/calc/admd/group")
+def admd_group(req: GroupRequest) -> GroupResult:
+    try:
+        return group(req, load_rules(req.rules))
     except RulesError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e

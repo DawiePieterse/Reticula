@@ -1,0 +1,1 @@
+{ "rules": "eskom/0.1.0", "observations": { "dwelling": "brick_small", "roof": "tiles", "walls": "plastered", "vehicles": "1", "appliances": ["fridge", "tv", "geyser"], "stand_size_m2": 450, "occupants": 5 } }

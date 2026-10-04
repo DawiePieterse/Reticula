@@ -1,0 +1,1 @@
+{ "rules": "eskom/0.1.0", "observations": { "dwelling": "informal", "roof": "sheeting", "walls": "informal", "vehicles": "0", "appliances": ["tv"], "stand_size_m2": 250, "occupants": 6 } }

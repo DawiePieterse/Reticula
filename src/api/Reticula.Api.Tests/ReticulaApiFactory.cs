@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authentication.BearerToken;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -21,6 +22,7 @@ public sealed class ReticulaApiFactory : WebApplicationFactory<Program>, IAsyncL
     public const string EngineerPassword = "engineer-test-pass";
 
     private readonly string _dbName = $"reticula_test_{Guid.NewGuid():N}";
+    public string StorageRoot { get; } = Path.Combine(Path.GetTempPath(), $"reticula-files-{Guid.NewGuid():N}");
 
     private static string BaseConnection =>
         Environment.GetEnvironmentVariable("RETICULA_TEST_DB") ?? "Host=localhost;Username=reticula;Password=reticula";
@@ -37,6 +39,7 @@ public sealed class ReticulaApiFactory : WebApplicationFactory<Program>, IAsyncL
         builder.UseSetting("Bootstrap:EngineerEmail", EngineerEmail);
         builder.UseSetting("Bootstrap:EngineerPassword", EngineerPassword);
         builder.UseSetting("Bootstrap:EngineerName", "Test Engineer");
+        builder.UseSetting("Storage:Root", StorageRoot);
         builder.UseSetting("Jobs:PollIntervalMs", "100");
         builder.UseSetting("Jobs:CancellationCheckMs", "200");
         builder.ConfigureServices(s =>
@@ -58,6 +61,7 @@ public sealed class ReticulaApiFactory : WebApplicationFactory<Program>, IAsyncL
         await conn.OpenAsync();
         await using var cmd = new NpgsqlCommand($"DROP DATABASE IF EXISTS \"{_dbName}\" WITH (FORCE)", conn);
         await cmd.ExecuteNonQueryAsync();
+        if (Directory.Exists(StorageRoot)) Directory.Delete(StorageRoot, recursive: true);
     }
 
     public async Task<HttpClient> ClientAsAsync(string email, string password)
@@ -122,6 +126,35 @@ public sealed class FakeCalc : ICalcClient
             : b.Zoning?.Contains("Residential", StringComparison.OrdinalIgnoreCase) == true ? new BuildingPrediction(b.Id, "house", 0.6, $"zoning:{b.Zoning}", false, [])
             : new BuildingPrediction(b.Id, "other", 0.3, "footprint", true, [])).ToList();
         return Task.FromResult(new PredictionResult("0123456789abcdef", "test", predictions));
+    }
+
+    public Task<JsonElement> GetAdmdFormAsync(string rulesRef, CancellationToken ct = default) =>
+        Task.FromResult(JsonDocument.Parse("{\"indicators\":[{\"key\":\"dwelling\",\"options\":[\"rdp\",\"brick_small\"]}],\"special_loads\":{\"school\":25}}").RootElement.Clone());
+
+    /// <summary>Simplified estimator: residential 1.5 kVA (category R2), "roof" missing unless given; school 25 kVA, other special 2 kVA.</summary>
+    public Task<AdmdEstimate> EstimateAdmdAsync(AdmdEstimateRequest r, CancellationToken ct = default)
+    {
+        Throw();
+        if (r.Observations?.TryGetValue("dwelling", out var d) == true && d.GetString() == "castle")
+            throw new CalcRejectedException("dwelling: unknown option 'castle'");
+        var special = r.Kind == "special";
+        var estimated = special ? (r.SpecialLoad == "school" ? 25 : 2) : 1.5;
+        var kva = r.OverrideKva ?? estimated;
+        var missing = special || r.Observations?.ContainsKey("roof") == true ? new List<string>() : ["roof"];
+        var traced = new TracedValue(kva, "kVA", "test", "test", "test clause", "0123456789abcdef", JsonDocument.Parse("[]").RootElement.Clone());
+        var result = new AdmdEstimate(r.Kind, missing, special ? null : "low", special ? r.SpecialLoad : "R2", traced, estimated,
+            r.OverrideKva is not null, "0123456789abcdef", "");
+        return Task.FromResult(result with { Raw = JsonSerializer.Serialize(new { kind = r.Kind, admd_kva = kva }) });
+    }
+
+    public Task<AdmdGroup> GroupAdmdAsync(string rulesRef, IReadOnlyList<AdmdGroupLoad> loads, CancellationToken ct = default)
+    {
+        var res = loads.Where(l => l.Kind == "residential").ToList();
+        var factor = res.Count == 0 ? (double?)null : 1 + 1.5 / res.Count;
+        var resKva = res.Sum(l => l.Kva) * (factor ?? 0);
+        var special = loads.Where(l => l.Kind == "special").Sum(l => l.Kva);
+        TracedValue T(double v) => new(v, "kVA", "test", "S = sum", "test clause", "0123456789abcdef", JsonDocument.Parse("[]").RootElement.Clone());
+        return Task.FromResult(new AdmdGroup(res.Count, loads.Count - res.Count, factor is null ? null : T(factor.Value), T(resKva), special, T(resKva + special), "0123456789abcdef"));
     }
 
     private void Throw()

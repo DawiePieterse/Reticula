@@ -12,7 +12,8 @@ using Reticula.Infrastructure.Layout;
 
 namespace Reticula.Api.Layout;
 
-public sealed record GeoFeature<TProps>(string Type, string Id, PolygonDto Geometry, TProps Properties);
+/// <summary>GeoJSON feature. Geometry is a PolygonDto, PointDto or LineStringDto, serialised by its runtime type.</summary>
+public sealed record GeoFeature<TProps>(string Type, string Id, object Geometry, TProps Properties);
 
 public sealed record GeoFeatureCollection<TProps>(string Type, IReadOnlyList<GeoFeature<TProps>> Features)
 {
@@ -23,7 +24,7 @@ public sealed record StandProps(string? Erf, string? Zoning, double AreaM2);
 
 public sealed record BuildingProps(
     string PredictedType, double Confidence, string Source, bool LowConfidence, string Status, string? ConfirmedType,
-    double AreaM2, string? Erf, string? Zoning, JsonElement Signals);
+    string EffectiveType, double AreaM2, string? Erf, string? Zoning, JsonElement Signals, uint Version);
 
 public sealed record PreviewProps(string Ref, string? Erf, double AreaM2);
 
@@ -124,10 +125,10 @@ public static class LayoutEndpoints
             select new { b, Erf = s == null ? null : s.ErfNumber }).ToListAsync(ct);
 
         return TypedResults.Ok(GeoFeatureCollection<BuildingProps>.Of(rows.Select(x => new GeoFeature<BuildingProps>(
-            "Feature", x.b.Id.ToString(), PolygonDto.From(x.b.Footprint),
+            "Feature", x.b.Id.ToString(), x.b.Footprint is null ? PointDto.From(x.b.Location) : PolygonDto.From(x.b.Footprint),
             new BuildingProps(x.b.PredictedType, x.b.PredictedConfidence, x.b.PredictionSource, x.b.LowConfidence,
-                x.b.Status.ToString().ToLowerInvariant(), x.b.ConfirmedType, x.b.AreaM2, x.Erf, x.b.Zoning,
-                JsonDocument.Parse(x.b.PredictionSignalsJson).RootElement.Clone())))));
+                x.b.Status.ToString().ToLowerInvariant(), x.b.ConfirmedType, x.b.EffectiveType, x.b.AreaM2, x.Erf, x.b.Zoning,
+                JsonDocument.Parse(x.b.PredictionSignalsJson).RootElement.Clone(), x.b.Version)))));
     }
 
     private static async Task<Results<Ok<LayoutSummary>, NotFound>> Summary(Guid projectId, ReticulaDbContext db, CancellationToken ct)

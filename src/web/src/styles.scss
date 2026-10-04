@@ -54,3 +54,5 @@ form label, form .field { display: flex; flex-direction: column; gap: .35rem; ma
 
 table { width: 100%; border-collapse: collapse; background: var(--surface); }
 th, td { text-align: left; padding: .6rem .75rem; border-bottom: 1px solid var(--border); }
+
+.row { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }

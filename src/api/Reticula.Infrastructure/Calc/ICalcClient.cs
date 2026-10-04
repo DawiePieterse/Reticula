@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace Reticula.Infrastructure.Calc;
 
 /// <summary>Gateway to the Python calculation service. No engineering number is computed on the .NET side.</summary>
@@ -18,6 +20,14 @@ public interface ICalcClient
 
     /// <exception cref="CalcRejectedException">The rules file has no prediction section.</exception>
     Task<PredictionResult> PredictBuildingTypesAsync(string rulesRef, IReadOnlyList<BuildingPredictionInput> buildings, CancellationToken ct = default);
+
+    /// <summary>The observation form for the income and ADMD tool, from the rules file.</summary>
+    Task<JsonElement> GetAdmdFormAsync(string rulesRef, CancellationToken ct = default);
+
+    /// <exception cref="CalcRejectedException">Unknown option, bad number or missing rules section.</exception>
+    Task<AdmdEstimate> EstimateAdmdAsync(AdmdEstimateRequest request, CancellationToken ct = default);
+
+    Task<AdmdGroup> GroupAdmdAsync(string rulesRef, IReadOnlyList<AdmdGroupLoad> loads, CancellationToken ct = default);
 }
 
 public sealed record RulesInfo(string Ref, string Hash, string EffectiveDate);

@@ -4,10 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { toApiProblem } from '../../core/api-problem';
+import { GeoJsonPolygon } from './geo';
 import {
   BUILDING_COLOURS,
   BuildingProps,
   FeatureCollection,
+  GeoJsonPoint,
   ImportKind,
   ImportResponse,
   LayoutApi,
@@ -18,7 +20,7 @@ import {
 
 export interface LayoutLayers {
   stands: FeatureCollection<StandProps> | null;
-  buildings: FeatureCollection<BuildingProps> | null;
+  buildings: FeatureCollection<BuildingProps, GeoJsonPolygon | GeoJsonPoint> | null;
   preview: FeatureCollection<PreviewProps> | null;
 }
 
@@ -174,7 +176,7 @@ export class ProjectLayout {
 
   protected readonly summary = signal<LayoutSummary | null>(null);
   private readonly stands = signal<FeatureCollection<StandProps> | null>(null);
-  private readonly buildings = signal<FeatureCollection<BuildingProps> | null>(null);
+  private readonly buildings = signal<FeatureCollection<BuildingProps, GeoJsonPolygon | GeoJsonPoint> | null>(null);
 
   protected readonly kind = signal<ImportKind>('stands');
   protected readonly file = signal<File | null>(null);

@@ -8,7 +8,7 @@ const SQUARE = { type: 'Polygon' as const, coordinates: [[[28.1, -25.52], [28.11
 
 const building = (id: string, confidence: number, low: boolean, erf: string): Feature<BuildingProps> => ({
   type: 'Feature', id, geometry: SQUARE,
-  properties: { predictedType: 'house', confidence, source: 'footprint:80 m²', lowConfidence: low, status: 'predicted', confirmedType: null, areaM2: 80, erf, zoning: null, signals: [] },
+  properties: { predictedType: 'house', confidence, source: 'footprint:80 m²', lowConfidence: low, status: 'predicted', confirmedType: null, effectiveType: 'house', areaM2: 80, erf, zoning: null, signals: [], version: 1 },
 });
 
 const summary = { stands: 2, standsWithoutErf: 0, buildings: 3, lowConfidence: 2, inspected: 0, predictedByType: { house: 3 } };

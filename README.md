@@ -52,6 +52,10 @@ dotnet ef migrations add <Name> -p Reticula.Infrastructure -s Reticula.Api -o Da
 
 CI fails if the model has changes without a migration.
 
+## Field work
+
+Importing layouts is described in `docs/imports.md`. Inspection, the income and ADMD tool, the assumptions register and the load schedule are described in `docs/field.md`.
+
 ## Operations
 
 Logging, tracing, error reporting, backups and restore are described in `docs/operations.md`.
