@@ -103,16 +103,16 @@ Deliverables: predicted building types, tablet inspection, income/ADMD tool, loa
 - [ ] 1.9 Offline map tiles: PMTiles pack per project area, download/refresh.
 - [~] 1.10 Load schedule view and export (CSV/Excel). (Done: view and CSV. To do: Excel with the documents in Phase 6.)
 - [x] 1.11 Assumptions register v1: every estimate and override auto-registered.
-- [~] 1.12 Validation: ADMD hand-worked cases from NRS 034-1 examples in `/test-cases`. (Done: hand-worked ADMD and Herman-Beta cases, and a self-check of every load class against its α, β and c. To do: compare with NRS 034-1 worked examples and ReticMaster results.)
+- [~] 1.12 Validation: ADMD hand-worked cases from NRS 034-1 examples in `/test-cases`. (Done: hand-worked ADMD and Herman-Beta cases, and a self-check of every load class against its α, β and c. ReticMaster's Herman-Beta example added. To do: compare with NRS 034-1 worked examples and ReticMaster results.)
 
 ### Phase 2 – LV design
 
 Deliverables: LV layout, phasing, conductor sizing, voltage drop, fault level, OH and UG checks.
 
 - [ ] 2.1 Network model in Python (networkx graph + shapely geometry), serialisation to/from Postgres.
-- [ ] 2.2 Load allocation to candidate LV routes; phase balancing (3-phase/1-phase per rules).
+- [ ] 2.2 Load allocation to candidate LV routes; phase balancing (3-phase/1-phase per rules). (1-phase and 3-phase domestic connections diversified separately and added; ReticMaster paired rotation W W R R B B. See docs/calc-methods.md.)
 - [ ] 2.3 Conductor/cable library from rules file (SANS 1507 LV cables, ABC/bare OH conductors) with ratings.
-- [ ] 2.4 Voltage drop calc (NRS 048-2 limits), thermal loading, LV fault level at ends.
+- [ ] 2.4 Voltage drop calc (NRS 048-2 limits), thermal loading, LV fault level at ends. (Herman-Beta voltage drop at 90 %, no empirical method; fault formulas checked against IEC 60909. See docs/calc-methods.md.)
 - [ ] 2.5 Overhead checks: span, sag/tension, clearances, pole class, stays.
 - [ ] 2.6 Underground checks: derating for soil thermal resistivity, depth, grouping.
 - [ ] 2.7 OH vs UG side-by-side where both allowed: cost + voltage.

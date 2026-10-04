@@ -5,6 +5,7 @@ from reticula_calc.calcs.admd import (
     EstimateRequest,
     GroupLoad,
     GroupRequest,
+    _moments,
     estimate,
     form_definition,
     group,
@@ -92,3 +93,10 @@ class TestGroup:
         with pytest.raises(AdmdInputError, match="unverified"):
             _load_class(cfg, rules, "c8", "engineer")
         assert _load_class(cfg, rules, "c9", "engineer").admd_kva == 9.64
+
+
+def test_reticmaster_example():
+    # ReticMaster help, Herman Beta Method: alpha 1.65, beta 7.35, Icb 60 A. The page prints 10.98 A after
+    # rounding the mean to 0.183; unrounded it is 11.00 A.
+    mean, _ = _moments(1.65, 7.35, 60)
+    assert mean == pytest.approx(11.0, abs=1e-9)
