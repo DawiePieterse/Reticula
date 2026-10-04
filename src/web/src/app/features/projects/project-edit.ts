@@ -5,12 +5,13 @@ import { firstValueFrom } from 'rxjs';
 import { ApiProblem, toApiProblem } from '../../core/api-problem';
 import { AuthService } from '../../core/auth/auth.service';
 import { AreaMap } from './area-map';
+import { LayoutLayers, ProjectLayout } from './project-layout';
 import { GeoJsonPolygon } from './geo';
 import { ProjectsApi } from './projects.api';
 
 @Component({
   selector: 'app-project-edit',
-  imports: [ReactiveFormsModule, RouterLink, AreaMap],
+  imports: [ReactiveFormsModule, RouterLink, AreaMap, ProjectLayout],
   template: `
     <div class="page-head">
       <h2>{{ isNew() ? 'New project' : form.controls.name.value || 'Project' }}</h2>
@@ -45,7 +46,16 @@ import { ProjectsApi } from './projects.api';
 
       <div class="field">
         <span>Area</span>
-        <app-area-map [area]="area()" [editable]="canEdit()" (areaChange)="area.set($event)" />
+        <app-area-map
+          [area]="area()"
+          [editable]="canEdit()"
+          (areaChange)="area.set($event)"
+          [stands]="layers().stands"
+          [buildings]="layers().buildings"
+          [preview]="layers().preview"
+          [focusId]="focusId()"
+          (featureClick)="focusId.set($event)"
+        />
         @for (e of fieldErrors('area'); track e) { <span class="field-error">{{ e }}</span> }
       </div>
 
@@ -57,6 +67,15 @@ import { ProjectsApi } from './projects.api';
         </div>
       }
     </form>
+
+    @if (id(); as projectId) {
+      <app-project-layout
+        [projectId]="projectId"
+        [canEdit]="canEdit()"
+        (layersChange)="layers.set($event)"
+        (focus)="focusId.set($event)"
+      />
+    }
   `,
 })
 export class ProjectEdit {
@@ -77,6 +96,8 @@ export class ProjectEdit {
   protected readonly conflict = signal(false);
   protected readonly saving = signal(false);
   protected readonly isNew = computed(() => !this.id());
+  protected readonly layers = signal<LayoutLayers>({ stands: null, buildings: null, preview: null });
+  protected readonly focusId = signal<string | null>(null);
   private version: number | undefined;
 
   constructor() {

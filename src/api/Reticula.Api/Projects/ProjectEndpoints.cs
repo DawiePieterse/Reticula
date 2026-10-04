@@ -2,7 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
-using Reticula.Api.Geo;
+using Reticula.Infrastructure.Geo;
 using Reticula.Domain.Auth;
 using Reticula.Domain.Projects;
 using Reticula.Infrastructure.Calc;

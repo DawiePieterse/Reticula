@@ -98,6 +98,32 @@ public sealed class FakeCalc : ICalcClient
         return Task.FromResult(Rules.Contains(rulesRef) ? new RulesInfo(rulesRef, "0123456789abcdef", "2026-10-03") : null);
     }
 
+    /// <summary>Set by a test to decide what the calc service returns for an uploaded file.</summary>
+    public Func<CalcImportRequest, CalcImportResult> OnImport { get; set; } =
+        r => new CalcImportResult(r.Kind, "kml", "WGS84", "test", [], [], []);
+
+    public CalcImportRequest? LastImport { get; private set; }
+    public IReadOnlyList<BuildingPredictionInput> LastPredictionInputs { get; private set; } = [];
+
+    public Task<CalcImportResult> ImportAsync(CalcImportRequest request, CancellationToken ct = default)
+    {
+        Throw();
+        LastImport = request;
+        return Task.FromResult(OnImport(request));
+    }
+
+    /// <summary>Simplified predictor: building=house tag, else residential zoning, else low-confidence "other".</summary>
+    public Task<PredictionResult> PredictBuildingTypesAsync(string rulesRef, IReadOnlyList<BuildingPredictionInput> buildings, CancellationToken ct = default)
+    {
+        Throw();
+        LastPredictionInputs = buildings;
+        var predictions = buildings.Select(b =>
+            b.Tags.GetValueOrDefault("building") == "house" ? new BuildingPrediction(b.Id, "house", 0.9, "osm:building=house", false, [])
+            : b.Zoning?.Contains("Residential", StringComparison.OrdinalIgnoreCase) == true ? new BuildingPrediction(b.Id, "house", 0.6, $"zoning:{b.Zoning}", false, [])
+            : new BuildingPrediction(b.Id, "other", 0.3, "footprint", true, [])).ToList();
+        return Task.FromResult(new PredictionResult("0123456789abcdef", "test", predictions));
+    }
+
     private void Throw()
     {
         if (Unreachable) throw new CalcUnavailableException("Calc service unreachable.");

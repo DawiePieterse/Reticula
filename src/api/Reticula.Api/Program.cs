@@ -3,11 +3,13 @@ using Reticula.Api;
 using Reticula.Api.Auth;
 using Reticula.Api.Infrastructure;
 using Reticula.Api.Jobs;
+using Reticula.Api.Layout;
 using Reticula.Api.Projects;
 using Reticula.Infrastructure.Calc;
 using Reticula.Infrastructure.Data;
 using Reticula.Infrastructure.Jobs;
 using Reticula.Infrastructure.Jobs.Handlers;
+using Reticula.Infrastructure.Layout;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -41,6 +43,7 @@ builder.Services.AddSignalR();
 builder.Services.AddSingleton<IJobNotifier, SignalRJobNotifier>();
 builder.Services.AddReticulaJobs();
 builder.Services.AddJobHandler<DiagnosticsJob>();
+builder.Services.AddScoped<LayoutService>();
 builder.Services.AddCors(o => o.AddDefaultPolicy(p => p.AllowAnyHeader().AllowAnyMethod().AllowAnyOrigin()));
 
 var app = builder.Build();
@@ -63,6 +66,7 @@ app.MapAuthEndpoints();
 app.MapUserEndpoints();
 app.MapProjectEndpoints();
 app.MapJobEndpoints();
+app.MapLayoutEndpoints();
 
 await app.InitialiseDatabaseAsync();
 

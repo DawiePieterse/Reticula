@@ -32,3 +32,41 @@ conductors:
     x_ohm_per_km: 0.080
     rating_a: 150
     clause: "SANS1507 §TBD"
+
+# Building-type prediction before the field visit. A Reticula heuristic, not a published standard:
+# tune per authority. Confidence is 0..1; buildings below low_confidence_below are visited first.
+building_prediction:
+  clause: "Reticula building-type heuristic v1 (not a standard)"
+  osm_tags:
+    - { match: "amenity=school", type: school, confidence: 0.95 }
+    - { match: "building=school", type: school, confidence: 0.9 }
+    - { match: "shop=*", type: shop, confidence: 0.85 }
+    - { match: "building=retail", type: shop, confidence: 0.85 }
+    - { match: "building=commercial", type: shop, confidence: 0.6 }
+    - { match: "building=kiosk", type: shop, confidence: 0.8 }
+    - { match: "building=house", type: house, confidence: 0.9 }
+    - { match: "building=detached", type: house, confidence: 0.9 }
+    - { match: "building=semidetached_house", type: house, confidence: 0.9 }
+    - { match: "building=terrace", type: house, confidence: 0.85 }
+    - { match: "building=residential", type: house, confidence: 0.7 }
+    - { match: "building=hut", type: house, confidence: 0.6 }
+    - { match: "amenity=place_of_worship", type: other, confidence: 0.9 }
+    - { match: "building=church", type: other, confidence: 0.9 }
+    - { match: "amenity=clinic", type: other, confidence: 0.9 }
+    - { match: "building=garage", type: other, confidence: 0.7 }
+    - { match: "building=shed", type: other, confidence: 0.6 }
+    - { match: "building=yes", type: house, confidence: 0.3 }
+  zoning:
+    - { match: "residential", type: house, confidence: 0.6 }
+    - { match: "business", type: shop, confidence: 0.6 }
+    - { match: "commercial", type: shop, confidence: 0.6 }
+    - { match: "education", type: school, confidence: 0.7 }
+    - { match: "institutional", type: other, confidence: 0.5 }
+    - { match: "community", type: other, confidence: 0.5 }
+  footprint_m2:
+    - { min: 0, max: 6, type: other, confidence: 0.5 }
+    - { min: 6, max: 400, type: house, confidence: 0.45 }
+    - { min: 400, max: 1500, type: other, confidence: 0.3 }
+    - { min: 1500, max: null, type: other, confidence: 0.4 }
+  agreement_boost: 0.1
+  low_confidence_below: 0.6
