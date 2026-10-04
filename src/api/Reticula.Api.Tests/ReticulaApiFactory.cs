@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
 using Reticula.Infrastructure.Calc;
+using Reticula.Infrastructure.Jobs;
 
 namespace Reticula.Api.Tests;
 
@@ -27,6 +28,7 @@ public sealed class ReticulaApiFactory : WebApplicationFactory<Program>, IAsyncL
     private string ConnectionString => new NpgsqlConnectionStringBuilder(BaseConnection) { Database = _dbName }.ConnectionString;
 
     public FakeCalc Calc { get; } = new();
+    public JobGate Gate { get; } = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -35,7 +37,15 @@ public sealed class ReticulaApiFactory : WebApplicationFactory<Program>, IAsyncL
         builder.UseSetting("Bootstrap:EngineerEmail", EngineerEmail);
         builder.UseSetting("Bootstrap:EngineerPassword", EngineerPassword);
         builder.UseSetting("Bootstrap:EngineerName", "Test Engineer");
-        builder.ConfigureServices(s => s.Replace(ServiceDescriptor.Singleton<ICalcClient>(Calc)));
+        builder.UseSetting("Jobs:PollIntervalMs", "100");
+        builder.UseSetting("Jobs:CancellationCheckMs", "200");
+        builder.ConfigureServices(s =>
+        {
+            s.Replace(ServiceDescriptor.Singleton<ICalcClient>(Calc));
+            s.AddSingleton(Gate);
+            s.AddJobHandler<GatedJob>();
+            s.AddJobHandler<FailingJob>();
+        });
     }
 
     public Task InitializeAsync() => Task.CompletedTask;
@@ -92,4 +102,51 @@ public sealed class FakeCalc : ICalcClient
     {
         if (Unreachable) throw new CalcUnavailableException("Calc service unreachable.");
     }
+}
+
+/// <summary>Lets a test hold a running job open until it releases the gate.</summary>
+public sealed class JobGate
+{
+    private readonly SemaphoreSlim _release = new(0);
+    private readonly SemaphoreSlim _started = new(0);
+
+    public void Release() => _release.Release();
+    public Task<bool> WaitStartedAsync(TimeSpan timeout) => _started.WaitAsync(timeout);
+
+    internal async Task EnterAsync(CancellationToken ct)
+    {
+        _started.Release();
+        await _release.WaitAsync(ct);
+    }
+}
+
+public sealed class GatedJob(JobGate gate) : IJobHandler
+{
+    public const string JobKind = "test.gated";
+    public string Kind => JobKind;
+
+    public async Task<object?> RunAsync(JobContext context, CancellationToken ct)
+    {
+        await context.Progress.ReportAsync(50, "Waiting at gate", ct);
+        await gate.EnterAsync(ct);
+        return new { ok = true };
+    }
+}
+
+public sealed class FailingJob : IJobHandler
+{
+    public const string JobKind = "test.failing";
+    public string Kind => JobKind;
+
+    public Task<object?> RunAsync(JobContext context, CancellationToken ct) => throw new InvalidOperationException("boom");
+}
+
+/// <summary>
+/// All API tests share one host and database. Hangfire keeps process-wide static state (log provider,
+/// global configuration), so several hosts in one process interfere; production runs one host.
+/// </summary>
+[CollectionDefinition(Name)]
+public sealed class ApiCollection : ICollectionFixture<ReticulaApiFactory>
+{
+    public const string Name = "api";
 }

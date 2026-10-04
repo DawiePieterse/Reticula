@@ -7,7 +7,8 @@ using Reticula.Domain.Auth;
 
 namespace Reticula.Api.Tests;
 
-public class ProjectTests(ReticulaApiFactory factory) : IClassFixture<ReticulaApiFactory>
+[Collection(ApiCollection.Name)]
+public class ProjectTests(ReticulaApiFactory factory)
 {
     // A small square in Soshanguve, Gauteng.
     private static PolygonDto Square(double lon = 28.10, double lat = -25.52, double d = 0.01) =>

@@ -6,7 +6,8 @@ using Reticula.Domain.Auth;
 
 namespace Reticula.Api.Tests;
 
-public class AuthTests(ReticulaApiFactory factory) : IClassFixture<ReticulaApiFactory>
+[Collection(ApiCollection.Name)]
+public class AuthTests(ReticulaApiFactory factory)
 {
     [Fact]
     public async Task Bootstrap_engineer_can_log_in_and_read_profile()

@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from fastapi import FastAPI, HTTPException
 
-from . import __version__ as _v  # noqa: F401  (placeholder for version import)
+from . import __version__
 from .calcs.voltage_drop import VoltageDropRequest, VoltageDropResult, voltage_drop
+from .logging_setup import configure_logging, log_requests
 from .rules import RulesError, list_rules, load_rules
 
-app = FastAPI(title="Reticula calc", version="0.1.0")
+configure_logging()
+app = FastAPI(title="Reticula calc", version=__version__)
+app.middleware("http")(log_requests)
 
 
 @app.get("/health")
