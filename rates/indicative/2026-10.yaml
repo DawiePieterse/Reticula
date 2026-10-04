@@ -37,3 +37,23 @@ transformer_each:
   "200": 185000
   "315": 240000
   "500": 330000
+mv_conductor_per_m:       # MV line or cable, supply and install per metre of route (cable incl. trench)
+  MV-SQUIRREL: 210
+  MV-FOX: 250
+  MV-MINK: 310
+  MV-HARE: 380
+  MV-XLPE-35: 1150
+  MV-XLPE-70: 1380
+  MV-XLPE-95: 1560
+  MV-XLPE-185: 2150
+pole_mount_each:          # transformer, structure, MV fuses, LV board
+  "50": 118000
+  "100": 152000
+  "200": 214000
+minisub_each:
+  "200": 395000
+  "315": 455000
+  "500": 560000
+  "630": 640000
+  "1000": 860000
+mv_pole_per_km: 92000     # MV poles, stays and hardware per km of overhead line

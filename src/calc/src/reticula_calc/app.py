@@ -24,6 +24,7 @@ from .geo.importers import ImportResult, UnreadableFileError, import_file
 from .geo.predict import PredictRequest, PredictResponse, predict
 from .logging_setup import configure_logging, log_requests
 from .lv.design import LvDesignRequest, LvDesignResult, design_lv
+from .mv.design import MvDesignRequest, MvDesignResult, design_mv
 from .rules import RulesError, list_rules, load_rules
 
 configure_logging()
@@ -121,6 +122,15 @@ def lv_design(req: LvDesignRequest) -> LvDesignResult:
     try:
         rules = load_rules(req.rules)
         return design_lv(req, rules)
+    except (RulesError, AdmdInputError, ValueError) as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+@app.post("/calc/mv/design")
+def mv_design(req: MvDesignRequest) -> MvDesignResult:
+    try:
+        rules = load_rules(req.rules)
+        return design_mv(req, rules)
     except (RulesError, AdmdInputError, ValueError) as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 

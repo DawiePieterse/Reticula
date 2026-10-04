@@ -1029,6 +1029,154 @@
           }
         }
       }
+    },
+    "mv_design": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nominal_kv",
+        "sending_voltage_pct",
+        "max_drop_pct",
+        "power_factor",
+        "supply_voltage_band_pct",
+        "max_lv_reach_m",
+        "max_tee_m",
+        "taps_pct",
+        "pole_mount_max_kva",
+        "pole_mount",
+        "minisub",
+        "mv_conductors"
+      ],
+      "properties": {
+        "clause": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "verified",
+            "unverified"
+          ]
+        },
+        "nominal_kv": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "sending_voltage_pct": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "max_drop_pct": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "power_factor": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "supply_voltage_band_pct": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "growth_allowance_pct": {
+          "type": "number",
+          "minimum": 0
+        },
+        "max_utilisation_pct": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "max_lv_reach_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "max_tee_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "taps_pct": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "number"
+          }
+        },
+        "pole_mount_max_kva": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "pole_mount": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "kva",
+              "z_pct"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "kva": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "z_pct": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "x_r": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            }
+          }
+        },
+        "minisub": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "kva",
+              "z_pct"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "kva": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "z_pct": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "x_r": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            }
+          }
+        },
+        "mv_conductors": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "overhead": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "underground": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

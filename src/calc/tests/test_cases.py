@@ -8,9 +8,12 @@ import pytest
 from reticula_calc.calcs.admd import EstimateRequest, GroupRequest, estimate, group
 from reticula_calc.calcs.voltage_drop import VoltageDropRequest, voltage_drop
 from reticula_calc.lv.analysis import analyse, derating
+from reticula_calc.lv.build import CustomerIn, RouteIn
 from reticula_calc.lv.library import library
 from reticula_calc.lv.model import LvNetwork
 from reticula_calc.lv.overhead import check_overhead
+from reticula_calc.mv.network import MvNetwork, analyse_mv, choose_tap
+from reticula_calc.mv.placement import SiteIn, allocate
 from reticula_calc.rules import load_rules
 
 CASES_DIR = Path(__file__).resolve().parents[3] / "test-cases"
@@ -55,8 +58,26 @@ def _run_ug_derating(inp: dict) -> dict:
     return {"factor": f, "rating_a": cable.rating_a * f}
 
 
+def _run_mv_sizing(inp: dict) -> dict:
+    r = allocate([SiteIn(**x) for x in inp["sites"]], [CustomerIn(**x) for x in inp["customers"]], [RouteIn(**x) for x in inp["lv_routes"]],
+                 load_rules(inp["rules"]), inp["lv_construction"])
+    return r.placements[0].model_dump()
+
+
+def _run_mv_vdrop(inp: dict) -> dict:
+    a = analyse_mv(MvNetwork(**inp["network"]), {k: [CustomerIn(**c) for c in v] for k, v in inp["customers"].items()}, load_rules(inp["rules"]))
+    b = a.branches[0]
+    return {"current_a": b.current_a, "demand_kva": b.demand_kva, "vdrop_pct": a.site_vdrop_pct["T1"]}
+
+
+def _run_mv_tap(inp: dict) -> dict:
+    tap, lo, hi, reg = choose_tap(load_rules(inp["rules"]), inp["mv_drop_pct"], inp["load_kva"], inp["rating_kva"], inp["z_pct"], inp["x_r"], inp["lv_drop_pct"])
+    return {"tap_pct": tap, "v_min_pct": lo, "v_max_pct": hi, "regulation_pct": reg}
+
+
 RUNNERS = {"voltage_drop": _run_voltage_drop, "admd": _run_admd, "admd_group": _run_admd_group, "hb_group": _run_hb_group,
-           "lv_vdrop": _run_lv, "lv_fault": _run_lv, "oh_sag": _run_oh_sag, "ug_derating": _run_ug_derating}
+           "lv_vdrop": _run_lv, "lv_fault": _run_lv, "oh_sag": _run_oh_sag, "ug_derating": _run_ug_derating,
+           "mv_sizing": _run_mv_sizing, "mv_vdrop": _run_mv_vdrop, "mv_tap": _run_mv_tap}
 
 
 def _cases():

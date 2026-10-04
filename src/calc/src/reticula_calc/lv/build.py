@@ -19,11 +19,10 @@ from typing import Literal
 
 import networkx as nx
 from pydantic import BaseModel
-from pyproj import Transformer
 from shapely import STRtree
 from shapely.geometry import LineString, Point
-from shapely.ops import unary_union
 
+from ..geo.routes import Projector, attach_point, route_graph, snap_routes
 from ..rules import RuleSet
 from .library import lv_config
 from .model import Branch, Customer, LvNetwork, Node
@@ -70,24 +69,6 @@ class BuildResult(BaseModel):
     issues: list[BuildIssue]
 
 
-class _Projector:
-    def __init__(self, lon0: float, lat0: float):
-        proj = f"+proj=tmerc +lat_0={lat0} +lon_0={lon0} +k=1 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
-        self.fwd = Transformer.from_crs("EPSG:4326", proj, always_xy=True)
-        self.inv = Transformer.from_crs(proj, "EPSG:4326", always_xy=True)
-
-    def xy(self, lon: float, lat: float) -> tuple[float, float]:
-        return self.fwd.transform(lon, lat)
-
-    def ll(self, x: float, y: float) -> tuple[float, float]:
-        lon, lat = self.inv.transform(x, y)
-        return round(lon, 8), round(lat, 8)
-
-
-def _key(p: tuple[float, float]) -> tuple[float, float]:
-    return (round(p[0] / 0.01) * 0.01, round(p[1] / 0.01) * 0.01)
-
-
 def build_network(req: BuildRequest, rules: RuleSet) -> BuildResult:
     cfg = lv_config(rules)
     spacing = float(rules.data["overhead"]["max_span_m"]) if req.construction == "overhead" else float(cfg.get("kiosk_spacing_m", 60))
@@ -97,46 +78,20 @@ def build_network(req: BuildRequest, rules: RuleSet) -> BuildResult:
     pts = [c for r in req.routes for c in r.coordinates] + [req.source]
     lon0 = sum(p[0] for p in pts) / len(pts)
     lat0 = sum(p[1] for p in pts) / len(pts)
-    pr = _Projector(lon0, lat0)
+    pr = Projector(lon0, lat0)
 
-    routes = _snap_routes({r.id: LineString([pr.xy(*c) for c in r.coordinates]) for r in req.routes if len(r.coordinates) >= 2})
+    routes = snap_routes({r.id: LineString([pr.xy(*c) for c in r.coordinates]) for r in req.routes if len(r.coordinates) >= 2})
     if not routes:
         raise ValueError("No LV routes to lay the network on; mark LV routes on the field screen first")
-    route_tree = STRtree(list(routes.values()))
-    route_ids = list(routes.keys())
 
     # 1. Node at crossings, then split every bend so each edge is straight.
-    noded = unary_union(list(routes.values()))
-    pieces = list(getattr(noded, "geoms", [noded]))
-    g = nx.Graph()
-    for piece in pieces:
-        coords = list(piece.coords)
-        for a, b in pairwise(coords):
-            ka, kb = _key(a), _key(b)
-            if ka == kb:
-                continue
-            seg = LineString([a, b])
-            mid = seg.interpolate(0.5, normalized=True)
-            idx = route_tree.query_nearest(mid, max_distance=SNAP_M)
-            rid = route_ids[int(idx[0])] if len(idx) else None
-            g.add_node(ka, xy=a)
-            g.add_node(kb, xy=b)
-            g.add_edge(ka, kb, length=seg.length, route_id=rid)
+    g = route_graph(routes, SNAP_M)
 
     # 2. Join the transformer to the nearest route.
     sx, sy = pr.xy(*req.source)
     src_pt = Point(sx, sy)
-    best = min(g.edges(data=True), key=lambda e: LineString([g.nodes[e[0]]["xy"], g.nodes[e[1]]["xy"]]).distance(src_pt))
-    u, v, data = best
-    seg = LineString([g.nodes[u]["xy"], g.nodes[v]["xy"]])
-    d = seg.project(src_pt)
-    proj_xy = tuple(seg.interpolate(d).coords[0])
-    k_proj = _key(proj_xy)
-    if k_proj not in (u, v):
-        g.remove_edge(u, v)
-        g.add_node(k_proj, xy=proj_xy)
-        g.add_edge(u, k_proj, length=Point(g.nodes[u]["xy"]).distance(Point(proj_xy)), route_id=data["route_id"])
-        g.add_edge(k_proj, v, length=Point(proj_xy).distance(Point(g.nodes[v]["xy"])), route_id=data["route_id"])
+    k_proj, _ = attach_point(g, src_pt)
+    proj_xy = g.nodes[k_proj]["xy"]
     # The transformer stands on the route: it is moved to the nearest point and feeds every direction from there.
     source_key = k_proj
     moved = src_pt.distance(Point(proj_xy))
@@ -297,34 +252,6 @@ def build_network(req: BuildRequest, rules: RuleSet) -> BuildResult:
 def _dist(net: nx.DiGraph, a: str, b: str) -> float:
     (x1, y1), (x2, y2) = net.nodes[a]["xy"], net.nodes[b]["xy"]
     return math.hypot(x2 - x1, y2 - y1)
-
-
-def _snap_routes(routes: dict[str, LineString], tol: float = 1.0) -> dict[str, LineString]:
-    """Join routes drawn to end on (or near) another route: a hand-drawn T-junction misses by millimetres once
-    projected. Each end within `tol` of another route moves onto it, and that route gets a vertex there."""
-    lines = {k: list(v.coords) for k, v in routes.items()}
-    for rid, coords in lines.items():
-        for end in (0, -1):
-            pt = Point(coords[end])
-            for oid, other in lines.items():
-                if oid == rid or len(other) < 2:
-                    continue
-                line = LineString(other)
-                if 1e-9 < line.distance(pt) <= tol or (line.distance(pt) <= 1e-9 and coords[end] not in other):
-                    d = line.project(pt)
-                    snap = tuple(line.interpolate(d).coords[0])
-                    coords[end] = snap
-                    # Insert the junction as a vertex of the other route, in order along it.
-                    acc = 0.0
-                    for i in range(len(other) - 1):
-                        seg = LineString([other[i], other[i + 1]])
-                        if acc - 1e-9 <= d <= acc + seg.length + 1e-9:
-                            if snap not in (other[i], other[i + 1]):
-                                other.insert(i + 1, snap)
-                            break
-                        acc += seg.length
-                    break
-    return {k: LineString(v) for k, v in lines.items()}
 
 
 def deviation_deg(a, b, c) -> float:
