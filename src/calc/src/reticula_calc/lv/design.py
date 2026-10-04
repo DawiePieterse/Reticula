@@ -30,6 +30,9 @@ class LvDesignRequest(BaseModel):
     site: dict[str, float] | None = None
     area: dict[str, Any] | None = None
     rates: str = "indicative/2026-10"
+    #: The authority's MV fault levels at the connection point (plan 4.1); the rules' default when absent.
+    source_fault_mva_max: float | None = None
+    source_fault_mva_min: float | None = None
 
 
 class OptionResult(BaseModel):
@@ -83,7 +86,8 @@ def design_lv(req: LvDesignRequest, rules: RuleSet) -> LvDesignResult:
         layout_checks = [Check(code=i.code, subject=sample, passed=False, value=1, limit=0, unit="",
                                message=i.message, clause="")
                          for i in built.issues if i.severity == "error" for sample in (i.samples or ["network"])]
-        sized = size_network(built.network, rules, construction, req.transformer_kva, req.site)
+        source = {"fault_mva_max": req.source_fault_mva_max, "fault_mva_min": req.source_fault_mva_min} if req.source_fault_mva_max else None
+        sized = size_network(built.network, rules, construction, req.transformer_kva, req.site, source)
         net = sized.network
         checks: list[Check] = [*layout_checks, *sized.analysis.checks]
         oh = None

@@ -8,6 +8,7 @@ from typing import Annotated
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 
 from . import __version__
+from .bulk.study import BulkStudyRequest, BulkStudyResult, bulk_study
 from .calcs.admd import (
     AdmdInputError,
     EstimateRequest,
@@ -132,5 +133,13 @@ def mv_design(req: MvDesignRequest) -> MvDesignResult:
         rules = load_rules(req.rules)
         return design_mv(req, rules)
     except (RulesError, AdmdInputError, ValueError) as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+@app.post("/calc/bulk/study")
+def bulk_supply_study(req: BulkStudyRequest) -> BulkStudyResult:
+    try:
+        return bulk_study(req, load_rules(req.rules))
+    except (RulesError, ValueError) as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 

@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from reticula_calc.bulk.study import BulkStudyRequest, bulk_study
 from reticula_calc.calcs.admd import EstimateRequest, GroupRequest, estimate, group
 from reticula_calc.calcs.voltage_drop import VoltageDropRequest, voltage_drop
 from reticula_calc.lv.analysis import analyse, derating
@@ -75,9 +76,19 @@ def _run_mv_tap(inp: dict) -> dict:
     return {"tap_pct": tap, "v_min_pct": lo, "v_max_pct": hi, "regulation_pct": reg}
 
 
+def _run_bulk(inp: dict) -> dict:
+    r = bulk_study(BulkStudyRequest(**inp), load_rules(inp["rules"]))
+    out: dict = {}
+    for b in r.buses:
+        out[f"{b.id}.v_pct"] = b.v_pct
+        out[f"{b.id}.ikss3_max_ka"] = b.ikss3_max_ka
+        out[f"{b.id}.ikss1_min_ka"] = b.ikss1_min_ka
+    return out
+
+
 RUNNERS = {"voltage_drop": _run_voltage_drop, "admd": _run_admd, "admd_group": _run_admd_group, "hb_group": _run_hb_group,
            "lv_vdrop": _run_lv, "lv_fault": _run_lv, "oh_sag": _run_oh_sag, "ug_derating": _run_ug_derating,
-           "mv_sizing": _run_mv_sizing, "mv_vdrop": _run_mv_vdrop, "mv_tap": _run_mv_tap}
+           "mv_sizing": _run_mv_sizing, "mv_vdrop": _run_mv_vdrop, "mv_tap": _run_mv_tap, "bulk_sc": _run_bulk, "bulk_lf": _run_bulk}
 
 
 def _cases():

@@ -209,7 +209,9 @@ def feeders(network: LvNetwork) -> dict[str, list[str]]:
 
 
 def analyse(network: LvNetwork, rules: RuleSet, transformer_kva: float | None = None,
-            site: dict[str, float] | None = None) -> Analysis:
+            site: dict[str, float] | None = None, source: dict[str, float] | None = None) -> Analysis:
+    """`source` may give the MV fault levels at the connection point (`fault_mva_max`, `fault_mva_min`, MVA),
+    which replace the rules' default."""
     cfg = lv_config(rules)
     lib = library(rules)
     pf = float(cfg["power_factor"])
@@ -368,20 +370,31 @@ def analyse(network: LvNetwork, rules: RuleSet, transformer_kva: float | None = 
                             limit=chosen["kva"], unit="kVA", message=f"Design demand {demand:.1f} kVA on a {chosen['kva']} kVA transformer",
                             clause=fault.get("clause", "")))
 
-    # Fault levels (IEC 60909, values referred to the LV side).
+    # Fault levels (IEC 60909-0, values referred to the LV side). Source: ZQ = cQ·Un²/S''kQ with cQ for the MV network
+    # (R/X 0.1). Network transformer: impedance corrected by KT = 0.95·cmax/(1 + 0.6·xT) for the maximum fault (§6.3.3).
     un = float(rules.data["voltage"]["lv_nominal_v"])
     c_max, c_min = float(fault["voltage_factor_max"]), float(fault["voltage_factor_min"])
-    zq_mag = c_max * un ** 2 / (float(fault["mv_fault_mva"]) * 1e6)
-    zq = complex(0.1 * 0.995 * zq_mag, 0.995 * zq_mag)
+    c_q = float(fault.get("voltage_factor_mv", 1.1))
+    sk_max = float((source or {}).get("fault_mva_max") or fault["mv_fault_mva"])
+    sk_min = float((source or {}).get("fault_mva_min") or fault.get("mv_fault_mva_min") or sk_max)
+
+    def zq_of(sk: float) -> complex:
+        mag = c_q * un ** 2 / (sk * 1e6)
+        return complex(0.1 * mag / math.sqrt(1.01), mag / math.sqrt(1.01))
+
     zt_mag = float(chosen["z_pct"]) / 100 * un ** 2 / (float(chosen["kva"]) * 1e3)
     xr = float(chosen.get("x_r", 3.0))
     rt = zt_mag / math.sqrt(1 + xr * xr)
     zt = complex(rt, rt * xr)
-    ik3 = c_max * un / (math.sqrt(3) * abs(zq + zt))
-    max_fault = traced(round(ik3 / 1000, 3), "kA", formula_id=FAULT_FORMULA_ID, formula="I''k3 = c·Un / (√3·|Zq + Zt|)",
+    xt_pu = float(chosen["z_pct"]) / 100 * xr / math.sqrt(1 + xr * xr)
+    kt = 0.95 * c_max / (1 + 0.6 * xt_pu)
+    zq = zq_of(sk_min)
+    ik3 = c_max * un / (math.sqrt(3) * abs(zq_of(sk_max) + kt * zt))
+    max_fault = traced(round(ik3 / 1000, 3), "kA", formula_id=FAULT_FORMULA_ID, formula="I''k3 = c·Un / (√3·|ZQ + KT·ZT|); ZQ = cQ·Un²/S''kQ; KT = 0.95·cmax/(1 + 0.6·xT)",
                        clause=fault.get("clause", ""), rules_hash=rules.hash,
-                       inputs={"c_max": (c_max, ""), "Un": (round(un, 1), "V"), "S_k_MV": (fault["mv_fault_mva"], "MVA", f"rules {rules.ref} fault"),
-                               "S_T": (chosen["kva"], "kVA"), "u_k": (chosen["z_pct"], "%"), "X/R": (xr, "")})
+                       inputs={"c_max": (c_max, ""), "c_Q": (c_q, ""), "Un": (round(un, 1), "V"),
+                               "S_k_MV": (sk_max, "MVA", "connection point" if (source or {}).get("fault_mva_max") else f"rules {rules.ref} fault"),
+                               "S_T": (chosen["kva"], "kVA"), "u_k": (chosen["z_pct"], "%"), "X/R": (xr, ""), "K_T": (round(kt, 4), "")})
     if fault.get("max_lv_terminal_fault_ka"):
         lim = float(fault["max_lv_terminal_fault_ka"])
         checks.append(Check(code="max_fault", subject=network.source_id, passed=ik3 / 1000 <= lim, value=round(ik3 / 1000, 2), limit=lim, unit="kA",

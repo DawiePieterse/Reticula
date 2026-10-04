@@ -1027,6 +1027,14 @@
             "type": "number",
             "exclusiveMinimum": 0
           }
+        },
+        "voltage_factor_mv": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "mv_fault_mva_min": {
+          "type": "number",
+          "exclusiveMinimum": 0
         }
       }
     },
@@ -1173,6 +1181,74 @@
               "items": {
                 "type": "string"
               }
+            }
+          }
+        }
+      }
+    },
+    "bulk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mv_voltage_band_pct",
+        "mv_switchgear_fault_ka",
+        "nmd_step_kva",
+        "zero_sequence"
+      ],
+      "properties": {
+        "clause": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "verified",
+            "unverified"
+          ]
+        },
+        "mv_voltage_band_pct": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "mv_switchgear_fault_ka": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "nmd_step_kva": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "nmd_margin_pct": {
+          "type": "number",
+          "minimum": 0
+        },
+        "source_r_x": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "zero_sequence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "r0_add_ohm_per_km",
+            "x0_factor"
+          ],
+          "properties": {
+            "r0_add_ohm_per_km": {
+              "type": "number",
+              "minimum": 0
+            },
+            "x0_factor": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "source_x0_x1": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "source_r0_x0": {
+              "type": "number",
+              "exclusiveMinimum": 0
             }
           }
         }

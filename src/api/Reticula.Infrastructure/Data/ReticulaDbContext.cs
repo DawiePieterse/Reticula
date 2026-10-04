@@ -27,6 +27,7 @@ public sealed class ReticulaDbContext(DbContextOptions<ReticulaDbContext> option
     public DbSet<TilePack> TilePacks => Set<TilePack>();
     public DbSet<MapFeature> MapFeatures => Set<MapFeature>();
     public DbSet<DesignRun> DesignRuns => Set<DesignRun>();
+    public DbSet<ConnectionPoint> ConnectionPoints => Set<ConnectionPoint>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -234,6 +235,15 @@ public sealed class ReticulaDbContext(DbContextOptions<ReticulaDbContext> option
             e.HasOne<ImportBatch>().WithMany().HasForeignKey(x => x.ImportBatchId).OnDelete(DeleteBehavior.Cascade);
         });
 
+        b.Entity<ConnectionPoint>(e =>
+        {
+            e.ToTable("connection_points");
+            e.HasKey(x => x.ProjectId);
+            e.Property(x => x.Location).HasColumnType($"geometry(Point,{ProjectRules.Srid})").IsRequired();
+            e.Property(x => x.XR).HasColumnName("x_r");
+            e.Property(x => x.Reference).HasMaxLength(200);
+            e.HasOne<Project>().WithOne().HasForeignKey<ConnectionPoint>(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
+        });
         b.Entity<DesignRun>(e =>
         {
             e.ToTable("design_runs");

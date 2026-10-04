@@ -24,8 +24,9 @@ reason is shown with the site.
 ## 3. MV routing (3.3)
 
 The MV routes are noded and joined. The supply point is, in order: the point the engineer gives; the authority's
-connection point from imported network data; the nearest point of an imported existing MV line; or the end of the MV
-routes furthest from the sites (an assumption stated with the result until plan 4.1 records the connection point).
+connection point entered on the Bulk supply page (docs/bulk-supply.md); a connection point from imported network
+data; the nearest point of an imported existing MV line; or the end of the MV routes furthest from the sites (an
+assumption stated with the result).
 Each site tees onto the nearest MV route (a tee longer than `max_tee_m` fails). A shortest-path tree makes the network
 radial and branches feeding no transformer are removed.
 

@@ -72,6 +72,7 @@ public sealed class LvDesignJob(ReticulaDbContext db, ICalcClient calc, DesignIn
         var customers = await inputs.CustomersAsync(run.ProjectId, ct);
         var roads = await inputs.RoadsAsync(run.ProjectId, ct);
         var sitePoint = (Point)site.Geometry;
+        var fault = await inputs.SourceFaultAsync(run.ProjectId, ct);
         return new
         {
             Rules = project.RulesRef,
@@ -84,6 +85,8 @@ public sealed class LvDesignJob(ReticulaDbContext db, ICalcClient calc, DesignIn
             TransformerKva = p.TransformerKva,
             p.Site,
             Area = PolygonDto.From(project.Area),
+            SourceFaultMvaMax = fault.Max,
+            SourceFaultMvaMin = fault.Min,
         };
     }
 }

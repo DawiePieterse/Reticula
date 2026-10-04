@@ -221,4 +221,94 @@ public class DesignTests(ReticulaApiFactory factory)
         var bad = await ctx.Engineer.PostAsJsonAsync($"/api/projects/{ctx.ProjectId}/mv-designs", new MvDesignRequest([Guid.NewGuid()], "aerial", null, [1]));
         Assert.Equal(HttpStatusCode.BadRequest, bad.StatusCode);
     }
+
+    private static async Task<DesignRunDetail> WaitBulkAsync(HttpClient client, Guid projectId, Guid runId)
+    {
+        for (var i = 0; i < 200; i++)
+        {
+            var d = await client.GetFromJsonAsync<DesignRunDetail>($"/api/projects/{projectId}/bulk-studies/{runId}");
+            if (d!.Run.Status is "succeeded" or "failed") return d;
+            await Task.Delay(100);
+        }
+        throw new TimeoutException();
+    }
+
+    [Fact]
+    public async Task Connection_point_is_validated_saved_and_lists_what_the_study_still_needs()
+    {
+        var ctx = await SetupAsync(rules: "eskom/0.4.0");
+        var url = $"/api/projects/{ctx.ProjectId}/connection-point";
+        Assert.Equal("", await ctx.Engineer.GetStringAsync(url)); // none yet
+
+        var bad = await ctx.Engineer.PutAsJsonAsync(url, new ConnectionPointRequest(200, Lat, 0, -1, 10, 20, 0, 120, null));
+        Assert.Equal(HttpStatusCode.BadRequest, bad.StatusCode);
+        var errors = (await bad.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors");
+        foreach (var key in new[] { "location", "voltageKv", "availableCapacityKva", "faultMvaMin", "xr", "sendingVoltagePct" })
+            Assert.True(errors.TryGetProperty(key, out _), key);
+
+        var saved = await (await ctx.Engineer.PutAsJsonAsync(url, new ConnectionPointRequest(Lon - 0.005, Lat + 0.002, 11, null, null, null, null, null, "  ")))
+            .Content.ReadFromJsonAsync<ConnectionPointDto>();
+        Assert.Equal(["available capacity", "fault level"], saved!.Missing);
+        Assert.Null(saved.Reference);
+        saved = await (await ctx.Engineer.PutAsJsonAsync(url, new ConnectionPointRequest(Lon - 0.005, Lat + 0.002, 11, 500, 150, 100, 8, 102, "ESKOM/Q/123")))
+            .Content.ReadFromJsonAsync<ConnectionPointDto>();
+        Assert.Empty(saved!.Missing);
+        var read = await ctx.Engineer.GetFromJsonAsync<ConnectionPointDto>(url);
+        Assert.Equal((500.0, 150.0, 8.0, "ESKOM/Q/123"), (read!.AvailableCapacityKva!.Value, read.FaultMvaMax!.Value, read.XR!.Value, read.Reference));
+        Assert.Equal(HttpStatusCode.NotFound, (await ctx.Engineer.GetAsync($"/api/projects/{Guid.NewGuid()}/connection-point")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Bulk_study_stops_without_capacity_or_fault_level_then_runs_on_the_mv_design()
+    {
+        var ctx = await SetupAsync(rules: "eskom/0.4.0");
+        await AddMvRouteAsync(ctx.Engineer, ctx.ProjectId);
+        var studies = $"/api/projects/{ctx.ProjectId}/bulk-studies";
+        var cpUrl = $"/api/projects/{ctx.ProjectId}/connection-point";
+
+        var stop = await ctx.Engineer.PostAsJsonAsync(studies, new BulkStudyRequest(null));
+        Assert.Equal(HttpStatusCode.BadRequest, stop.StatusCode);
+        var errors = (await stop.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors");
+        Assert.True(errors.TryGetProperty("connectionPoint", out _) && errors.TryGetProperty("mvDesignRunId", out _));
+
+        (await ctx.Engineer.PutAsJsonAsync(cpUrl, new ConnectionPointRequest(Lon - 0.005, Lat + 0.002, 11, null, 150, null, null, null, null))).EnsureSuccessStatusCode();
+        // The MV design is fed from the entered connection point, with its fault level.
+        var mvStarted = await (await ctx.Engineer.PostAsJsonAsync($"/api/projects/{ctx.ProjectId}/mv-designs", new MvDesignRequest(null, null, null, null)))
+            .Content.ReadFromJsonAsync<StartedDesign>();
+        Assert.Equal("succeeded", (await WaitMvAsync(ctx.Engineer, ctx.ProjectId, mvStarted!.Run.Id)).Run.Status);
+        var mvSent = factory.Calc.LastMvDesign!.Value;
+        Assert.Equal(Lon - 0.005, mvSent.GetProperty("supply")[0].GetDouble(), 9);
+        Assert.Equal(150, mvSent.GetProperty("source_fault_mva_max").GetDouble());
+
+        stop = await ctx.Engineer.PostAsJsonAsync(studies, new BulkStudyRequest(null));
+        Assert.Equal(HttpStatusCode.BadRequest, stop.StatusCode);
+        Assert.Contains("available capacity", await stop.Content.ReadAsStringAsync());
+
+        (await ctx.Engineer.PutAsJsonAsync(cpUrl, new ConnectionPointRequest(Lon - 0.005, Lat + 0.002, 11, 500, 150, 100, null, null, "Q-1"))).EnsureSuccessStatusCode();
+        var r = await ctx.Engineer.PostAsJsonAsync(studies, new BulkStudyRequest(null));
+        Assert.Equal(HttpStatusCode.Accepted, r.StatusCode);
+        var started = await r.Content.ReadFromJsonAsync<StartedDesign>();
+        Assert.Equal("design.bulk", started!.Job.Kind);
+        var done = await WaitBulkAsync(ctx.Engineer, ctx.ProjectId, started.Run.Id);
+        Assert.Equal("succeeded", done.Run.Status);
+        Assert.False(done.Run.Passed);
+        Assert.Equal(100, done.Run.Summary!.Value.GetProperty("notified_max_demand_kva").GetDouble());
+
+        var sent = factory.Calc.LastBulkStudy!.Value;
+        Assert.Equal("eskom/0.4.0", sent.GetProperty("rules").GetString());
+        var cp = sent.GetProperty("connection_point");
+        Assert.Equal((11.0, 500.0, 150.0, 100.0), (cp.GetProperty("voltage_kv").GetDouble(), cp.GetProperty("available_capacity_kva").GetDouble(),
+            cp.GetProperty("fault_mva_max").GetDouble(), cp.GetProperty("fault_mva_min").GetDouble()));
+        Assert.Equal(JsonValueKind.Null, cp.GetProperty("x_r").ValueKind);
+        Assert.Equal("SUPPLY", sent.GetProperty("mv_network").GetProperty("supply_id").GetString());
+        var site = Assert.Single(sent.GetProperty("sites").EnumerateArray()); // the unrated site is left out
+        Assert.Equal(("T1", 80.0, 2.5), (site.GetProperty("site_id").GetString(), site.GetProperty("design_kva").GetDouble(), site.GetProperty("tap_pct").GetDouble()));
+        Assert.Single((await ctx.Engineer.GetFromJsonAsync<List<DesignRunDto>>(studies))!);
+
+        // Moving the connection point makes the MV design stale.
+        (await ctx.Engineer.PutAsJsonAsync(cpUrl, new ConnectionPointRequest(Lon - 0.004, Lat + 0.002, 11, 500, 150, 100, null, null, "Q-1"))).EnsureSuccessStatusCode();
+        stop = await ctx.Engineer.PostAsJsonAsync(studies, new BulkStudyRequest(null));
+        Assert.Equal(HttpStatusCode.BadRequest, stop.StatusCode);
+        Assert.Contains("run the MV design again", await stop.Content.ReadAsStringAsync());
+    }
 }

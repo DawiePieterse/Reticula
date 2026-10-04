@@ -21,6 +21,7 @@ import { ProjectsApi } from './projects.api';
           <a class="button" [routerLink]="['/projects', projectId, 'loads']">Loads</a>
           <a class="button" [routerLink]="['/projects', projectId, 'lv']">LV design</a>
           <a class="button" [routerLink]="['/projects', projectId, 'mv']">MV design</a>
+          <a class="button" [routerLink]="['/projects', projectId, 'bulk']">Bulk supply</a>
         }
         <a routerLink="/projects">Back to projects</a>
       </div>

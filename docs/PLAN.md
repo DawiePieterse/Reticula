@@ -131,12 +131,12 @@ Deliverables: LV layout, phasing, conductor sizing, voltage drop, fault level, O
 
 ### Phase 4 – Bulk supply
 
-- [ ] 4.1 Authority connection point input form; hard stop if capacity or fault level missing.
-- [ ] 4.2 pandapower model builder from network model.
-- [ ] 4.3 Load flow (balanced; unbalanced LV later via OpenDSS).
-- [ ] 4.4 IEC 60909 fault studies (3-ph, 1-ph) at all buses.
-- [ ] 4.5 Supply sizing and bulk feeder selection.
-- [ ] 4.6 Validation: pandapower results vs hand-worked IEC 60909 example; vs authority's accepted method sample.
+- [x] 4.1 Authority connection point input form; hard stop if capacity or fault level missing. (Bulk supply page; feeds the MV design supply and the LV/MV source fault levels; docs/bulk-supply.md.)
+- [x] 4.2 pandapower model builder from network model. (reticula_calc/bulk/study.py.)
+- [x] 4.3 Load flow (balanced; unbalanced LV later via OpenDSS).
+- [x] 4.4 IEC 60909 fault studies (3-ph, 1-ph) at all buses. (LV design aligned: cQ 1.1 and KT.)
+- [x] 4.5 Supply sizing and bulk feeder selection. (Capacity check, NMD, bulk feeder.)
+- [~] 4.6 Validation: pandapower results vs hand-worked IEC 60909 example; vs authority's accepted method sample. (Done: test-cases/bulk_sc, bulk_lf. To do: authority's accepted study sample, needs one from the authority.)
 
 ### Phase 5 – Optimisation and comparison
 
@@ -213,7 +213,7 @@ F. **Performance targets.** Field UI usable on mid-range Android tablet; 2,000-s
 - [ ] Phase 1 Field capture – usable offline on tablet
 - [x] Phase 2 LV design – checks pass on validation cases (engine values pending verification against the standards)
 - [x] Phase 3 MV network – checks pass on validation cases (engine values pending verification against the standards)
-- [ ] Phase 4 Bulk supply – load flow and IEC 60909 validated
+- [x] Phase 4 Bulk supply – load flow and IEC 60909 validated (against hand-worked cases; authority sample pending)
 - [ ] Phase 5 Optimisation – three options + compare view
 - [ ] Phase 6 Documents – one-step full document set
 - [ ] Phase 7 Review and sign-off – revision, audit, export

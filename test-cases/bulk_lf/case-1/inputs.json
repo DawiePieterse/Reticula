@@ -1,0 +1,59 @@
+{
+ "rules": "eskom/0.4.0",
+ "connection_point": {
+  "lon": 28.09,
+  "lat": -25.52,
+  "voltage_kv": 11,
+  "available_capacity_kva": 1000,
+  "fault_mva_max": 250,
+  "x_r": 10
+ },
+ "mv_network": {
+  "supply_id": "SUPPLY",
+  "nodes": [
+   {
+    "id": "SUPPLY",
+    "kind": "supply",
+    "lon": 28.09,
+    "lat": -25.52
+   },
+   {
+    "id": "SITE:T1",
+    "kind": "site",
+    "lon": 28.1,
+    "lat": -25.52,
+    "site_id": "T1"
+   }
+  ],
+  "branches": [
+   {
+    "id": "MB1",
+    "from_id": "SUPPLY",
+    "to_id": "SITE:T1",
+    "kind": "line",
+    "conductor": "MV-FOX",
+    "length_m": 1000,
+    "geometry": [
+     [
+      28.09,
+      -25.52
+     ],
+     [
+      28.1,
+      -25.52
+     ]
+    ]
+   }
+  ]
+ },
+ "sites": [
+  {
+   "site_id": "T1",
+   "rating_kva": 200,
+   "z_pct": 4.5,
+   "x_r": 3.0,
+   "tap_pct": 0,
+   "design_kva": 180
+  }
+ ]
+}

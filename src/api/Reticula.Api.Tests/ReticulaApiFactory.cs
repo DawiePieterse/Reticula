@@ -159,7 +159,21 @@ public sealed class FakeCalc : ICalcClient
         Throw();
         LastMvDesign = JsonSerializer.SerializeToElement(request, new JsonSerializerOptions(JsonSerializerDefaults.Web) { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower });
         return Task.FromResult(JsonDocument.Parse(
-            "{\"rules\":\"eskom/0.4.0\",\"rules_hash\":\"0011223344556677\",\"passed\":true,\"issues\":[],\"sites\":[{}],\"checks\":[{\"passed\":true}],\"cost_total\":5000,\"unverified\":[]}").RootElement.Clone());
+            "{\"rules\":\"eskom/0.4.0\",\"rules_hash\":\"0011223344556677\",\"passed\":true,\"issues\":[],\"checks\":[{\"passed\":true}],\"cost_total\":5000,\"unverified\":[]," +
+            "\"sites\":[{\"placement\":{\"site_id\":\"T1\",\"rating_kva\":100,\"z_pct\":4,\"x_r\":2,\"design_kva\":80},\"tap_pct\":2.5}," +
+            "{\"placement\":{\"site_id\":\"T2\",\"rating_kva\":null,\"z_pct\":null,\"x_r\":null,\"design_kva\":900},\"tap_pct\":null}]," +
+            "\"mv_network\":{\"supply_id\":\"SUPPLY\",\"nodes\":[],\"branches\":[]}}").RootElement.Clone());
+    }
+
+    public JsonElement? LastBulkStudy { get; private set; }
+
+    public Task<JsonElement> StudyBulkAsync(object request, CancellationToken ct = default)
+    {
+        Throw();
+        LastBulkStudy = JsonSerializer.SerializeToElement(request);
+        return Task.FromResult(JsonDocument.Parse(
+            "{\"rules\":\"eskom/0.4.0\",\"rules_hash\":\"8899aabbccddeeff\",\"passed\":false,\"supply_kva\":82.5,\"notified_max_demand_kva\":100," +
+            "\"checks\":[{\"passed\":true},{\"passed\":false}],\"buses\":[],\"lines\":[],\"transformers\":[]}").RootElement.Clone());
     }
 
     public Task<JsonElement> GetAdmdFormAsync(string rulesRef, CancellationToken ct = default) =>

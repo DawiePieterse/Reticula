@@ -73,6 +73,7 @@ public sealed class MvDesignJob(ReticulaDbContext db, ICalcClient calc, DesignIn
         var customers = await inputs.CustomersAsync(run.ProjectId, ct);
         var (supply, note) = await inputs.SupplyAsync(run.ProjectId, p.Supply, [.. siteRows.Select(s => (Point)s.Geometry)], project.Area,
             [.. mvRows.Select(r => (LineString)r.Geometry)], ct);
+        var fault = await inputs.SourceFaultAsync(run.ProjectId, ct);
         return new
         {
             Rules = project.RulesRef,
@@ -86,6 +87,8 @@ public sealed class MvDesignJob(ReticulaDbContext db, ICalcClient calc, DesignIn
             p.MvConstruction,
             Roads = await inputs.RoadsAsync(run.ProjectId, ct),
             Area = PolygonDto.From(project.Area),
+            SourceFaultMvaMax = fault.Max,
+            SourceFaultMvaMin = fault.Min,
         };
     }
 }

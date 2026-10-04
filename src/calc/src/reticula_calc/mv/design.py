@@ -29,6 +29,8 @@ class MvDesignRequest(BaseModel):
     roads: list[list[tuple[float, float]]] = []
     area: dict[str, Any] | None = None
     rates: str = "indicative/2026-10"
+    source_fault_mva_max: float | None = None
+    source_fault_mva_min: float | None = None
 
 
 class SiteResult(BaseModel):
@@ -99,7 +101,8 @@ def design_mv(req: MvDesignRequest, rules: RuleSet) -> MvDesignResult:
         lv_opt = None
         if p.rating_kva:
             lv = design_lv(LvDesignRequest(rules=req.rules, source=site_xy[p.site_id], routes=req.lv_routes, customers=customers_by_site[p.site_id],
-                                           constructions=[req.lv_construction], roads=req.roads, transformer_kva=p.rating_kva, area=req.area, rates=req.rates), rules)
+                                           constructions=[req.lv_construction], roads=req.roads, transformer_kva=p.rating_kva, area=req.area, rates=req.rates,
+                                           source_fault_mva_max=req.source_fault_mva_max, source_fault_mva_min=req.source_fault_mva_min), rules)
             lv_opt = lv.options[0]
             unverified.update(lv.unverified)
             lines += [CostLine(item=f"Site {p.site_id}: {line.item}", quantity=line.quantity, unit=line.unit, rate=line.rate, amount=line.amount)

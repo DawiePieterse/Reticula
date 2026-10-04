@@ -100,21 +100,21 @@ public static class DesignEndpoints
         return TypedResults.Accepted($"/api/projects/{projectId}/mv-designs/{run.Id}", new StartedDesign(ToDto(run), JobDto.From(job)));
     }
 
-    private static async Task<Ok<List<DesignRunDto>>> ListKind(Guid projectId, string kind, ReticulaDbContext db, CancellationToken ct)
+    internal static async Task<Ok<List<DesignRunDto>>> ListKind(Guid projectId, string kind, ReticulaDbContext db, CancellationToken ct)
     {
         var runs = await db.DesignRuns.AsNoTracking().Where(r => r.ProjectId == projectId && r.Kind == kind)
             .OrderByDescending(r => r.CreatedAt).Take(50).ToListAsync(ct);
         return TypedResults.Ok(runs.Select(ToDto).ToList());
     }
 
-    private static async Task<Results<Ok<DesignRunDetail>, NotFound>> Get(Guid projectId, Guid runId, string kind, ReticulaDbContext db, CancellationToken ct)
+    internal static async Task<Results<Ok<DesignRunDetail>, NotFound>> Get(Guid projectId, Guid runId, string kind, ReticulaDbContext db, CancellationToken ct)
     {
         var run = await db.DesignRuns.AsNoTracking().FirstOrDefaultAsync(r => r.Id == runId && r.ProjectId == projectId && r.Kind == kind, ct);
         if (run is null) return TypedResults.NotFound();
         return TypedResults.Ok(new DesignRunDetail(ToDto(run), run.ResultJson is null ? null : JsonDocument.Parse(run.ResultJson).RootElement.Clone()));
     }
 
-    private static DesignRunDto ToDto(DesignRun r) => new(
+    internal static DesignRunDto ToDto(DesignRun r) => new(
         r.Id, r.Kind, r.Status.ToString().ToLowerInvariant(), r.JobId, JsonDocument.Parse(r.ParametersJson).RootElement.Clone(), r.RulesRef, r.RulesHash,
         r.Passed, r.SummaryJson is null ? null : JsonDocument.Parse(r.SummaryJson).RootElement.Clone(), r.Error, r.CreatedAt, r.FinishedAt);
 }

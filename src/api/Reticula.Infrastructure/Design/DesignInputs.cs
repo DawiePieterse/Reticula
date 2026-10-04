@@ -43,6 +43,13 @@ public sealed class DesignInputs(ReticulaDbContext db)
         })];
     }
 
+    /// <summary>The fault levels the authority gave at the connection point, or nulls (the rules' defaults then apply).</summary>
+    public async Task<(double? Max, double? Min)> SourceFaultAsync(Guid projectId, CancellationToken ct)
+    {
+        var cp = await db.ConnectionPoints.AsNoTracking().FirstOrDefaultAsync(c => c.ProjectId == projectId, ct);
+        return (cp?.FaultMvaMax, cp?.FaultMvaMin);
+    }
+
     public async Task<List<IEnumerable<double[]>>> RoadsAsync(Guid projectId, CancellationToken ct)
     {
         var roads = await db.MapFeatures.AsNoTracking().Where(m => m.ProjectId == projectId && m.Layer == MapLayers.Roads).Select(m => m.Geometry).ToListAsync(ct);
@@ -50,14 +57,17 @@ public sealed class DesignInputs(ReticulaDbContext db)
     }
 
     /// <summary>
-    /// Where the MV network is fed from: the engineer's point if given; else the authority's connection point (imported
-    /// network data) nearest the project; else the nearest point of an existing MV line; else the end of the MV routes
+    /// Where the MV network is fed from: the engineer's point if given; else the authority's connection point entered for
+    /// the project (plan 4.1); else a connection point in the imported network data nearest the project; else the nearest point of an existing MV line; else the end of the MV routes
     /// furthest from the transformer sites. The note says which, so the design states its assumption.
     /// </summary>
     public async Task<(double[] Point, string? Note)> SupplyAsync(Guid projectId, double[]? given, IReadOnlyList<Point> sites, Polygon area,
         IReadOnlyList<LineString> mvRoutes, CancellationToken ct)
     {
         if (given is { Length: 2 }) return (given, null);
+        var entered = await db.ConnectionPoints.AsNoTracking().FirstOrDefaultAsync(c => c.ProjectId == projectId, ct);
+        if (entered is not null)
+            return ([entered.Location.X, entered.Location.Y], null);
         var centre = area.Centroid;
         var assets = await db.MapFeatures.AsNoTracking().Where(m => m.ProjectId == projectId && m.Layer == MapLayers.Network).ToListAsync(ct);
         var cp = assets.Where(a => a.Subtype == "connection_point" && a.Geometry is Point).OrderBy(a => a.Geometry.Distance(centre)).FirstOrDefault();
@@ -73,6 +83,6 @@ public sealed class DesignInputs(ReticulaDbContext db)
         }
         if (routeEnds.Count == 0) throw new InvalidOperationException("Mark the MV route on the field screen before designing the MV network.");
         var far = routeEnds.OrderByDescending(e => sites.Count == 0 ? 0 : sites.Min(s => s.Distance(e))).First();
-        return ([far.X, far.Y], "No connection point is known yet (plan 4.1): supply assumed at the end of the MV route furthest from the transformer sites.");
+        return ([far.X, far.Y], "No connection point is entered yet: supply assumed at the end of the MV route furthest from the transformer sites.");
     }
 }

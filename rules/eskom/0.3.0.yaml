@@ -100,6 +100,7 @@ fault:
   clause: "IEC60909-0 (method), NRS034-1 protection grading; idx F-01"
   status: unverified
   mv_fault_mva: 250           # used until the authority gives the connection point fault level (plan 4.1)
+  voltage_factor_mv: 1.1      # IEC 60909 c for the MV source impedance (Table 1, 1 kV < Un ≤ 35 kV)
   voltage_factor_max: 1.05    # IEC 60909 c for LV, maximum fault
   voltage_factor_min: 0.95    # IEC 60909 c for LV, minimum fault
   contact_resistance_ohm: 0.0

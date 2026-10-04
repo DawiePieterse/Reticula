@@ -33,7 +33,7 @@ class SizingResult(BaseModel):
 
 
 def size_network(network: LvNetwork, rules: RuleSet, construction: Construction, transformer_kva: float | None = None,
-                 site: dict[str, float] | None = None) -> SizingResult:
+                 site: dict[str, float] | None = None, source: dict[str, float] | None = None) -> SizingResult:
     options = [c.code for c in feeder_options(rules, construction)]
     rank = {code: i for i, code in enumerate(options)}
     cfg = lv_config(rules)
@@ -70,7 +70,7 @@ def size_network(network: LvNetwork, rules: RuleSet, construction: Construction,
             if rank[b.conductor] < biggest:
                 b.conductor = options[biggest]
 
-    a = analyse(net, rules, transformer_kva, site)
+    a = analyse(net, rules, transformer_kva, site, source)
     for rounds in range(1, MAX_ROUNDS + 1):
         failing = [c for c in a.checks if not c.passed and c.code in SIZING_CODES]
         if not failing:
@@ -103,5 +103,5 @@ def size_network(network: LvNetwork, rules: RuleSet, construction: Construction,
         if not changed:
             return SizingResult(network=net, analysis=a, rounds=rounds, converged=False)
         taper()
-        a = analyse(net, rules, transformer_kva, site)
+        a = analyse(net, rules, transformer_kva, site, source)
     return SizingResult(network=net, analysis=a, rounds=MAX_ROUNDS, converged=False)

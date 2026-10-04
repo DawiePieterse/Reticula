@@ -53,6 +53,16 @@ mv_design:
     overhead: [MV-SQUIRREL, MV-FOX, MV-MINK, MV-HARE]
     underground: [MV-XLPE-35, MV-XLPE-70, MV-XLPE-95, MV-XLPE-185]
 
+bulk:
+  clause: "NRS048-2 MV voltage; IEC60909-0; NRS034-1 supply application; idx B-01"
+  status: unverified
+  mv_voltage_band_pct: 5          # MV bus voltages in the load flow
+  mv_switchgear_fault_ka: 20      # three-phase fault the MV equipment is rated for
+  nmd_step_kva: 50                # the notified maximum demand is applied for in these steps
+  nmd_margin_pct: 0               # added to the studied demand before rounding up
+  source_r_x: 0.1                 # connection point R/X when the authority gives none
+  zero_sequence: { r0_add_ohm_per_km: 0.148, x0_factor: 3.0, source_x0_x1: 1.0, source_r0_x0: 0.1 }
+
 conductors:
   # LV library (as eskom/0.3.0; lists replace rather than merge, so they are repeated here)
   - { code: ABC-35, description: "4 x 35 mm² Al ABC (SANS 1418)", kind: overhead, role: feeder, material: Al, area_mm2: 35, r_ohm_per_km: 1.08, x_ohm_per_km: 0.087, neutral_r_ohm_per_km: 1.08, rating_a: 120, k: 94, fuse_a: 100, mass_kg_per_m: 0.55, diameter_mm: 28, uts_kn: 19.6, e_gpa: 56, alpha_per_c: 2.3e-5, clause: "SANS1418-1; idx C-01", status: unverified }

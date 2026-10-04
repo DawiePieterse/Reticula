@@ -44,6 +44,11 @@ export const routes: Routes = [
         canActivate: [onlineGuard],
         loadComponent: () => import('./features/design/mv-design-page').then((m) => m.MvDesignPage),
       },
+      {
+        path: 'projects/:id/bulk',
+        canActivate: [onlineGuard],
+        loadComponent: () => import('./features/design/bulk-supply-page').then((m) => m.BulkSupplyPage),
+      },
       { path: 'system', loadComponent: () => import('./features/system/system-status').then((m) => m.SystemStatus) },
     ],
   },

@@ -31,6 +31,9 @@ public interface ICalcClient
     /// <summary>Places and sizes transformers and designs each site's LV network and the MV network.</summary>
     Task<JsonElement> DesignMvAsync(object request, CancellationToken ct = default);
 
+    /// <summary>Load flow, IEC 60909 faults, supply capacity and NMD for an MV design fed from the authority's connection point.</summary>
+    Task<JsonElement> StudyBulkAsync(object request, CancellationToken ct = default);
+
     /// <exception cref="CalcRejectedException">Unknown option, bad number or missing rules section.</exception>
     Task<AdmdEstimate> EstimateAdmdAsync(AdmdEstimateRequest request, CancellationToken ct = default);
 

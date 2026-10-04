@@ -54,6 +54,7 @@ builder.Services.AddTilePacks();
 builder.Services.AddScoped<DesignInputs>();
 builder.Services.AddJobHandler<LvDesignJob>();
 builder.Services.AddJobHandler<MvDesignJob>();
+builder.Services.AddJobHandler<BulkStudyJob>();
 builder.Services.AddScoped<LayoutService>();
 builder.Services.AddHttpClient<OverpassClient>(c =>
 {
@@ -88,6 +89,7 @@ app.MapLayoutEndpoints();
 app.MapFieldEndpoints();
 app.MapTilePackEndpoints();
 app.MapDesignEndpoints();
+app.MapBulkEndpoints();
 
 await app.InitialiseDatabaseAsync();
 
