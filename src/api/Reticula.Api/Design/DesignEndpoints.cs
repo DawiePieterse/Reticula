@@ -52,7 +52,7 @@ public static class DesignEndpoints
         return app;
     }
 
-    private static async Task<Results<Accepted<StartedDesign>, NotFound, ValidationProblem>> Start(
+    internal static async Task<Results<Accepted<StartedDesign>, NotFound, ValidationProblem>> Start(
         Guid projectId, LvDesignRequest req, ReticulaDbContext db, IJobQueue queue, TimeProvider time, ClaimsPrincipal user, CancellationToken ct)
     {
         var project = await db.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.Id == projectId && p.ArchivedAt == null, ct);
@@ -79,7 +79,7 @@ public static class DesignEndpoints
         return TypedResults.Accepted($"/api/projects/{projectId}/lv-designs/{run.Id}", new StartedDesign(ToDto(run), JobDto.From(job)));
     }
 
-    private static async Task<Results<Accepted<StartedDesign>, NotFound, ValidationProblem>> StartMv(
+    internal static async Task<Results<Accepted<StartedDesign>, NotFound, ValidationProblem>> StartMv(
         Guid projectId, MvDesignRequest req, ReticulaDbContext db, IJobQueue queue, TimeProvider time, ClaimsPrincipal user, CancellationToken ct)
     {
         var project = await db.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.Id == projectId && p.ArchivedAt == null, ct);
@@ -109,7 +109,7 @@ public static class DesignEndpoints
         return TypedResults.Accepted($"/api/projects/{projectId}/mv-designs/{run.Id}", new StartedDesign(ToDto(run), JobDto.From(job)));
     }
 
-    private static async Task<Results<Accepted<StartedDesign>, NotFound, ValidationProblem>> StartOptions(
+    internal static async Task<Results<Accepted<StartedDesign>, NotFound, ValidationProblem>> StartOptions(
         Guid projectId, OptionSearchRequest req, ReticulaDbContext db, IJobQueue queue, TimeProvider time, ClaimsPrincipal user, CancellationToken ct)
     {
         var project = await db.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.Id == projectId && p.ArchivedAt == null, ct);

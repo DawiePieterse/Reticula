@@ -105,6 +105,13 @@ def render_report(pkg: DocumentPackage, sheets: list[Any] | None = None) -> byte
         s += [Spacer(1, 6), _p("NOT FOR SUBMISSION. This design uses rules values not yet verified against the current standards: "
                                + ", ".join(unverified(pkg)) + ".", WARN)]
 
+    def narrative(*keys: str) -> None:
+        for sec in (x for x in pkg.report_sections if x.key in keys):
+            s.append(Paragraph(sec.title, H2))
+            s.extend(_p(par, BODY) for par in sec.text.split("\n\n") if par.strip())
+
+    narrative("introduction", "site_description", "design_approach")
+
     # 1. Design basis
     s += [Paragraph("1. Design basis", H2),
           _p("Voltage drop by the Herman-Beta statistical method (NRS 034-1) at the rules' confidence level; thermal loading from the same "
@@ -191,6 +198,8 @@ def render_report(pkg: DocumentPackage, sheets: list[Any] | None = None) -> byte
                        [[o["title"], o["design"]["construction"], f"{o['option']['analysis']['transformer_kva']:g} kVA at the {o['design']['position_label']}",
                          f"{r['currency']} {o['option']['cost']['total']:,.0f}", f"{r['currency']} {o['lifetime']['total']['value']:,.0f}", _fmt(o["spare"]["spare_pct"], 1),
                          "yes" if o["too_close_to_call"] else ""] for o in r["options"]]))
+
+    narrative("options_discussion", "conclusions")
 
     # 7. Assumptions
     s.append(Paragraph("7. Assumptions", H2))

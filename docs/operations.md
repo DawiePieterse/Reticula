@@ -72,3 +72,9 @@ The PDF documents use DejaVu Sans for symbols in formulas (Δ, Σ, ≤); the cal
 Generated documents are kept in the file store under `projects/<project>/documents/<set>/`. Downloads use signed
 links that expire after 10 minutes (ASP.NET data protection; keys in the default key ring). In a multi-instance
 deployment, persist the key ring (`AddDataProtection().PersistKeysTo…`) so a link made on one instance works on another.
+
+## Design assistant
+
+Off by default. To enable, set `Assistant__Enabled=true` and the secret `Assistant__ApiKey` (Anthropic) on the API;
+optionally `Assistant__Model`. The API calls `https://api.anthropic.com` (allow it in the network policy). See
+docs/assistant.md for what the assistant can and cannot do.

@@ -60,6 +60,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/review/review-page').then((m) => m.ReviewPage),
       },
       {
+        path: 'projects/:id/assistant',
+        canActivate: [onlineGuard],
+        loadComponent: () => import('./features/assistant/assistant-page').then((m) => m.AssistantPage),
+      },
+      {
         path: 'projects/:id/bulk',
         canActivate: [onlineGuard],
         loadComponent: () => import('./features/design/bulk-supply-page').then((m) => m.BulkSupplyPage),

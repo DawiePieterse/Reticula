@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.HttpLogging;
 using Reticula.Api;
+using Reticula.Api.Assistant;
 using Reticula.Api.Auth;
 using Reticula.Api.Costs;
 using Reticula.Api.Design;
@@ -12,6 +13,7 @@ using Reticula.Api.Layout;
 using Reticula.Api.Maps;
 using Reticula.Api.Projects;
 using Reticula.Api.Review;
+using Reticula.Infrastructure.Assistant;
 using Reticula.Infrastructure.Audit;
 using Reticula.Infrastructure.Calc;
 using Reticula.Infrastructure.Data;
@@ -76,6 +78,10 @@ builder.Services.AddScoped<ReviewReadiness>();
 builder.Services.AddJobHandler<RevisionIssueJob>();
 builder.Services.AddJobHandler<RevisionReproduceJob>();
 builder.Services.AddJobHandler<ProjectExportJob>();
+builder.Services.AddSingleton(AssistantOptions.From(builder.Configuration));
+builder.Services.AddHttpClient<IAssistantModel, AnthropicModel>(c => c.Timeout = TimeSpan.FromSeconds(120));
+builder.Services.AddScoped<AssistantTools>();
+builder.Services.AddScoped<AssistantService>();
 builder.Services.AddScoped<LayoutService>();
 builder.Services.AddHttpClient<OverpassClient>(c =>
 {
@@ -114,6 +120,7 @@ app.MapBulkEndpoints();
 app.MapRateListEndpoints();
 app.MapDocumentEndpoints();
 app.MapReviewEndpoints();
+app.MapAssistantEndpoints();
 
 await app.InitialiseDatabaseAsync();
 

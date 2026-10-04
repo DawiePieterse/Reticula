@@ -27,7 +27,8 @@ public sealed record DocumentSourceSet(
     int Loads,
     DateTimeOffset? LoadsChanged,
     int OpenAssumptions,
-    DateTimeOffset? AssumptionsChanged)
+    DateTimeOffset? AssumptionsChanged,
+    DateTimeOffset? ReportSectionsChanged = null)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -52,6 +53,7 @@ public sealed record DocumentSourceSet(
         if (RateList != then.RateList) out_.Add("the rate list changed");
         if (Loads != then.Loads || LoadsChanged != then.LoadsChanged) out_.Add("loads changed");
         if (OpenAssumptions != then.OpenAssumptions || AssumptionsChanged != then.AssumptionsChanged) out_.Add("assumptions changed");
+        if (ReportSectionsChanged != then.ReportSectionsChanged) out_.Add("report text changed");
         return [.. out_.Distinct()];
     }
 
@@ -76,6 +78,7 @@ public sealed record DocumentSourceSet(
         var assumptions = db.Assumptions.AsNoTracking().Where(a => a.ProjectId == projectId);
         return new DocumentSourceSet(project.RulesRef, lv, Latest(DesignKinds.Mv), Latest(DesignKinds.Bulk), Latest(DesignKinds.Options), cp, rate,
             await loads.CountAsync(ct), await loads.MaxAsync(l => (DateTimeOffset?)l.UpdatedAt, ct),
-            await assumptions.CountAsync(a => a.Status == AssumptionStatus.Open, ct), await assumptions.MaxAsync(a => (DateTimeOffset?)a.UpdatedAt, ct));
+            await assumptions.CountAsync(a => a.Status == AssumptionStatus.Open, ct), await assumptions.MaxAsync(a => (DateTimeOffset?)a.UpdatedAt, ct),
+            await db.ReportSections.AsNoTracking().Where(r => r.ProjectId == projectId).MaxAsync(r => (DateTimeOffset?)(r.ApprovedAt ?? r.UpdatedAt), ct));
     }
 }

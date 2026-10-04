@@ -34,6 +34,9 @@ public sealed class ReticulaApiFactory : WebApplicationFactory<Program>, IAsyncL
     public JobGate Gate { get; } = new();
     public FakeTileServer Tiles { get; } = new();
     public FakeOverpass Overpass { get; } = new();
+    public FakeAssistantModel Assistant { get; } = new();
+    /// <summary>Off by default (plan 8.5); assistant tests switch it on and back off.</summary>
+    public Reticula.Infrastructure.Assistant.AssistantOptions AssistantOptions { get; } = new() { Model = "test-model" };
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -56,6 +59,8 @@ public sealed class ReticulaApiFactory : WebApplicationFactory<Program>, IAsyncL
             s.AddJobHandler<FailingJob>();
             s.AddHttpClient(TilePackJob.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => Tiles);
             s.AddHttpClient<Reticula.Infrastructure.Layout.OverpassClient>().ConfigurePrimaryHttpMessageHandler(() => Overpass);
+            s.Replace(ServiceDescriptor.Singleton(AssistantOptions));
+            s.Replace(ServiceDescriptor.Transient<Reticula.Infrastructure.Assistant.IAssistantModel>(_ => Assistant));
         });
     }
 
@@ -331,4 +336,32 @@ public sealed class FakeOverpass : HttpMessageHandler
     }
 
     protected override void Dispose(bool disposing) { }
+}
+
+
+/// <summary>A scripted model: each call answers with the next step, given the transcript so far.</summary>
+public sealed class FakeAssistantModel : Reticula.Infrastructure.Assistant.IAssistantModel
+{
+    public Queue<Func<Reticula.Infrastructure.Assistant.ModelRequest, Reticula.Infrastructure.Assistant.ModelReply>> Script { get; } = new();
+    public List<Reticula.Infrastructure.Assistant.ModelRequest> Requests { get; } = [];
+
+    public Task<Reticula.Infrastructure.Assistant.ModelReply> SendAsync(Reticula.Infrastructure.Assistant.ModelRequest request, CancellationToken ct)
+    {
+        Requests.Add(new(request.System, request.Tools, (System.Text.Json.Nodes.JsonArray)request.Messages.DeepClone()));
+        var step = Script.Count > 0 ? Script.Dequeue() : _ => Text("Done.");
+        return Task.FromResult(step(request));
+    }
+
+    public static Reticula.Infrastructure.Assistant.ModelReply Text(string text) =>
+        new(new System.Text.Json.Nodes.JsonArray(new System.Text.Json.Nodes.JsonObject { ["type"] = "text", ["text"] = text }), "end_turn");
+
+    public static Reticula.Infrastructure.Assistant.ModelReply Tools(params (string Name, object Input)[] calls) =>
+        new(new System.Text.Json.Nodes.JsonArray([.. calls.Select((c, i) => (System.Text.Json.Nodes.JsonNode)new System.Text.Json.Nodes.JsonObject
+        {
+            ["type"] = "tool_use", ["id"] = $"toolu_{Guid.NewGuid():N}", ["name"] = c.Name, ["input"] = System.Text.Json.JsonSerializer.SerializeToNode(c.Input),
+        })]), "tool_use");
+
+    /// <summary>The tool results the model was given in its last request.</summary>
+    public static IEnumerable<System.Text.Json.Nodes.JsonObject> LastToolResults(Reticula.Infrastructure.Assistant.ModelRequest r) =>
+        (r.Messages.Last()!["content"] as System.Text.Json.Nodes.JsonArray ?? []).OfType<System.Text.Json.Nodes.JsonObject>().Where(b => b["type"]?.GetValue<string>() == "tool_result");
 }

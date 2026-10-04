@@ -7,12 +7,13 @@ import { toApiProblem } from '../../core/api-problem';
 import { AuthService } from '../../core/auth/auth.service';
 import { Job, JobsService } from '../../core/jobs/jobs.service';
 import { JobProgress } from '../../shared/job-progress';
+import { ReportSections } from '../assistant/report-sections';
 import { DocumentSet, DocumentsApi, ProjectDocument } from './documents.api';
 
 /** Design documents (plan Phase 6): one-step generate all, stale detection, registers and checklist, downloads. */
 @Component({
   selector: 'app-documents-page',
-  imports: [FormsModule, RouterLink, DatePipe, JobProgress],
+  imports: [FormsModule, RouterLink, DatePipe, JobProgress, ReportSections],
   template: `
     <div class="page-head">
       <h2>Documents</h2>
@@ -67,6 +68,8 @@ import { DocumentSet, DocumentsApi, ProjectDocument } from './documents.api';
         }
       </section>
     } @empty { <p class="muted">No documents yet. Run the LV design (and MV design and bulk study where needed), then generate.</p> }
+
+    <app-report-sections [projectId]="id()" [canEdit]="auth.isEngineer()" (changed)="reload()" />
   `,
   styles: `
     .run { border: 1px solid var(--border); border-radius: 8px; margin: 1rem 0; }
@@ -105,6 +108,10 @@ export class DocumentsPage {
       const id = this.id();
       untracked(() => void this.load(id));
     });
+  }
+
+  protected reload(): Promise<void> {
+    return this.load(this.id());
   }
 
   protected size(bytes: number): string {

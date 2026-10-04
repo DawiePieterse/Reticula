@@ -169,12 +169,12 @@ Deliverables: LV layout, phasing, conductor sizing, voltage drop, fault level, O
 
 ### Phase 8 – Design assistant
 
-- [ ] 8.1 Tool gateway: expose existing endpoints as Claude tools with strict schemas; no calculation tool exists outside the Python service.
-- [ ] 8.2 Run setup: assistant drafts run parameters, user confirms.
-- [ ] 8.3 Option explanation from traceability records only.
-- [ ] 8.4 Report text drafting into editable sections; engineer edits and approves.
-- [ ] 8.5 Feature flag + graceful absence; full test suite passes with flag off.
-- [ ] 8.6 Prompt-injection and data-boundary tests (assistant cannot alter authority inputs or sign off).
+- [x] 8.1 Tool gateway: expose existing endpoints as Claude tools with strict schemas; no calculation tool exists outside the Python service. (docs/assistant.md.)
+- [x] 8.2 Run setup: assistant drafts run parameters, user confirms.
+- [x] 8.3 Option explanation from traceability records only.
+- [x] 8.4 Report text drafting into editable sections; engineer edits and approves.
+- [x] 8.5 Feature flag + graceful absence; full test suite passes with flag off.
+- [x] 8.6 Prompt-injection and data-boundary tests (assistant cannot alter authority inputs or sign off).
 
 ---
 
@@ -217,7 +217,7 @@ F. **Performance targets.** Field UI usable on mid-range Android tablet; 2,000-s
 - [x] Phase 5 Optimisation – three options + compare view
 - [x] Phase 6 Documents – one-step full document set
 - [x] Phase 7 Review and sign-off – revision, audit, export
-- [ ] Phase 8 Design assistant – flagged, optional, tested
+- [x] Phase 8 Design assistant – flagged, optional, tested
 
 ### Release gate (every release)
 - [ ] All hand-worked test cases pass

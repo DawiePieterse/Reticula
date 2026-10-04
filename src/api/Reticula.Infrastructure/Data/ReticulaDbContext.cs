@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Reticula.Domain.Assistant;
 using Reticula.Domain.Audit;
 using Reticula.Domain.Costs;
 using Reticula.Domain.Design;
@@ -38,6 +39,9 @@ public sealed class ReticulaDbContext(DbContextOptions<ReticulaDbContext> option
     public DbSet<Revision> Revisions => Set<Revision>();
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
     public DbSet<ProjectExport> ProjectExports => Set<ProjectExport>();
+    public DbSet<AssistantConversation> AssistantConversations => Set<AssistantConversation>();
+    public DbSet<AssistantDraft> AssistantDrafts => Set<AssistantDraft>();
+    public DbSet<ReportSection> ReportSections => Set<ReportSection>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -315,6 +319,36 @@ public sealed class ReticulaDbContext(DbContextOptions<ReticulaDbContext> option
             e.Property(x => x.Sha256).HasMaxLength(64);
             e.Property(x => x.Error).HasMaxLength(2000);
             e.HasIndex(x => x.ProjectId);
+            e.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
+        });
+        b.Entity<AssistantConversation>(e =>
+        {
+            e.ToTable("assistant_conversations");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.MessagesJson).HasColumnType("jsonb").IsRequired();
+            e.HasIndex(x => new { x.ProjectId, x.UserId });
+            e.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
+        });
+        b.Entity<AssistantDraft>(e =>
+        {
+            e.ToTable("assistant_drafts");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Kind).HasMaxLength(30).IsRequired();
+            e.Property(x => x.ParametersJson).HasColumnType("jsonb").IsRequired();
+            e.Property(x => x.Explanation).HasMaxLength(4000).IsRequired();
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.HasIndex(x => new { x.ProjectId, x.Status });
+            e.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
+        });
+        b.Entity<ReportSection>(e =>
+        {
+            e.ToTable("report_sections");
+            e.HasKey(x => new { x.ProjectId, x.Key });
+            e.Property(x => x.Key).HasMaxLength(50);
+            e.Property(x => x.Text).HasMaxLength(20000).IsRequired();
+            e.Property(x => x.Source).HasMaxLength(20).IsRequired();
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Version).IsRowVersion();
             e.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
         });
         b.Entity<AuditEntry>(e =>

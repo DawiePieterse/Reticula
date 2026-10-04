@@ -80,6 +80,14 @@ class AssumptionRow(BaseModel):
     status: str = "open"
 
 
+class ReportText(BaseModel):
+    """A narrative section the engineer approved (plan 8.4)."""
+
+    key: str
+    title: str
+    text: str
+
+
 class Stand(BaseModel):
     erf: str | None = None
     coordinates: list[list[tuple[float, float]]]
@@ -96,6 +104,7 @@ class DocumentPackage(BaseModel):
     connection_point: dict[str, Any] | None = None
     assumptions: list[AssumptionRow] = []
     stands: list[Stand] = []
+    report_sections: list[ReportText] = []
     rates: RatesRef = "indicative/2026-10"
 
 

@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using NetTopologySuite.Geometries;
+using Reticula.Domain.Assistant;
 using Reticula.Domain.Audit;
 using Reticula.Domain.Costs;
 using Reticula.Domain.Design;
@@ -40,7 +41,7 @@ public sealed class AuditInterceptor(AuditActor actor, TimeProvider time) : Save
     {
         [typeof(Project)] = true, [typeof(Candidate)] = true, [typeof(LoadPoint)] = true, [typeof(Building)] = false, [typeof(Inspection)] = true,
         [typeof(Assumption)] = true, [typeof(ConnectionPoint)] = true, [typeof(RateList)] = true, [typeof(DesignRun)] = true, [typeof(ImportBatch)] = true,
-        [typeof(DocumentSet)] = true, [typeof(Revision)] = true,
+        [typeof(DocumentSet)] = true, [typeof(Revision)] = true, [typeof(AssistantDraft)] = true, [typeof(ReportSection)] = true,
     };
 
     private static readonly HashSet<string> Skipped =

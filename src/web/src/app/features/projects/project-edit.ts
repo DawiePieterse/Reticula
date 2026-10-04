@@ -5,6 +5,8 @@ import { firstValueFrom } from 'rxjs';
 import { ApiProblem, toApiProblem } from '../../core/api-problem';
 import { AuthService } from '../../core/auth/auth.service';
 import { ProjectRateList } from '../costs/project-rate-list';
+import { AssistantApi } from '../assistant/assistant.api';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { AreaMap } from './area-map';
 import { LayoutLayers, ProjectLayout } from './project-layout';
 import { GeoJsonPolygon } from './geo';
@@ -26,6 +28,7 @@ import { ProjectsApi } from './projects.api';
           <a class="button" [routerLink]="['/projects', projectId, 'bulk']">Bulk supply</a>
           <a class="button" [routerLink]="['/projects', projectId, 'documents']">Documents</a>
           <a class="button" [routerLink]="['/projects', projectId, 'review']">Review</a>
+          @if (assistant()?.enabled) { <a class="button" [routerLink]="['/projects', projectId, 'assistant']">Assistant</a> }
         }
         <a routerLink="/projects">Back to projects</a>
       </div>
@@ -100,6 +103,8 @@ export class ProjectEdit {
   private readonly api = inject(ProjectsApi);
   private readonly router = inject(Router);
   protected readonly canEdit = inject(AuthService).isEngineer;
+  /** The assistant link shows only when it is enabled (plan 8.5). */
+  protected readonly assistant = toSignal(inject(AssistantApi).status$);
 
   protected readonly form = new FormGroup({
     name: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(200)] }),

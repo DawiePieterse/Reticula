@@ -15,7 +15,7 @@ from pypdf import PdfReader
 
 from reticula_calc.docs.boq import sections
 from reticula_calc.docs.pack import render
-from reticula_calc.docs.package import RenderRequest
+from reticula_calc.docs.package import RenderRequest, ReportText
 
 
 @pytest.fixture(scope="module")
@@ -119,6 +119,14 @@ def test_a_signed_off_revision_carries_the_sign_off():
     assert "ECSA Pr Eng 20231234" in pdf_text(report)
     dxf = next(base64.b64decode(f.data_b64) for f in r.files if f.kind == "drawings").decode()
     assert "Signed off: A. Engineer, ECSA Pr Eng 20231234" in dxf
+
+
+def test_approved_narrative_sections_are_printed():
+    pkg = package().model_copy(deep=True)
+    pkg.report_sections = [ReportText(key="introduction", title="Introduction", text="This report covers Ext 1.\n\nIt has two sites."),
+                           ReportText(key="conclusions", title="Conclusions and recommendations", text="Build overhead.")]
+    text = pdf_text(base64.b64decode(render(RenderRequest(package=pkg, kinds=["report"])).files[0].data_b64))
+    assert text.index("This report covers Ext 1.") < text.index("1. Design basis") < text.index("Build overhead.") < text.index("7. Assumptions")
 
 
 def test_endpoint_returns_only_the_requested_kinds(client):

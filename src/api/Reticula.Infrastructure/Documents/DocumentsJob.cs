@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
+using Reticula.Domain.Assistant;
 using Reticula.Domain.Design;
 using Reticula.Domain.Documents;
 using Reticula.Domain.Field;
@@ -150,6 +151,9 @@ public sealed class DocumentGenerator(ReticulaDbContext db, ICalcClient calc, De
                     .Select(ring => (JsonNode)new JsonArray([.. ring.Coordinates.Select(c => (JsonNode)new JsonArray(c.X, c.Y))]))]),
             })]),
             ["rates"] = rates is JsonObject ro2 ? ro2.DeepClone() : JsonValue.Create((string)rates),
+            ["report_sections"] = new JsonArray([.. (await db.ReportSections.AsNoTracking().Where(r => r.ProjectId == set.ProjectId && r.Status == ReportSectionStatus.Approved).ToListAsync(ct))
+                .Where(r => ReportSectionKeys.Titles.ContainsKey(r.Key))
+                .Select(r => (JsonNode)new JsonObject { ["key"] = r.Key, ["title"] = ReportSectionKeys.Titles[r.Key], ["text"] = r.Text })]),
         };
     }
 }
