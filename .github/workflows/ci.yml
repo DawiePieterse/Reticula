@@ -51,6 +51,28 @@ jobs:
       - run: dotnet test --no-build
         working-directory: src/api
 
+  backup:
+    name: Backup and restore
+    runs-on: ubuntu-latest
+    container: postgis/postgis:17-3.5
+    services:
+      postgres:
+        image: postgis/postgis:17-3.5
+        env:
+          POSTGRES_USER: reticula
+          POSTGRES_PASSWORD: reticula
+        options: >-
+          --health-cmd "pg_isready -U reticula"
+          --health-interval 5s
+          --health-retries 10
+    env:
+      PGHOST: postgres
+      PGUSER: reticula
+      PGPASSWORD: reticula
+    steps:
+      - uses: actions/checkout@v4
+      - run: infra/backup/test-restore.sh
+
   web:
     name: Web (Angular 22)
     runs-on: ubuntu-latest

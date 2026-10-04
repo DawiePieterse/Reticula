@@ -1,24 +1,52 @@
+using Microsoft.AspNetCore.HttpLogging;
 using Reticula.Api;
 using Reticula.Api.Auth;
 using Reticula.Api.Infrastructure;
+using Reticula.Api.Jobs;
 using Reticula.Api.Projects;
 using Reticula.Infrastructure.Calc;
 using Reticula.Infrastructure.Data;
+using Reticula.Infrastructure.Jobs;
+using Reticula.Infrastructure.Jobs.Handlers;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Structured JSON logs outside development; request trace ids flow to the calc service via traceparent.
+if (!builder.Environment.IsDevelopment())
+{
+    builder.Logging.ClearProviders();
+    builder.Logging.AddJsonConsole(o =>
+    {
+        o.IncludeScopes = true;
+        o.UseUtcTimestamp = true;
+        o.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ ";
+    });
+}
+builder.Services.AddHttpLogging(o =>
+{
+    o.LoggingFields = HttpLoggingFields.RequestMethod | HttpLoggingFields.RequestPath
+                      | HttpLoggingFields.ResponseStatusCode | HttpLoggingFields.Duration;
+    o.CombineLogs = true;
+});
+
 builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<CalcUnavailableExceptionHandler>();
+builder.Services.AddExceptionHandler<UnknownJobKindExceptionHandler>();
 builder.Services.AddCalcClient(builder.Configuration);
 builder.Services.AddReticulaData();
 builder.Services.AddReticulaAuth();
+builder.Services.AddSignalR();
+builder.Services.AddSingleton<IJobNotifier, SignalRJobNotifier>();
+builder.Services.AddReticulaJobs();
+builder.Services.AddJobHandler<DiagnosticsJob>();
 builder.Services.AddCors(o => o.AddDefaultPolicy(p => p.AllowAnyHeader().AllowAnyMethod().AllowAnyOrigin()));
 
 var app = builder.Build();
 
 app.UseExceptionHandler();
+app.UseHttpLogging();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -30,9 +58,11 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapSystemEndpoints();
+app.MapClientErrorEndpoints();
 app.MapAuthEndpoints();
 app.MapUserEndpoints();
 app.MapProjectEndpoints();
+app.MapJobEndpoints();
 
 await app.InitialiseDatabaseAsync();
 

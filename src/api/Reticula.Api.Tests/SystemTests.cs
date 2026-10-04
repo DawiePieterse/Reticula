@@ -3,7 +3,8 @@ using System.Net.Http.Json;
 
 namespace Reticula.Api.Tests;
 
-public class SystemTests(ReticulaApiFactory factory) : IClassFixture<ReticulaApiFactory>
+[Collection(ApiCollection.Name)]
+public class SystemTests(ReticulaApiFactory factory)
 {
     [Fact]
     public async Task Health_is_anonymous_and_reports_calc_state()

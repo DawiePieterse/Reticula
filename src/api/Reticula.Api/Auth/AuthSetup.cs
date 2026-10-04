@@ -18,6 +18,13 @@ public static class AuthSetup
                 o.BearerTokenExpiration = TimeSpan.FromHours(1);
                 // Long refresh window so a tablet can stay signed in through days of offline field work.
                 o.RefreshTokenExpiration = TimeSpan.FromDays(14);
+                // Browsers cannot set headers on WebSocket requests, so SignalR sends the token in the query string.
+                o.Events.OnMessageReceived = ctx =>
+                {
+                    if (ctx.Request.Path.StartsWithSegments("/hubs") && ctx.Request.Query["access_token"] is [{ Length: > 0 } token])
+                        ctx.Token = token;
+                    return Task.CompletedTask;
+                };
             });
 
         services.AddAuthorizationBuilder()

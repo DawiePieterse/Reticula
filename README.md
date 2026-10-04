@@ -52,6 +52,10 @@ dotnet ef migrations add <Name> -p Reticula.Infrastructure -s Reticula.Api -o Da
 
 CI fails if the model has changes without a migration.
 
+## Operations
+
+Logging, tracing, error reporting, backups and restore are described in `docs/operations.md`.
+
 ## Rules
 
 A design run always names a rules file as `authority/version`. The calc service validates it against `rules/schema.json`, hashes it, and stamps the hash on every traced value and document. No rule value is hard-coded in calculation code.

@@ -85,8 +85,8 @@ Deliverables: running skeleton, auth, project CRUD, map, CI.
 - [x] 0.5 PWA shell: service worker, install prompt, offline route guard.
 - [x] 0.6 Rules-file JSON schema, loader, hashing, version endpoint.
 - [x] 0.7 Traceability record type and a sample calc end-to-end (LV voltage drop) proving the pipeline. (DB storage of traced results lands with the first design run in Phase 2)
-- [ ] 0.8 Background job framework with progress events.
-- [ ] 0.9 Logging, error reporting, backup job for Postgres and object store.
+- [x] 0.8 Background job framework with progress events. (ADR 0003)
+- [x] 0.9 Logging, error reporting, backup job for Postgres and object store. (docs/operations.md)
 
 ### Phase 1 – Field capture
 
@@ -207,7 +207,7 @@ F. **Performance targets.** Field UI usable on mid-range Android tablet; 2,000-s
 - [ ] Decisions A–I confirmed by engineer
 - [ ] Open items resolved or explicitly deferred
 - [ ] Standards clause index drafted
-- [ ] Phase 0 complete
+- [x] Phase 0 complete
 
 ### Build
 - [ ] Phase 1 Field capture – usable offline on tablet
