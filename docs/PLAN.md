@@ -101,7 +101,7 @@ Deliverables: predicted building types, tablet inspection, income/ADMD tool, loa
 - [x] 1.7 Income and ADMD tool: observable inputs → income band → category → ADMD (per NRS 034-1 tables in rules file); group after-diversity demand; special loads at own kVA; override with reason. (eskom/0.2.0: NRS 034 and SANS 507-1 load classes and Herman-Beta group demand; see docs/load-data.md. Score thresholds still a heuristic; SANS 507 C8 unverified.)
 - [x] 1.8 Offline: IndexedDB store, cached rules tables, photo queue, sync engine with conflict detection and side-by-side resolution UI (never auto-overwrite). (docs/field.md, Offline. Loads saved offline get their kVA from the calc service on sync.)
 - [x] 1.9 Offline map tiles: PMTiles pack per project area, download/refresh. (Raster tiles from a configured source with an offline licence; docs/field.md, Offline map.)
-- [~] 1.10 Load schedule view and export (CSV/Excel). (Done: view and CSV. To do: Excel with the documents in Phase 6.)
+- [x] 1.10 Load schedule view and export (CSV/Excel). (Excel made by the calc service with the documents, plan 6.)
 - [x] 1.11 Assumptions register v1: every estimate and override auto-registered.
 - [~] 1.12 Validation: ADMD hand-worked cases from NRS 034-1 examples in `/test-cases`. (Done: hand-worked ADMD and Herman-Beta cases, and a self-check of every load class against its α, β and c. ReticMaster's Herman-Beta example added. To do: compare with NRS 034-1 worked examples and ReticMaster project results; needs the standard's worked examples and a ReticMaster run for the same input.)
 
@@ -149,14 +149,14 @@ Deliverables: LV layout, phasing, conductor sizing, voltage drop, fault level, O
 
 ### Phase 6 – Documents
 
-- [ ] 6.1 Material library and rate list management UI; supplier price-list import; override with date.
-- [ ] 6.2 DXF drawings (ezdxf): layers, symbols, title block, sheet layouts per authority template; DWG conversion if required.
-- [ ] 6.3 Design report PDF: calcs, assumptions, clause refs, traceability tables, versions footer.
-- [ ] 6.4 BoQ: PDF + Excel, indicative costs marked "estimate".
-- [ ] 6.5 GIS exports: KML, GeoJSON, Shapefile.
-- [ ] 6.6 Submission pack: drawing register, document register, authority checklist, zipped.
-- [ ] 6.7 One-step "Generate all" job; stale-document detection on any upstream change.
-- [ ] 6.8 Every document stamped with rules version, rate date, design date, revision.
+- [x] 6.1 Material library and rate list management UI; supplier price-list import; override with date. (docs/documents.md.)
+- [x] 6.2 DXF drawings (ezdxf): layers, symbols, title block, sheet layouts per authority template; DWG conversion if required. (DXF in Lo metres, A1 sheets per templates/eskom.yaml; DWG via ODA converter when an authority requires it, see open items.)
+- [x] 6.3 Design report PDF: calcs, assumptions, clause refs, traceability tables, versions footer.
+- [x] 6.4 BoQ: PDF + Excel, indicative costs marked "estimate".
+- [x] 6.5 GIS exports: KML, GeoJSON, Shapefile.
+- [x] 6.6 Submission pack: drawing register, document register, authority checklist, zipped.
+- [x] 6.7 One-step "Generate all" job; stale-document detection on any upstream change.
+- [x] 6.8 Every document stamped with rules version, rate date, design date, revision.
 
 ### Phase 7 – Review and sign-off
 
@@ -215,7 +215,7 @@ F. **Performance targets.** Field UI usable on mid-range Android tablet; 2,000-s
 - [x] Phase 3 MV network – checks pass on validation cases (engine values pending verification against the standards)
 - [x] Phase 4 Bulk supply – load flow and IEC 60909 validated (against hand-worked cases; authority sample pending)
 - [x] Phase 5 Optimisation – three options + compare view
-- [ ] Phase 6 Documents – one-step full document set
+- [x] Phase 6 Documents – one-step full document set
 - [ ] Phase 7 Review and sign-off – revision, audit, export
 - [ ] Phase 8 Design assistant – flagged, optional, tested
 

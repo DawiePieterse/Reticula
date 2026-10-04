@@ -36,7 +36,7 @@ from pydantic import BaseModel, Field
 from ..geo.routes import Projector
 from ..lv.analysis import Check, analyse, customer_loads
 from ..lv.build import BuildIssue, BuildRequest, BuildResult, CustomerIn, RouteIn, build_network
-from ..lv.costs import estimate, load_rates
+from ..lv.costs import RatesRef, estimate, rates_name, rates_of
 from ..lv.design import OptionResult, design_option
 from ..lv.library import Construction, feeder_options, lv_config
 from ..lv.model import LvNetwork
@@ -69,7 +69,7 @@ class OptimiseRequest(BaseModel):
     roads: list[list[tuple[float, float]]] = []
     site: dict[str, float] | None = None
     area: dict[str, Any] | None = None
-    rates: str = "indicative/2026-10"
+    rates: RatesRef = "indicative/2026-10"
     source_fault_mva_max: float | None = None
     source_fault_mva_min: float | None = None
 
@@ -425,7 +425,7 @@ def spare_of(option: OptionResult, rules: RuleSet) -> Spare:
 
 def optimise(req: OptimiseRequest, rules: RuleSet) -> OptimiseResult:
     run = _Run(req, rules)
-    rates = load_rates(req.rates)
+    rates = rates_of(req.rates)
     band = float(rates.get("uncertainty_pct", 15))
     pts, issues = run.positions()
     run.points = {p.id: p for p in pts}
@@ -442,7 +442,7 @@ def optimise(req: OptimiseRequest, rules: RuleSet) -> OptimiseResult:
         (f"Lifetime: {run.params['period_years']} years, discount rate {run.params['discount_rate_pct']} %, losses at "
          f"{run.params['energy_cost_per_kwh']} per kWh, demand growth {run.params['load_growth_pct']} % a year."),
         "Losses use the expected (mean and variance) Herman-Beta currents at peak and conductor resistance at operating temperature.",
-        f"Costs are indicative (rates {req.rates}, ±{band:g} %); differences inside that band are too close to call.",
+        f"Costs are indicative (rates {rates_name(req.rates)}, ±{band:g} %); differences inside that band are too close to call.",
     ]
     if req.allow_move:
         assumptions.append(f"The transformer may move up to {run.radius:g} m from the marked site along the LV routes (plus the load centre); "

@@ -4,6 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { ApiProblem, toApiProblem } from '../../core/api-problem';
 import { AuthService } from '../../core/auth/auth.service';
+import { ProjectRateList } from '../costs/project-rate-list';
 import { AreaMap } from './area-map';
 import { LayoutLayers, ProjectLayout } from './project-layout';
 import { GeoJsonPolygon } from './geo';
@@ -11,7 +12,7 @@ import { ProjectsApi } from './projects.api';
 
 @Component({
   selector: 'app-project-edit',
-  imports: [ReactiveFormsModule, RouterLink, AreaMap, ProjectLayout],
+  imports: [ReactiveFormsModule, RouterLink, AreaMap, ProjectLayout, ProjectRateList],
   template: `
     <div class="page-head">
       <h2>{{ isNew() ? 'New project' : form.controls.name.value || 'Project' }}</h2>
@@ -23,6 +24,7 @@ import { ProjectsApi } from './projects.api';
           <a class="button" [routerLink]="['/projects', projectId, 'options']">Options</a>
           <a class="button" [routerLink]="['/projects', projectId, 'mv']">MV design</a>
           <a class="button" [routerLink]="['/projects', projectId, 'bulk']">Bulk supply</a>
+          <a class="button" [routerLink]="['/projects', projectId, 'documents']">Documents</a>
         }
         <a routerLink="/projects">Back to projects</a>
       </div>
@@ -80,6 +82,7 @@ import { ProjectsApi } from './projects.api';
     </form>
 
     @if (id(); as projectId) {
+      <app-project-rate-list [projectId]="projectId" [canEdit]="canEdit()" />
       <app-project-layout
         [projectId]="projectId"
         [canEdit]="canEdit()"

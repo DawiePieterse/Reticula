@@ -17,6 +17,7 @@ import { Assumption, FieldApi, LoadPoint, LoadSchedule } from './field.api';
       <div class="row">
         <a [routerLink]="['/projects', id(), 'field']">Field inspection</a>
         <button type="button" (click)="downloadCsv()" [disabled]="!schedule()">Download CSV</button>
+        <button type="button" (click)="downloadXlsx()" [disabled]="!schedule()">Download Excel</button>
       </div>
     </div>
     @if (problem()) { <p class="error" role="alert">{{ problem() }}</p> }
@@ -168,13 +169,21 @@ export class LoadsPage {
     await this.run(() => firstValueFrom(this.api.clearAssumption(this.id(), a.id, this.noteFor(a.id).trim() || null)));
   }
 
-  protected async downloadCsv(): Promise<void> {
+  protected downloadCsv(): Promise<void> {
+    return this.save(() => firstValueFrom(this.api.scheduleCsv(this.id())), `load-schedule-${this.id()}.csv`);
+  }
+
+  protected downloadXlsx(): Promise<void> {
+    return this.save(() => firstValueFrom(this.api.scheduleXlsx(this.id())), `load-schedule-${this.id()}.xlsx`);
+  }
+
+  private async save(fetch: () => Promise<Blob>, name: string): Promise<void> {
     try {
-      const blob = await firstValueFrom(this.api.scheduleCsv(this.id()));
+      const blob = await fetch();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `load-schedule-${this.id()}.csv`;
+      a.download = name;
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {

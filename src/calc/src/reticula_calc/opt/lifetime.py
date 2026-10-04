@@ -23,7 +23,7 @@ import networkx as nx
 from pydantic import BaseModel, Field
 
 from ..lv.analysis import PHASES, customer_loads
-from ..lv.costs import load_rates
+from ..lv.costs import RatesRef, rates_name, rates_of
 from ..lv.library import library, lv_config
 from ..lv.model import LvNetwork
 from ..rules import RuleSet
@@ -70,13 +70,13 @@ def opt_config(rules: RuleSet) -> dict:
     return cfg
 
 
-def resolved_params(params: LifetimeParams | None, rates_ref: str) -> dict[str, float]:
-    defaults = load_rates(rates_ref).get("lifetime", {})
+def resolved_params(params: LifetimeParams | None, rates_ref: RatesRef) -> dict[str, float]:
+    defaults = rates_of(rates_ref).get("lifetime", {})
     given = (params or LifetimeParams()).model_dump()
     out = {k: (given[k] if given[k] is not None else defaults.get(k)) for k in given}
     missing = [k for k, v in out.items() if v is None]
     if missing:
-        raise ValueError(f"lifetime cost needs {', '.join(missing)} (not in the run or rate list {rates_ref})")
+        raise ValueError(f"lifetime cost needs {', '.join(missing)} (not in the run or rate list {rates_name(rates_ref)})")
     return out
 
 

@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from ..lv.analysis import Check
 from ..lv.build import BuildIssue, CustomerIn, RouteIn
-from ..lv.costs import CostLine, load_rates
+from ..lv.costs import CostLine, RatesRef, rates_of
 from ..lv.design import LvDesignRequest, OptionResult, design_lv
 from ..rules import RuleSet
 from .network import MvAnalysis, MvNetwork, build_mv, choose_tap, size_mv
@@ -28,7 +28,7 @@ class MvDesignRequest(BaseModel):
     mv_construction: Literal["overhead", "underground"] = "overhead"
     roads: list[list[tuple[float, float]]] = []
     area: dict[str, Any] | None = None
-    rates: str = "indicative/2026-10"
+    rates: RatesRef = "indicative/2026-10"
     source_fault_mva_max: float | None = None
     source_fault_mva_min: float | None = None
 
@@ -85,7 +85,7 @@ def design_mv(req: MvDesignRequest, rules: RuleSet) -> MvDesignResult:
     by_id = {c.building_id: c for c in req.customers}
     site_xy = {s.id: (s.lon, s.lat) for s in req.sites}
     customers_by_site = {p.site_id: [by_id[b] for b in p.customers] for p in placement.placements}
-    rates = load_rates(req.rates)
+    rates = rates_of(req.rates)
     lines: list[CostLine] = []
 
     # Each site's LV network, with its chosen transformer.

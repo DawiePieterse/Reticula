@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.HttpLogging;
 using Reticula.Api;
 using Reticula.Api.Auth;
+using Reticula.Api.Costs;
 using Reticula.Api.Design;
+using Reticula.Api.Documents;
 using Reticula.Api.Field;
 using Reticula.Api.Infrastructure;
 using Reticula.Api.Jobs;
@@ -11,6 +13,7 @@ using Reticula.Api.Projects;
 using Reticula.Infrastructure.Calc;
 using Reticula.Infrastructure.Data;
 using Reticula.Infrastructure.Design;
+using Reticula.Infrastructure.Documents;
 using Reticula.Infrastructure.Field;
 using Reticula.Infrastructure.Files;
 using Reticula.Infrastructure.Jobs;
@@ -56,6 +59,7 @@ builder.Services.AddJobHandler<LvDesignJob>();
 builder.Services.AddJobHandler<MvDesignJob>();
 builder.Services.AddJobHandler<BulkStudyJob>();
 builder.Services.AddJobHandler<OptionSearchJob>();
+builder.Services.AddJobHandler<DocumentsJob>();
 builder.Services.AddScoped<LayoutService>();
 builder.Services.AddHttpClient<OverpassClient>(c =>
 {
@@ -91,6 +95,8 @@ app.MapFieldEndpoints();
 app.MapTilePackEndpoints();
 app.MapDesignEndpoints();
 app.MapBulkEndpoints();
+app.MapRateListEndpoints();
+app.MapDocumentEndpoints();
 
 await app.InitialiseDatabaseAsync();
 

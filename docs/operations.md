@@ -53,3 +53,22 @@ The tile provider's terms must allow downloading tiles for offline use. The publ
 
 Fetching buildings and roads uses the Overpass API at `Overpass:Url` (default `https://overpass-api.de/api/interpreter`). The public instance is shared and rate-limited; for heavy use, point this at a self-hosted Overpass server. When the server cannot be reached or refuses (for example 429), the import screen shows the reason and an export file can be imported instead.
 
+
+## Calc service data folders
+
+The calc service reads three folders from the repository, mounted read-only in `infra/docker-compose.yml`:
+
+| Variable | Folder | Holds |
+|---|---|---|
+| `RETICULA_RULES_DIR` | `rules/` | Engineering rules per authority and version |
+| `RETICULA_RATES_DIR` | `rates/` | Shipped rate lists (copied into editable rate lists on the Rates page) |
+| `RETICULA_TEMPLATES_DIR` | `templates/` | Document templates per authority: drawing sheet, layers, title block, submission checklist |
+
+The PDF documents use DejaVu Sans for symbols in formulas (Δ, Σ, ≤); the calc image installs `fonts-dejavu-core`.
+`RETICULA_FONT_DIR` points elsewhere if needed; without it the PDFs fall back to Helvetica and lose those symbols.
+
+## Documents
+
+Generated documents are kept in the file store under `projects/<project>/documents/<set>/`. Downloads use signed
+links that expire after 10 minutes (ASP.NET data protection; keys in the default key ring). In a multi-instance
+deployment, persist the key ring (`AddDataProtection().PersistKeysTo…`) so a link made on one instance works on another.

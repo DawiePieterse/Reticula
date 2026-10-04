@@ -43,6 +43,25 @@ public sealed class DesignInputs(ReticulaDbContext db)
         })];
     }
 
+    /// <summary>The shipped rate list used when a project has none of its own.</summary>
+    public const string DefaultRates = "indicative/2026-10";
+
+    /// <summary>
+    /// The project's rate list for the calc service (plan 6.1): its content inline (name, rate date and revision added),
+    /// or the shipped default's name.
+    /// </summary>
+    public async Task<object> RatesAsync(Guid projectId, CancellationToken ct)
+    {
+        var id = await db.Projects.AsNoTracking().Where(p => p.Id == projectId).Select(p => p.RateListId).FirstOrDefaultAsync(ct);
+        var list = id is null ? null : await db.RateLists.AsNoTracking().FirstOrDefaultAsync(r => r.Id == id, ct);
+        if (list is null) return DefaultRates;
+        var content = System.Text.Json.Nodes.JsonNode.Parse(list.ContentJson)!.AsObject();
+        content["name"] = $"{list.Name} (rev {list.Revision})";
+        content["rate_date"] = list.RateDate.ToString("yyyy-MM-dd");
+        content["currency"] = list.Currency;
+        return content;
+    }
+
     /// <summary>The fault levels the authority gave at the connection point, or nulls (the rules' defaults then apply).</summary>
     public async Task<(double? Max, double? Min)> SourceFaultAsync(Guid projectId, CancellationToken ct)
     {

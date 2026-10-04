@@ -31,6 +31,15 @@ public interface ICalcClient
     /// <summary>Places and sizes transformers and designs each site's LV network and the MV network.</summary>
     Task<JsonElement> DesignMvAsync(object request, CancellationToken ct = default);
 
+    /// <summary>The rate lists shipped with the calc service (rates/&lt;name&gt;/&lt;date&gt;.yaml).</summary>
+    Task<IReadOnlyList<string>> ListRatesAsync(CancellationToken ct = default);
+
+    /// <summary>A shipped rate list's content, or null when there is none of that name.</summary>
+    Task<JsonElement?> GetRatesAsync(string rateRef, CancellationToken ct = default);
+
+    /// <summary>Makes the design documents from a package (plan Phase 6).</summary>
+    Task<JsonElement> RenderDocumentsAsync(object request, CancellationToken ct = default);
+
     /// <summary>Searches LV designs for one transformer site: lowest capex, lowest lifetime cost, most spare capacity.</summary>
     Task<JsonElement> OptimiseLvAsync(object request, CancellationToken ct = default);
 

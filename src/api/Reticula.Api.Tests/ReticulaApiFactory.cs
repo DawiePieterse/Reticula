@@ -165,6 +165,27 @@ public sealed class FakeCalc : ICalcClient
             "\"mv_network\":{\"supply_id\":\"SUPPLY\",\"nodes\":[],\"branches\":[]}}").RootElement.Clone());
     }
 
+    public Task<IReadOnlyList<string>> ListRatesAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<string>>(["indicative/2026-10"]);
+
+    public Task<JsonElement?> GetRatesAsync(string rateRef, CancellationToken ct = default) => Task.FromResult<JsonElement?>(rateRef != "indicative/2026-10" ? null
+        : JsonDocument.Parse("{\"name\":\"indicative\",\"rate_date\":\"2026-10-01\",\"currency\":\"ZAR\",\"conductor_per_m\":{\"ABC-35\":165,\"ABC-50\":195}," +
+            "\"pole_each\":{\"WP-9-160\":{\"assembly\":\"OH-POLE-9-160\"}},\"stay_each\":1900,\"materials\":{\"POLE-9-160\":{\"description\":\"Wood pole 9 m\",\"unit\":\"each\",\"rate\":3300}," +
+            "\"LAB-POLE-9\":{\"description\":\"Labour\",\"unit\":\"each\",\"rate\":1900}},\"assemblies\":{\"OH-POLE-9-160\":{\"description\":\"LV pole 9 m\"," +
+            "\"components\":[{\"material\":\"POLE-9-160\",\"qty\":1},{\"material\":\"LAB-POLE-9\",\"qty\":1}]}}}").RootElement.Clone());
+
+    public JsonElement? LastDocuments { get; private set; }
+
+    public Task<JsonElement> RenderDocumentsAsync(object request, CancellationToken ct = default)
+    {
+        Throw();
+        LastDocuments = JsonSerializer.SerializeToElement(request);
+        var b64 = Convert.ToBase64String("%PDF-1.4 test"u8.ToArray());
+        return Task.FromResult(JsonDocument.Parse(
+            "{\"files\":[{\"kind\":\"report\",\"name\":\"p-d1-report.pdf\",\"title\":\"Design report\",\"content_type\":\"application/pdf\",\"size\":13,\"sha256\":\"" + new string('a', 64) + "\",\"data_b64\":\"" + b64 + "\"}," +
+            "{\"kind\":\"loads_xlsx\",\"name\":\"p-d1-load-schedule.xlsx\",\"title\":\"Load schedule (Excel)\",\"content_type\":\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\",\"size\":13,\"sha256\":\"" + new string('b', 64) + "\",\"data_b64\":\"" + b64 + "\"}]," +
+            "\"checklist\":[{\"id\":\"C01\",\"text\":\"Connection point\",\"status\":\"not met\",\"detail\":\"\"}],\"warnings\":[\"unverified\"]}").RootElement.Clone());
+    }
+
     public JsonElement? LastOptionSearch { get; private set; }
 
     public Task<JsonElement> OptimiseLvAsync(object request, CancellationToken ct = default)

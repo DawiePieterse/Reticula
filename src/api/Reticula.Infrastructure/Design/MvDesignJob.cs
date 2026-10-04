@@ -89,6 +89,7 @@ public sealed class MvDesignJob(ReticulaDbContext db, ICalcClient calc, DesignIn
             Area = PolygonDto.From(project.Area),
             SourceFaultMvaMax = fault.Max,
             SourceFaultMvaMin = fault.Min,
+            Rates = await inputs.RatesAsync(run.ProjectId, ct),
         };
     }
 }

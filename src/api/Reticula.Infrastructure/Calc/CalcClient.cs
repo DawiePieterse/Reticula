@@ -77,6 +77,26 @@ public sealed class CalcClient(HttpClient http) : ICalcClient
         return await ReadAsync<JsonElement>(r, ct);
     }
 
+    public async Task<IReadOnlyList<string>> ListRatesAsync(CancellationToken ct = default)
+    {
+        using var r = await SendAsync("/rates", ct);
+        return await ReadAsync<List<string>>(r, ct);
+    }
+
+    public async Task<JsonElement?> GetRatesAsync(string rateRef, CancellationToken ct = default)
+    {
+        using var r = await SendAsync($"/rates/{string.Join('/', rateRef.Split('/').Select(Uri.EscapeDataString))}", ct);
+        if (r.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
+        return await ReadAsync<JsonElement>(r, ct);
+    }
+
+    public async Task<JsonElement> RenderDocumentsAsync(object request, CancellationToken ct = default)
+    {
+        using var content = JsonContent.Create(request, options: Json);
+        using var r = await SendAsync(() => http.PostAsync("/docs/render", content, ct), ct);
+        return await ReadAsync<JsonElement>(r, ct);
+    }
+
     public async Task<JsonElement> OptimiseLvAsync(object request, CancellationToken ct = default)
     {
         using var content = JsonContent.Create(request, options: Json);

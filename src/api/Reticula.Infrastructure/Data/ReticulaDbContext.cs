@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Reticula.Domain.Costs;
 using Reticula.Domain.Design;
+using Reticula.Domain.Documents;
 using Reticula.Domain.Field;
 using Reticula.Domain.Maps;
 using Reticula.Domain.Jobs;
@@ -28,6 +30,9 @@ public sealed class ReticulaDbContext(DbContextOptions<ReticulaDbContext> option
     public DbSet<MapFeature> MapFeatures => Set<MapFeature>();
     public DbSet<DesignRun> DesignRuns => Set<DesignRun>();
     public DbSet<ConnectionPoint> ConnectionPoints => Set<ConnectionPoint>();
+    public DbSet<RateList> RateLists => Set<RateList>();
+    public DbSet<DocumentSet> DocumentSets => Set<DocumentSet>();
+    public DbSet<ProjectDocument> ProjectDocuments => Set<ProjectDocument>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -235,6 +240,47 @@ public sealed class ReticulaDbContext(DbContextOptions<ReticulaDbContext> option
             e.HasOne<ImportBatch>().WithMany().HasForeignKey(x => x.ImportBatchId).OnDelete(DeleteBehavior.Cascade);
         });
 
+        b.Entity<RateList>(e =>
+        {
+            e.ToTable("rate_lists");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Name).HasMaxLength(100).IsRequired();
+            e.Property(x => x.BasedOn).HasMaxLength(100).IsRequired();
+            e.Property(x => x.Currency).HasMaxLength(3).IsRequired();
+            e.Property(x => x.ContentJson).HasColumnType("jsonb").IsRequired();
+            e.Property(x => x.OverridesJson).HasColumnType("jsonb").IsRequired();
+            e.Property(x => x.Version).IsRowVersion();
+        });
+        b.Entity<Project>().HasOne<RateList>().WithMany().HasForeignKey(p => p.RateListId).OnDelete(DeleteBehavior.SetNull);
+        b.Entity<DocumentSet>(e =>
+        {
+            e.ToTable("document_sets");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Revision).HasMaxLength(20).IsRequired();
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.SourcesJson).HasColumnType("jsonb").IsRequired();
+            e.Property(x => x.SourcesHash).HasMaxLength(64).IsRequired();
+            e.Property(x => x.RulesRef).HasMaxLength(50).IsRequired();
+            e.Property(x => x.Engineer).HasMaxLength(200);
+            e.Property(x => x.ChecklistJson).HasColumnType("jsonb");
+            e.Property(x => x.WarningsJson).HasColumnType("jsonb");
+            e.Property(x => x.Error).HasMaxLength(2000);
+            e.HasIndex(x => new { x.ProjectId, x.Number }).IsUnique();
+            e.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
+        });
+        b.Entity<ProjectDocument>(e =>
+        {
+            e.ToTable("project_documents");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Kind).HasMaxLength(30).IsRequired();
+            e.Property(x => x.FileName).HasMaxLength(200).IsRequired();
+            e.Property(x => x.Title).HasMaxLength(200).IsRequired();
+            e.Property(x => x.ContentType).HasMaxLength(100).IsRequired();
+            e.Property(x => x.StorageKey).HasMaxLength(300).IsRequired();
+            e.Property(x => x.Sha256).HasMaxLength(64).IsRequired();
+            e.HasIndex(x => x.SetId);
+            e.HasOne<DocumentSet>().WithMany().HasForeignKey(x => x.SetId).OnDelete(DeleteBehavior.Cascade);
+        });
         b.Entity<ConnectionPoint>(e =>
         {
             e.ToTable("connection_points");

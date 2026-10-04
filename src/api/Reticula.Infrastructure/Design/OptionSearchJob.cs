@@ -98,6 +98,7 @@ public sealed class OptionSearchJob(ReticulaDbContext db, ICalcClient calc, Desi
             Area = PolygonDto.From(project.Area),
             SourceFaultMvaMax = fault.Max,
             SourceFaultMvaMin = fault.Min,
+            Rates = await inputs.RatesAsync(run.ProjectId, ct),
         };
     }
 }

@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
 import yaml
 from pydantic import BaseModel
@@ -76,8 +77,21 @@ def resolve_rate(rates: dict, value) -> tuple[float | None, str | None, list[Com
     return round(sum(p.quantity * p.rate for p in parts), 2), code, parts
 
 
-def estimate(network: LvNetwork, transformer_kva: float, ref: str = "indicative/2026-10") -> CostEstimate:
-    r = load_rates(ref)
+#: A rate list: the name of a file under rates/ (e.g. "indicative/2026-10"), or its content given inline (an edited rate
+#: list from the API, plan 6.1).
+RatesRef = str | dict[str, Any]
+
+
+def rates_of(ref: RatesRef) -> dict:
+    return ref if isinstance(ref, dict) else load_rates(ref)
+
+
+def rates_name(ref: RatesRef) -> str:
+    return ref if isinstance(ref, str) else f"{ref.get('name', 'custom')}/{ref.get('rate_date', '')}"
+
+
+def estimate(network: LvNetwork, transformer_kva: float, ref: RatesRef = "indicative/2026-10") -> CostEstimate:
+    r = rates_of(ref)
     lines: list[CostLine] = []
     missing: set[str] = set()
 
@@ -113,5 +127,5 @@ def estimate(network: LvNetwork, transformer_kva: float, ref: str = "indicative/
         add("Service connection (underground)", len(services), "each", r.get("service_underground_each"))
     add(f"Transformer {transformer_kva:g} kVA", 1, "each", r.get("transformer_each", {}).get(f"{transformer_kva:g}"))
 
-    return CostEstimate(rates=ref, rate_date=str(r.get("rate_date")), currency=r.get("currency", "ZAR"), lines=lines,
+    return CostEstimate(rates=rates_name(ref), rate_date=str(r.get("rate_date")), currency=r.get("currency", "ZAR"), lines=lines,
                         total=round(sum(x.amount for x in lines), 2), missing_rates=sorted(missing))

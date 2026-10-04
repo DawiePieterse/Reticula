@@ -1,0 +1,46 @@
+# Document template for Eskom submissions (plan Phase 6): drawing sheet, layers, title block and the submission
+# checklist. Presentation only; no engineering values. Replace with the authority's own template when issued.
+authority: eskom
+title: "Eskom Distribution – electrification design submission"
+drawing:
+  crs: LO-auto              # Lo zone nearest the project (South African CAD convention); or LO29, UTM35S, EPSG:<code>
+  sheet: A1                 # A1 841 x 594 mm landscape
+  scales: [500, 1000, 2000, 2500, 5000, 10000]
+  number_prefix: "RET"
+  layers:                   # name: [ACI colour, linetype, lineweight (1/100 mm)]
+    LV-FEEDER-OH: [5, CONTINUOUS, 50]
+    LV-FEEDER-UG: [1, DASHED, 50]
+    LV-SERVICE: [8, CONTINUOUS, 18]
+    LV-POLE: [7, CONTINUOUS, 25]
+    LV-STAY: [7, CONTINUOUS, 18]
+    LV-KIOSK: [6, CONTINUOUS, 25]
+    TRANSFORMER: [1, CONTINUOUS, 50]
+    MV-LINE-OH: [3, CONTINUOUS, 70]
+    MV-CABLE-UG: [3, DASHED, 70]
+    CONNECTION-POINT: [1, CONTINUOUS, 50]
+    STANDS: [9, CONTINUOUS, 13]
+    CUSTOMERS: [2, CONTINUOUS, 18]
+    TEXT: [7, CONTINUOUS, 18]
+    TITLE: [7, CONTINUOUS, 35]
+    VIEWPORT: [8, CONTINUOUS, 13]
+  title_block:              # fields in the title block, top to bottom
+    - [project, "Project"]
+    - [sheet_title, "Drawing"]
+    - [drawing_number, "Drawing no."]
+    - [revision, "Revision"]
+    - [scale, "Scale"]
+    - [rules, "Design rules"]
+    - [rate_date, "Rate date"]
+    - [design_date, "Design date"]
+    - [engineer, "Engineer"]
+checklist:                  # submission checklist: id, text, and what Reticula checks automatically (or manual)
+  - { id: C01, text: "Authority connection point, capacity and fault level confirmed in writing", auto: connection_point }
+  - { id: C02, text: "Every building inspected or its load estimate accepted", auto: loads_recorded }
+  - { id: C03, text: "LV design passes every check for every transformer", auto: lv_passed }
+  - { id: C04, text: "MV design passes every check", auto: mv_passed }
+  - { id: C05, text: "Bulk supply study passes every check; NMD stated", auto: bulk_passed }
+  - { id: C06, text: "All rules values verified against the current standards (no unverified values)", auto: rules_verified }
+  - { id: C07, text: "Assumptions register cleared", auto: assumptions_cleared }
+  - { id: C08, text: "Drawings, report, BoQ and GIS data from the same design revision", auto: same_revision }
+  - { id: C09, text: "Servitudes and wayleaves obtained", auto: manual }
+  - { id: C10, text: "Signed off by a registered professional engineer (ECSA)", auto: manual }

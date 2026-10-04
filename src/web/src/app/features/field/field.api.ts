@@ -280,6 +280,11 @@ export class FieldApi {
     return this.http.get(`${this.base(projectId)}/load-schedule.csv`, { responseType: 'blob' });
   }
 
+  /** The stamped load schedule spreadsheet (plan 1.10). */
+  scheduleXlsx(projectId: string): Observable<Blob> {
+    return this.http.get(`/api/projects/${encodeURIComponent(projectId)}/load-schedule.xlsx`, { responseType: 'blob' });
+  }
+
   photos(projectId: string, buildingId: string): Observable<PhotoInfo[]> {
     return this.http.get<PhotoInfo[]>(`${this.base(projectId)}/photos?buildingId=${buildingId}`);
   }

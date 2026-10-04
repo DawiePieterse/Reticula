@@ -20,10 +20,13 @@ from .calcs.admd import (
     group,
 )
 from .calcs.voltage_drop import VoltageDropRequest, VoltageDropResult, voltage_drop
+from .docs.pack import render
+from .docs.package import RenderRequest, RenderResult
 from .geo import crs as crs_mod
 from .geo.importers import ImportResult, UnreadableFileError, import_file
 from .geo.predict import PredictRequest, PredictResponse, predict
 from .logging_setup import configure_logging, log_requests
+from .lv.costs import load_rates, rates_dir
 from .lv.design import LvDesignRequest, LvDesignResult, design_lv
 from .mv.design import MvDesignRequest, MvDesignResult, design_mv
 from .opt.search import OptimiseRequest, OptimiseResult, optimise
@@ -95,6 +98,24 @@ def predict_building_types(req: PredictRequest) -> PredictResponse:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
 
+@app.get("/rates")
+def rates_index() -> list[str]:
+    """The rate lists shipped as files (rates/<name>/<date>.yaml)."""
+    root = rates_dir()
+    return sorted(str(p.relative_to(root).with_suffix("")) for p in root.glob("*/*.yaml"))
+
+
+@app.get("/rates/{name}/{date}")
+def rates_content(name: str, date: str) -> dict:
+    """A shipped rate list's content, for the API to copy into an editable rate list (plan 6.1)."""
+    if not (name.replace("-", "").replace("_", "").isalnum() and date.replace("-", "").isalnum()):
+        raise HTTPException(status_code=404, detail="rate list not found")
+    try:
+        return load_rates(f"{name}/{date}")
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail="rate list not found") from e
+
+
 @app.get("/calc/admd/form/{authority}/{version}")
 def admd_form(authority: str, version: str) -> dict:
     try:
@@ -143,6 +164,14 @@ def lv_optimise(req: OptimiseRequest) -> OptimiseResult:
         return optimise(req, load_rules(req.rules))
     except (RulesError, AdmdInputError, ValueError, FileNotFoundError) as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+@app.post("/docs/render")
+def docs_render(req: RenderRequest) -> RenderResult:
+    try:
+        return render(req)
+    except (KeyError, ValueError, FileNotFoundError) as e:
+        raise HTTPException(status_code=422, detail=f"cannot make the documents: {e}") from e
 
 
 @app.post("/calc/bulk/study")

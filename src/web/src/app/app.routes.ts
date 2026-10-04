@@ -50,10 +50,16 @@ export const routes: Routes = [
         loadComponent: () => import('./features/design/options-page').then((m) => m.OptionsPage),
       },
       {
+        path: 'projects/:id/documents',
+        canActivate: [onlineGuard],
+        loadComponent: () => import('./features/documents/documents-page').then((m) => m.DocumentsPage),
+      },
+      {
         path: 'projects/:id/bulk',
         canActivate: [onlineGuard],
         loadComponent: () => import('./features/design/bulk-supply-page').then((m) => m.BulkSupplyPage),
       },
+      { path: 'rates', canActivate: [onlineGuard], loadComponent: () => import('./features/costs/rates-page').then((m) => m.RatesPage) },
       { path: 'system', loadComponent: () => import('./features/system/system-status').then((m) => m.SystemStatus) },
     ],
   },

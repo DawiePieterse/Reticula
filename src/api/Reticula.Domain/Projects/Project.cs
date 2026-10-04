@@ -33,8 +33,17 @@ public sealed class Project
     public DateTimeOffset UpdatedAt { get; private set; }
     public DateTimeOffset? ArchivedAt { get; private set; }
 
+    /// <summary>The editable rate list the designs are costed with (plan 6.1); the shipped default when null.</summary>
+    public Guid? RateListId { get; private set; }
+
     /// <summary>Optimistic concurrency token (Postgres xmin).</summary>
     public uint Version { get; private set; }
+
+    public void UseRateList(Guid? rateListId, DateTimeOffset now)
+    {
+        RateListId = rateListId;
+        UpdatedAt = now;
+    }
 
     public void Update(string name, string rulesRef, Polygon area, DateTimeOffset now)
     {

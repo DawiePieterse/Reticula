@@ -14,12 +14,14 @@ dependencies = [
     "jsonschema>=4.26.0",
     "networkx>=3.7",
     "numpy>=2.4.6",
+    "openpyxl>=3.1.5",
     "pandapower>=3.5.5",
     "pydantic>=2.13.5",
     "pyproj>=3.8.0",
     "pyshp>=3.1.6",
     "python-multipart>=0.0.32",
     "pyyaml>=6.0.3",
+    "reportlab>=5.0.1",
     "shapely>=2.1.2",
     "tifffile>=2026.9.20",
     "uvicorn[standard]>=0.54.0",
@@ -35,6 +37,7 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = [
     "httpx2>=2.13.1",
+    "pypdf>=6.19.0",
     "pytest>=9.1.1",
     "ruff>=0.16.10",
 ]

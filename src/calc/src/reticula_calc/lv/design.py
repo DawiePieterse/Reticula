@@ -10,7 +10,7 @@ from shapely.geometry import LineString, shape
 from ..rules import RuleSet
 from .analysis import Analysis, Check
 from .build import BuildIssue, BuildRequest, BuildResult, CustomerIn, RouteIn, build_network
-from .costs import CostEstimate, estimate
+from .costs import CostEstimate, RatesRef, estimate
 from .library import Construction
 from .model import LvNetwork
 from .overhead import OverheadResult, check_overhead
@@ -29,7 +29,7 @@ class LvDesignRequest(BaseModel):
     transformer_kva: float | None = None
     site: dict[str, float] | None = None
     area: dict[str, Any] | None = None
-    rates: str = "indicative/2026-10"
+    rates: RatesRef = "indicative/2026-10"
     #: The authority's MV fault levels at the connection point (plan 4.1); the rules' default when absent.
     source_fault_mva_max: float | None = None
     source_fault_mva_min: float | None = None
@@ -71,7 +71,7 @@ class LvDesignResult(BaseModel):
 
 
 def design_option(built: BuildResult, construction: Construction, rules: RuleSet, transformer_kva: float | None, site: dict[str, float] | None,
-                  source: dict[str, float] | None, rates: str, min_feeder: int = 0) -> tuple[OptionResult, set[str]]:
+                  source: dict[str, float] | None, rates: RatesRef, min_feeder: int = 0) -> tuple[OptionResult, set[str]]:
     """Size, check and cost one laid-out network; returns the option and the unverified rules sections it used."""
     unverified: set[str] = set()
     # A layout error (a building that cannot be connected) fails the design like any check.
