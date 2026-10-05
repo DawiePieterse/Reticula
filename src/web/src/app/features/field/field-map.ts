@@ -1,25 +1,13 @@
 import { Component, ElementRef, OnDestroy, afterNextRender, computed, effect, input, output, signal, untracked, viewChild } from '@angular/core';
 import type { FeatureCollection as GjCollection } from 'geojson';
-import type { GeoJSONSource, Map as MlMap, MapMouseEvent, StyleSpecification } from 'maplibre-gl';
+import type { GeoJSONSource, Map as MlMap, MapMouseEvent } from 'maplibre-gl';
 import { Position, bounds } from '../projects/geo';
 import { AnyGeometry, BUILDING_COLOURS, FeatureCollection } from '../projects/layout.api';
 import { CANDIDATE_COLOURS, GpsFix } from './field.api';
+import { basemapStyle } from './map/basemap';
+import { LocalMapPack } from './map/map-pack.store';
 
 export type FieldMode = 'select' | 'building' | 'site' | 'route';
-
-const STYLE: StyleSpecification = {
-  version: 8,
-  sources: {
-    osm: {
-      type: 'raster',
-      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-      tileSize: 256,
-      maxzoom: 19,
-      attribution: '© OpenStreetMap contributors',
-    },
-  },
-  layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
-};
 
 const WORKER_PATH = 'maplibre/maplibre-gl-worker.mjs';
 const SOURCES = ['stands', 'buildings', 'candidates', 'draft', 'gps'] as const;
@@ -55,6 +43,8 @@ export class FieldMap implements OnDestroy {
   readonly selectedId = input<string | null>(null);
   readonly mode = input<FieldMode>('select');
   readonly gps = input<GpsFix | null>(null);
+  /** The offline basemap on the device; the online basemap shows without one. */
+  readonly pack = input<LocalMapPack | null>(null);
 
   readonly buildingSelect = output<string>();
   readonly candidateSelect = output<string>();
@@ -65,10 +55,22 @@ export class FieldMap implements OnDestroy {
   private readonly mapEl = viewChild.required<ElementRef<HTMLDivElement>>('mapEl');
   private map: MlMap | null = null;
   private fitted = false;
+  private shownPack: string | null = null;
 
   private readonly gpsCollection = computed<GjCollection>(() => {
     const g = this.gps();
     return { type: 'FeatureCollection', features: g ? [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [g.lon, g.lat] } }] : [] };
+  });
+
+  private readonly draftCollection = computed(() => {
+    const d = this.draft();
+    return {
+      type: 'FeatureCollection',
+      features: [
+        ...(d.length >= 2 ? [{ type: 'Feature', id: 'l', properties: {}, geometry: { type: 'LineString', coordinates: d } }] : []),
+        ...d.map((p, i) => ({ type: 'Feature', id: `p${i}`, properties: {}, geometry: { type: 'Point', coordinates: p } })),
+      ],
+    } as never;
   });
 
   constructor() {
@@ -82,16 +84,7 @@ export class FieldMap implements OnDestroy {
     });
     effect(() => this.set('candidates', this.candidates()));
     effect(() => this.set('gps', this.gpsCollection() as never));
-    effect(() => {
-      const d = this.draft();
-      this.set('draft', {
-        type: 'FeatureCollection',
-        features: [
-          ...(d.length >= 2 ? [{ type: 'Feature', id: 'l', properties: {}, geometry: { type: 'LineString', coordinates: d } }] : []),
-          ...d.map((p, i) => ({ type: 'Feature', id: `p${i}`, properties: {}, geometry: { type: 'Point', coordinates: p } })),
-        ],
-      } as never);
-    });
+    effect(() => this.set('draft', this.draftCollection()));
     effect(() => {
       const id = this.selectedId();
       untracked(() => this.highlight(id));
@@ -99,13 +92,20 @@ export class FieldMap implements OnDestroy {
     effect(() => {
       if (this.mode() !== 'route') untracked(() => this.draft.set([]));
     });
+    effect(() => {
+      const pack = this.pack();
+      untracked(() => void this.showBasemap(pack));
+    });
 
     afterNextRender(async () => {
       const { Map, NavigationControl, setWorkerUrl } = await import('maplibre-gl');
       setWorkerUrl(new URL(WORKER_PATH, document.baseURI).href);
-      const map = new Map({ container: this.mapEl().nativeElement, style: STYLE, center: [25, -29], zoom: 5 });
+      const pack = this.pack();
+      this.shownPack = pack?.packId ?? null;
+      const map = new Map({ container: this.mapEl().nativeElement, style: await basemapStyle(pack), center: [25, -29], zoom: 5 });
       map.addControl(new NavigationControl(), 'top-right');
-      map.on('load', () => {
+      // Each basemap change brings a new style; the project layers are added again on top of it.
+      map.on('style.load', () => {
         for (const s of SOURCES) map.addSource(s, { type: 'geojson', data: { type: 'FeatureCollection', features: [] }, promoteId: 'id' });
         map.addLayer({ id: 'stands-line', type: 'line', source: 'stands', paint: { 'line-color': '#6e7781', 'line-width': 1 } });
         const typeColour = ['match', ['get', 'effectiveType'], ...Object.entries(BUILDING_COLOURS).flat(), BUILDING_COLOURS['other']] as never;
@@ -142,8 +142,9 @@ export class FieldMap implements OnDestroy {
         this.set('buildings', this.buildings());
         this.set('candidates', this.candidates());
         this.set('gps', this.gpsCollection() as never);
+        this.set('draft', this.draftCollection());
         const b = this.buildings();
-        if (b?.features.length) this.fitTo(b);
+        if (!this.fitted && b?.features.length) this.fitTo(b);
         this.highlight(this.selectedId());
       });
       map.on('click', (e: MapMouseEvent) => this.onClick(e));
@@ -154,6 +155,15 @@ export class FieldMap implements OnDestroy {
   ngOnDestroy(): void {
     this.map?.remove();
     this.map = null;
+  }
+
+  /** Switches between the pack on the device and the online basemap, keeping the view and the project layers. */
+  private async showBasemap(pack: LocalMapPack | null): Promise<void> {
+    const id = pack?.packId ?? null;
+    if (!this.map || id === this.shownPack) return;
+    this.shownPack = id;
+    const style = await basemapStyle(pack);
+    if (this.map && this.shownPack === id) this.map.setStyle(style, { diff: false });
   }
 
   protected undoPoint(): void {

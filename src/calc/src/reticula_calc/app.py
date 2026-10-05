@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Annotated
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Response, UploadFile
 
 from . import __version__
 from .calcs.admd import (
@@ -23,6 +23,7 @@ from .geo import crs as crs_mod
 from .geo.importers import ImportResult, UnreadableFileError, import_file
 from .geo.predict import PredictRequest, PredictResponse, predict
 from .logging_setup import configure_logging, log_requests
+from .maps.extract import ExtractRequest, MapSourceError, extract_configured
 from .rules import RulesError, list_rules, load_rules
 
 configure_logging()
@@ -110,3 +111,17 @@ def admd_group(req: GroupRequest) -> GroupResult:
         return group(req, load_rules(req.rules))
     except (RulesError, AdmdInputError) as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+@app.post("/maps/extract", response_class=Response, responses={200: {"content": {"application/vnd.pmtiles": {}}}})
+def maps_extract(req: ExtractRequest) -> Response:
+    """The basemap for an area as a PMTiles archive, for a tablet to keep offline."""
+    try:
+        pack = extract_configured(req)
+    except MapSourceError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    return Response(
+        pack.data,
+        media_type="application/vnd.pmtiles",
+        headers={"X-Tile-Count": str(pack.tiles), "X-Max-Zoom": str(pack.max_zoom), "X-Map-Source": pack.source},
+    )

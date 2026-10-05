@@ -85,6 +85,20 @@ public sealed class CalcClient(HttpClient http) : ICalcClient
         return await ReadAsync<AdmdGroup>(r, ct);
     }
 
+    public async Task<MapExtract> ExtractMapAsync(double minLon, double minLat, double maxLon, double maxLat, CancellationToken ct = default)
+    {
+        using var content = JsonContent.Create(new { bbox = new[] { minLon, minLat, maxLon, maxLat } }, options: Json);
+        using var r = await SendAsync(() => http.PostAsync("/maps/extract", content, ct), ct);
+        if (r.StatusCode is HttpStatusCode.UnprocessableEntity) throw new CalcRejectedException(await DetailAsync(r, ct));
+        if (!r.IsSuccessStatusCode) throw new CalcUnavailableException($"Calc service returned {(int)r.StatusCode}.");
+        static string Header(HttpResponseMessage r, string name) => r.Headers.TryGetValues(name, out var v) ? v.First() : "";
+        return new MapExtract(
+            await r.Content.ReadAsByteArrayAsync(ct),
+            int.TryParse(Header(r, "X-Tile-Count"), out var tiles) ? tiles : 0,
+            int.TryParse(Header(r, "X-Max-Zoom"), out var zoom) ? zoom : 0,
+            Header(r, "X-Map-Source"));
+    }
+
     private static async Task<T> ReadAsync<T>(HttpResponseMessage r, CancellationToken ct)
     {
         if (r.StatusCode is HttpStatusCode.UnprocessableEntity or HttpStatusCode.RequestEntityTooLarge)

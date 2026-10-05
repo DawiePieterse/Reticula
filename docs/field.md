@@ -53,4 +53,14 @@ The field screen works without a connection (ADR 0004).
 - **Signing out** keeps unsynced changes on the tablet. They sync the next time the same person signs in. Each person's changes are kept apart.
 - Any request can be sent twice without being applied twice: buildings, inspections, candidates, loads and photos carry ids made on the device.
 
-Not offline yet: the basemap tiles (plan item 1.9), the project list and settings, the **Loads** page and the CSV export. The engineer's confirm and clear actions are online only.
+## Offline map
+
+The background map needs a connection unless the project's offline map is saved on the tablet (ADR 0005).
+
+- In the field screen, with nothing selected, **Offline map** shows the state. **Prepare offline map** builds the map for the project area plus 500 m on the server, then saves it on the tablet. A township of a few kilometres is a few MB.
+- Once saved, the field map draws from the tablet's copy, online or not. Streets, water and place names show; stands, buildings and candidates draw on top.
+- **Rebuild from the latest map data** makes a new map from the current map source. When the server has a newer map than the tablet, **Update** saves it.
+- **Remove from this tablet** frees the space. The offline screen lists which projects have a map saved.
+- The map source is set up once by whoever runs the server (docs/operations.md). Without it, **Prepare offline map** says what is missing.
+
+Not offline: the project list and settings, the **Loads** page and the CSV export. The engineer's confirm and clear actions are online only.

@@ -161,6 +161,18 @@ public sealed class FakeCalc : ICalcClient
         return Task.FromResult(new AdmdGroup(res.Count, loads.Count - res.Count, factor is null ? null : T(factor.Value), T(resKva), special, T(resKva + special), "0123456789abcdef"));
     }
 
+    /// <summary>Set by a test to decide what the calc service returns for a map extract.</summary>
+    public Func<double[], MapExtract> OnExtract { get; set; } = b => new MapExtract([.. "PMTiles"u8, 3, .. new byte[120]], 42, 15, "test-planet.pmtiles");
+
+    public double[]? LastExtractBox { get; private set; }
+
+    public Task<MapExtract> ExtractMapAsync(double minLon, double minLat, double maxLon, double maxLat, CancellationToken ct = default)
+    {
+        Throw();
+        LastExtractBox = [minLon, minLat, maxLon, maxLat];
+        return Task.FromResult(OnExtract(LastExtractBox));
+    }
+
     private void Throw()
     {
         if (Unreachable) throw new CalcUnavailableException("Calc service unreachable.");

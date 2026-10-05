@@ -20,5 +20,5 @@ J. Photos are queued as bytes (an `ArrayBuffer` with its content type), not as `
 - A project works offline only after its field screen has been opened once online on that tablet. The offline screen lists the projects on the tablet.
 - Progress counts are worked out on the device from the same rules as the server, so they stay right offline. The open-assumptions count is the server's, fetched after each sync.
 - Re-importing buildings while changes are queued can leave those changes pointing at buildings that no longer exist. They come back as refusals to discard.
-- The basemap needs a connection until offline map tiles land (plan item 1.9). Stands, buildings and candidates draw without it.
+- The basemap is offline once the project's map pack is saved on the tablet (ADR 0005). Without it, stands, buildings and candidates still draw.
 - Without IndexedDB (rare; some private modes) the queue lives in memory, and the sync panel warns that changes are lost on reload.

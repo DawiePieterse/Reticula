@@ -173,14 +173,14 @@ function clone<T>(v: T): T {
   return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, clone(x)])) as T;
 }
 
-function request<T>(r: IDBRequest<T>): Promise<T> {
+export function request<T>(r: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
     r.onsuccess = () => resolve(r.result);
     r.onerror = () => reject(r.error);
   });
 }
 
-function complete(t: IDBTransaction): Promise<void> {
+export function complete(t: IDBTransaction): Promise<void> {
   return new Promise((resolve, reject) => {
     t.oncomplete = () => resolve();
     t.onerror = () => reject(t.error);
