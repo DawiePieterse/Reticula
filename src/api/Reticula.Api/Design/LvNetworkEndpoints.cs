@@ -23,10 +23,11 @@ public sealed record LvLoadDto(Guid LoadPointId, Guid BuildingId, string? Label,
 public sealed record LvLoadsDto(string Clause, LvLoadSummary Summary, IReadOnlyList<LvFeederPhases> Feeders, IReadOnlyList<LvBox> Boxes,
     IReadOnlyList<LvLoadDto> Connections);
 
+/// <param name="Analysis">Voltage drop, thermal loading and fault level; null when the rules file has no design settings.</param>
 /// <param name="Stale">Why the network no longer matches the marked routes and sites or the project's rules; null when it does.</param>
 public sealed record LvNetworkDto(Guid Id, string RulesRef, string RulesHash, string Clause, DateTimeOffset BuiltAt, string? Stale,
     LvSummary Summary, IReadOnlyList<LvFeeder> Feeders, IReadOnlyList<LvIssue> Issues, IReadOnlyList<LvNodeDto> Nodes, IReadOnlyList<LvBranchDto> Branches,
-    LvLoadsDto? Loads);
+    LvLoadsDto? Loads, CalcLvAnalysis? Analysis = null);
 
 /// <param name="Network">The project's LV network, or null before it is first built.</param>
 public sealed record LvNetworkStatus(LvNetworkDto? Network);
@@ -91,7 +92,8 @@ public static class LvNetworkEndpoints
             [.. nodes.Select(x => new LvNodeDto(x.Key, x.Kind, [x.Geometry.X, x.Geometry.Y], x.Label, x.CandidateId, x.Feeder, x.DistanceM))],
             [.. branches.Select(x => new LvBranchDto(x.Key, x.Kind, x.FromKey, x.ToKey, [.. x.Geometry.Coordinates.Select(c => new[] { c.X, c.Y })],
                 x.LengthM, x.CandidateId, x.Feeder))],
-            await LoadsAsync(db, n, ct));
+            await LoadsAsync(db, n, ct),
+            n.AnalysisJson is null ? null : JsonSerializer.Deserialize<CalcLvAnalysis>(n.AnalysisJson, json));
     }
 
     private static async Task<LvLoadsDto?> LoadsAsync(ReticulaDbContext db, LvNetwork n, CancellationToken ct)

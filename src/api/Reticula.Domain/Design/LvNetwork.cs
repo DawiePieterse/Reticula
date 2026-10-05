@@ -13,7 +13,7 @@ public sealed class LvNetwork
 
     public LvNetwork(Guid id, Guid projectId, string rulesRef, string rulesHash, string clause, string summaryJson, string feedersJson,
         string issuesJson, int errorCount, Guid builtBy, DateTimeOffset builtAt, string? loadsClause = null, string? loadsSummaryJson = null,
-        string phasesJson = "[]", string boxesJson = "[]")
+        string phasesJson = "[]", string boxesJson = "[]", string? analysisJson = null)
     {
         Id = id;
         ProjectId = projectId;
@@ -30,6 +30,7 @@ public sealed class LvNetwork
         LoadsSummaryJson = loadsSummaryJson;
         PhasesJson = phasesJson;
         BoxesJson = boxesJson;
+        AnalysisJson = analysisJson;
     }
 
     public Guid Id { get; private set; }
@@ -59,6 +60,9 @@ public sealed class LvNetwork
 
     /// <summary>Service distribution boxes on poles, with their phase and loads.</summary>
     public string BoxesJson { get; private set; } = "[]";
+
+    /// <summary>Voltage drop, thermal loading and fault level (plan 2.4); null when the rules file has no design settings.</summary>
+    public string? AnalysisJson { get; private set; }
 }
 
 /// <summary>

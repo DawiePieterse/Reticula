@@ -171,6 +171,8 @@ export class AreaMap implements OnDestroy {
         map.addLayer({ id: 'lv-service', type: 'line', source: LV_SERVICES, paint: { 'line-color': ['get', 'colour'] as never, 'line-width': 1.5 } });
         map.addLayer({ id: 'lv-load', type: 'circle', source: LV_LOADS,
           paint: { 'circle-radius': 3, 'circle-color': ['get', 'colour'] as never, 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1 } });
+        map.addLayer({ id: 'lv-overload', type: 'line', source: LV_BRANCHES, filter: ['==', ['get', 'overloaded'], true],
+          layout: { 'line-cap': 'round' }, paint: { 'line-color': '#cf222e', 'line-width': 9, 'line-opacity': 0.35 } });
         map.addLayer({ id: 'lv-route', type: 'line', source: LV_BRANCHES, filter: ['==', ['get', 'kind'], 'route'],
           layout: { 'line-cap': 'round' }, paint: { 'line-color': ['get', 'colour'] as never, 'line-width': 3.5 } });
         map.addLayer({ id: 'lv-link', type: 'line', source: LV_BRANCHES, filter: ['==', ['get', 'kind'], 'link'],
@@ -179,6 +181,9 @@ export class AreaMap implements OnDestroy {
           minzoom: 15, paint: { 'circle-radius': 2.5, 'circle-color': '#ffffff', 'circle-stroke-color': '#24292f', 'circle-stroke-width': 1 } });
         map.addLayer({ id: 'lv-pole', type: 'circle', source: LV_NODES, filter: ['==', ['get', 'kind'], 'pole'],
           paint: { 'circle-radius': 3.5, 'circle-color': '#57606a', 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1 } });
+        // Voltage drop band as a ring around each node, so it shows over the pole markers.
+        map.addLayer({ id: 'lv-drop', type: 'circle', source: LV_NODES, filter: ['to-boolean', ['get', 'dropColour']] as never,
+          paint: { 'circle-radius': 6, 'circle-opacity': 0, 'circle-stroke-color': ['get', 'dropColour'] as never, 'circle-stroke-width': 2.5 } });
         map.addLayer({ id: 'lv-source', type: 'circle', source: LV_NODES, filter: ['==', ['get', 'kind'], 'source'],
           paint: { 'circle-radius': 7, 'circle-color': '#24292f', 'circle-stroke-color': '#ffd33d', 'circle-stroke-width': 2.5 } });
         map.addLayer({ id: 'lv-issue', type: 'circle', source: LV_ISSUES,

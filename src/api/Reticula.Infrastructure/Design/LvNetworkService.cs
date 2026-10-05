@@ -32,8 +32,9 @@ public sealed class LvNetworkService(ReticulaDbContext db, ICalcClient calc, Tim
         var input = candidates.Select(c => new LvCandidate(c.Id.ToString(), c.Kind, JsonSerializer.SerializeToElement(GeometryInput.ToDto(c.Geometry), Json))).ToList();
         var result = await calc.BuildLvNetworkAsync(project.RulesRef, input, ct);
 
-        var buildings = await LoadInputsAsync(project.Id, ct);
+        var (buildings, classes) = await LoadInputsAsync(project.Id, ct);
         CalcLvLoads? loads = null;
+        CalcLvAnalysis? analysis = null;
         var issues = result.Issues.ToList();
         try
         {
@@ -45,12 +46,27 @@ public sealed class LvNetworkService(ReticulaDbContext db, ICalcClient calc, Tim
             // Rules from before plan 2.2 have no service or phasing settings: keep the network, say why loads are missing.
             issues.Add(new LvIssue("warning", "loads_skipped", $"Loads were not connected: {e.Message}.", 1, [], []));
         }
+        if (loads is not null)
+        {
+            try
+            {
+                var at = loads.Allocations.Select(a => new LvLoadAt(a.LoadId, a.Branch, a.OffsetM, a.Phase, a.Kva, a.Kind,
+                    classes.GetValueOrDefault(a.LoadId), a.Label)).ToList();
+                analysis = await calc.AnalyseLvAsync(project.RulesRef, result, at, ct);
+                issues.AddRange(analysis.Issues);
+            }
+            catch (CalcRejectedException e)
+            {
+                // Rules from before plan 2.4 have no design check settings.
+                issues.Add(new LvIssue("warning", "checks_skipped", $"Voltage drop, loading and fault level were not checked: {e.Message}.", 1, [], []));
+            }
+        }
 
         var network = new LvNetwork(Guid.CreateVersion7(), project.Id, result.RulesRef, result.RulesHash, result.Clause,
             JsonSerializer.Serialize(result.Summary, Json), JsonSerializer.Serialize(result.Feeders, Json), JsonSerializer.Serialize(issues, Json),
             issues.Count(i => i.Severity == "error"), userId, time.GetUtcNow(),
             loads?.Clause, loads is null ? null : JsonSerializer.Serialize(loads.Summary, Json), JsonSerializer.Serialize(loads?.Feeders ?? [], Json),
-            JsonSerializer.Serialize(loads?.Boxes ?? [], Json));
+            JsonSerializer.Serialize(loads?.Boxes ?? [], Json), analysis is null ? null : JsonSerializer.Serialize(analysis, Json));
         var known = candidates.Select(c => c.Id).ToHashSet();
         Guid? Candidate(string? id) => Guid.TryParse(id, out var g) && known.Contains(g) ? g : null;
 
@@ -94,8 +110,11 @@ public sealed class LvNetworkService(ReticulaDbContext db, ICalcClient calc, Tim
         return loads ? "Buildings or their loads changed after the network was built." : null;
     }
 
-    /// <summary>Every building still standing, with its load when it has one. Buildings without a load are reported, not guessed.</summary>
-    private async Task<List<LvLoadIn>> LoadInputsAsync(Guid projectId, CancellationToken ct)
+    /// <summary>
+    /// Every building still standing, with its load when it has one, and each residential load's Herman-Beta class by load id.
+    /// Buildings without a load are reported, not guessed.
+    /// </summary>
+    private async Task<(List<LvLoadIn> Inputs, Dictionary<string, string?> Classes)> LoadInputsAsync(Guid projectId, CancellationToken ct)
     {
         var rows = await (
             from b in db.Buildings.AsNoTracking()
@@ -106,7 +125,11 @@ public sealed class LvNetworkService(ReticulaDbContext db, ICalcClient calc, Tim
             from l in ls.DefaultIfEmpty()
             orderby b.Id
             select new { b.Id, b.Location, Erf = s == null ? null : s.ErfNumber, Load = l }).ToListAsync(ct);
-        return [.. rows.Select(x => new LvLoadIn((x.Load?.Id ?? x.Id).ToString(), x.Id.ToString(), x.Erf, [x.Location.X, x.Location.Y],
-            x.Load?.Kva, x.Load?.Kind ?? LoadKinds.Residential))];
+        var inputs = rows.Select(x => new LvLoadIn((x.Load?.Id ?? x.Id).ToString(), x.Id.ToString(), x.Erf, [x.Location.X, x.Location.Y],
+            x.Load?.Kva, x.Load?.Kind ?? LoadKinds.Residential)).ToList();
+        // A residential load point's category is its load class (or the engineer's override); special loads have none.
+        var classes = rows.Where(x => x.Load is { Kind: LoadKinds.Residential })
+            .ToDictionary(x => x.Load!.Id.ToString(), x => x.Load!.ClassOverride ?? x.Load!.Category);
+        return (inputs, classes);
     }
 }

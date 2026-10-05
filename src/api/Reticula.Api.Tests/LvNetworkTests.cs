@@ -74,7 +74,7 @@ public class LvNetworkTests(ReticulaApiFactory factory)
         Assert.Equal(("B1", "route", "N2", "N3", route, 100.0), (branch.Id, branch.Kind, branch.FromNode, branch.ToNode, branch.CandidateId, branch.LengthM));
         Assert.Equal([[Lon, Lat], [Lon + 0.002, Lat]], branch.Coordinates);
         Assert.Equal("TX1-F1", Assert.Single(stored.Feeders).Id);
-        var issue = Assert.Single(stored.Issues);
+        var issue = stored.Issues.Single(i => i.Code == "near_miss");
         Assert.Equal(("near_miss", 28.1), (issue.Code, issue.At[0][0]));
         Assert.Equal((1, 1, 100.0), (stored.Summary.Routes, stored.Summary.Feeders, stored.Summary.RouteLengthM));
     }
@@ -157,6 +157,15 @@ public class LvNetworkTests(ReticulaApiFactory factory)
         Assert.Equal("test service practice", loads.Clause);
         Assert.Contains(net.Issues, i => i.Code == "no_load");
 
+        // The checks get each connected load with its Herman-Beta class, and their results are stored.
+        var at = Assert.Single(factory.Calc.LastLvLoadsAt);
+        Assert.Equal((c.LoadPointId.ToString(), "township_area", "B1", "R"), (at.LoadId, at.LoadClass, at.Branch, at.Phase));
+        var analysis = Assert.IsType<CalcLvAnalysis>(net.Analysis);
+        Assert.Equal((4.2, 61.0, 812.0, true), (analysis.Feeders[0].MaxDropPct, analysis.Feeders[0].MaxUtilisationPct, analysis.Feeders[0].MinFaultA, analysis.Feeders[0].Passes));
+        Assert.Contains(analysis.Points, p => p.Id == c.LoadPointId.ToString() && p.Kind == "connection");
+        Assert.Equal(4.2, analysis.WorstDrop!.Value);
+        Assert.Contains(net.Issues, i => i.Code == "placeholders");
+
         // Estimating the bare building's load makes the network out of date.
         (await client.PutAsJsonAsync($"/api/projects/{projectId}/buildings/{bare}/load", new LoadRequest("residential", [], null, null, null, null)))
             .EnsureSuccessStatusCode();
@@ -184,6 +193,28 @@ public class LvNetworkTests(ReticulaApiFactory factory)
         finally
         {
             factory.Calc.OnAllocateLvLoads = FakeCalc.DefaultLvLoads;
+        }
+    }
+
+    [Fact]
+    public async Task Rules_without_design_settings_connect_loads_but_say_the_checks_were_skipped()
+    {
+        factory.Calc.OnBuildLvNetwork = FakeCalc.DefaultLvNetwork;
+        factory.Calc.OnAnalyseLv = (rules, _, _) => throw new CalcRejectedException($"rules {rules} has no lv_design section");
+        try
+        {
+            var (client, projectId) = await NewProjectAsync();
+            await MarkAsync(client, projectId, "lv_route", Line());
+            await AddHouseAsync(client, projectId, 0.0005, withLoad: true);
+            Assert.Equal(HttpStatusCode.OK, (await client.PostAsync($"/api/projects/{projectId}/lv-network", null)).StatusCode);
+            var net = (await GetAsync(client, projectId))!;
+            Assert.NotNull(net.Loads);
+            Assert.Null(net.Analysis);
+            Assert.Contains(net.Issues, i => i.Code == "checks_skipped" && i.Message.Contains("lv_design"));
+        }
+        finally
+        {
+            factory.Calc.OnAnalyseLv = FakeCalc.DefaultLvAnalysis;
         }
     }
 

@@ -250,6 +250,32 @@ public sealed class FakeCalc : ICalcClient
             issues, new LvLoadSummary(loads.Count, allocations.Count, 0, unestimated.Count, allocations.Count, 0, allocations.Count == 0 ? 0 : 1, kva, 12.5));
     }
 
+    /// <summary>Set by a test to decide what the LV checks return. By default one feeder at 4.2 % drop, 61 % loading, 812 A at the end.</summary>
+    public Func<string, CalcLvNetwork, IReadOnlyList<LvLoadAt>, CalcLvAnalysis> OnAnalyseLv { get; set; } = DefaultLvAnalysis;
+
+    public IReadOnlyList<LvLoadAt> LastLvLoadsAt { get; private set; } = [];
+
+    public Task<CalcLvAnalysis> AnalyseLvAsync(string rulesRef, CalcLvNetwork network, IReadOnlyList<LvLoadAt> loads, CancellationToken ct = default)
+    {
+        Throw();
+        LastLvLoadsAt = loads;
+        return Task.FromResult(OnAnalyseLv(rulesRef, network, loads));
+    }
+
+    public static CalcLvAnalysis DefaultLvAnalysis(string rulesRef, CalcLvNetwork network, IReadOnlyList<LvLoadAt> loads)
+    {
+        var drops = new Dictionary<string, double> { ["R"] = 4.2, ["W"] = -0.5, ["B"] = -0.5 };
+        var points = network.Nodes.Select(n => new LvPointResult(n.Id, "node", "TX1-F1", 100, drops, 4.2, 812, true))
+            .Concat(loads.Select(l => new LvPointResult(l.LoadId, "connection", "TX1-F1", 90, drops, 4.2, 812, true))).ToList();
+        var branches = network.Branches.Select(b => new LvBranchResult(b.Id, "TX1-F1", "ABC-3C-70", 228,
+            new Dictionary<string, double> { ["R"] = 139, ["W"] = 0, ["B"] = 0 }, 61, true)).ToList();
+        TracedValue T(double v, string unit) => new(v, unit, "test", "test", "test clause", "0123456789abcdef", JsonDocument.Parse("[]").RootElement.Clone());
+        return new CalcLvAnalysis(rulesRef, "0123456789abcdef", "test design settings", 7.5, 230.94, 90, points, branches,
+            [new LvFeederResult("TX1-F1", 4.2, "N2", 61, "B1", 812, "N2", true)],
+            [new LvIssue("warning", "placeholders", "These results use placeholder values.", 1, [], [])],
+            T(4.2, "%"), T(139, "A"), T(812, "A"), ["the LV source transformer"]);
+    }
+
     public Task<CalcConductorLibrary?> GetConductorsAsync(string rulesRef, CancellationToken ct = default)
     {
         Throw();

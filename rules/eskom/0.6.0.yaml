@@ -1,0 +1,25 @@
+# Eskom residential distribution rules: 0.5.0 plus LV design checks (Phase 2.4).
+# Only the keys below differ from the base file. Every value must be checked before use in a design.
+base: eskom/0.5.0
+authority: eskom
+version: 0.6.0
+effective_date: 2026-10-05
+notes: >-
+  As 0.5.0, plus the settings for the LV voltage drop, thermal loading and fault level checks. The source
+  transformer, power factor and default conductor are placeholders: transformers are sized in Phase 3, and the
+  voltage drop limit (voltage.lv_max_drop_pct) waits for Eskom 240-70465489. Not for design use until checked.
+
+# LV design checks (Phase 2.4). Voltage drop uses the Herman-Beta method on each phase, from the LV board to every
+# node and service connection, at the confidence level of income_admd.diversity.
+lv_design:
+  clause: "LV design check settings: placeholders until Eskom 240-70465489 (voltage) and the transformer sizing of Phase 3"
+  index: ESKOM-VDROP
+  default_conductor: ABC-3C-70       # PLACEHOLDER: the conductor of every LV branch until the engineer chooses
+  power_factor: 0.98                 # PLACEHOLDER: domestic load power factor (ReticMaster's default)
+  conductor_temp_c: 70               # resistance temperature for conductors without an AC resistance in the library
+  temperature_coefficients: { cu: 0.00393, al: 0.00403 }   # per °C at 20 °C (IEC 60228 materials)
+  source:                            # PLACEHOLDER: the LV source until Phase 3 sizes the transformer
+    rating_kva: 100
+    impedance_pct: 4.0
+    x_over_r: 1.5
+  # min_end_fault_a is not set: with no protection settings held (Eskom 240-57649065), fault levels are reported only.

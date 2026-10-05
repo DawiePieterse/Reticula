@@ -790,6 +790,87 @@
           "second_box_other_phase"
         ]
       }
+    },
+    "lv_design": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "LV design checks (Phase 2.4): voltage drop, thermal loading and fault level.",
+      "required": [
+        "default_conductor",
+        "power_factor",
+        "conductor_temp_c",
+        "temperature_coefficients",
+        "source"
+      ],
+      "properties": {
+        "clause": {
+          "type": "string"
+        },
+        "index": {
+          "type": "string",
+          "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)+$",
+          "description": "Id of the clause in docs/standards-index.md"
+        },
+        "default_conductor": {
+          "type": "string",
+          "description": "Conductor code used for every LV branch until one is chosen"
+        },
+        "power_factor": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "conductor_temp_c": {
+          "type": "number",
+          "description": "Temperature for resistance where the library has no AC resistance"
+        },
+        "temperature_coefficients": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "cu",
+            "al"
+          ],
+          "properties": {
+            "cu": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "al": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "rating_kva",
+            "impedance_pct",
+            "x_over_r"
+          ],
+          "properties": {
+            "rating_kva": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "impedance_pct": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "x_over_r": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "min_end_fault_a": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Smallest phase-to-neutral fault current allowed anywhere on a feeder; unset: reported only"
+        }
+      }
     }
   }
 }

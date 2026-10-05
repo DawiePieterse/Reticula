@@ -25,6 +25,7 @@ from .geo.importers import ImportResult, Kind, UnreadableFileError, import_file
 from .geo.osm import OsmError, OsmKind, fetch_osm
 from .geo.predict import PredictRequest, PredictResponse, predict
 from .logging_setup import configure_logging, log_requests
+from .lv.analysis import AnalyseRequest, Analysis, analyse
 from .lv.conductors import Library, library
 from .lv.loads import AllocateRequest, LoadAllocation, allocate
 from .lv.network import BuildRequest, LvNetwork, build_network
@@ -86,6 +87,15 @@ def calc_lv_loads(req: AllocateRequest) -> LoadAllocation:
     """Connects each building's load to the LV network and spreads single-phase loads over the phases of their feeder."""
     try:
         return allocate(req, load_rules(req.rules))
+    except RulesError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+@app.post("/calc/lv/analyse")
+def calc_lv_analyse(req: AnalyseRequest) -> Analysis:
+    """Voltage drop (Herman-Beta, per phase), thermal loading and fault level for the connected LV network."""
+    try:
+        return analyse(req, load_rules(req.rules))
     except RulesError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 

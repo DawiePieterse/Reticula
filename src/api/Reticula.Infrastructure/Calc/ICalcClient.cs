@@ -46,6 +46,10 @@ public interface ICalcClient
     /// <summary>The rules file's conductor library; null when the rules file does not exist.</summary>
     Task<CalcConductorLibrary?> GetConductorsAsync(string rulesRef, CancellationToken ct = default);
 
+    /// <summary>Voltage drop, thermal loading and fault level of the connected LV network.</summary>
+    /// <exception cref="CalcRejectedException">The rules file has no lv_design section.</exception>
+    Task<CalcLvAnalysis> AnalyseLvAsync(string rulesRef, CalcLvNetwork network, IReadOnlyList<LvLoadAt> loads, CancellationToken ct = default);
+
     Task<AdmdGroup> GroupAdmdAsync(string rulesRef, IReadOnlyList<AdmdGroupLoad> loads, CancellationToken ct = default);
 }
 
