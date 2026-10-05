@@ -1,13 +1,12 @@
-import { Component, input, output } from '@angular/core';
+import { Component, input, output, signal } from '@angular/core';
+import { HttpTestingController } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideHttpClient } from '@angular/common/http';
-import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { BuildingPanel } from './building-panel';
 import { FieldMap } from './field-map';
 import { FieldPage } from './field-page';
 import { GeolocationService } from './geolocation.service';
-import { signal } from '@angular/core';
+import { answerRefresh, building, buildingField, flushSnapshot, settle, snapshot, syncTesting } from './sync/testing';
 
 @Component({ selector: 'app-field-map', template: '' })
 class FieldMapStub {
@@ -25,27 +24,28 @@ class FieldMapStub {
 
 @Component({ selector: 'app-building-panel', template: '<span class="panel-stub">{{ building()?.id }}</span>' })
 class BuildingPanelStub {
-  readonly projectId = input<string>();
   readonly building = input<{ id: string } | null>();
   readonly gps = input<unknown>();
   readonly form = input<unknown>();
   readonly load = input<unknown>();
-  readonly changed = output<unknown>();
-  readonly loadSaved = output<unknown>();
+  readonly openSync = output<void>();
 }
 
-const square = { type: 'Polygon', coordinates: [[[28.1, -25.52], [28.11, -25.52], [28.11, -25.51], [28.1, -25.52]]] };
-const b = (id: string, confidence: number, status = 'predicted') => ({
-  type: 'Feature', id, geometry: square,
-  properties: { predictedType: 'house', confidence, source: 's', lowConfidence: confidence < 0.6, status, confirmedType: null, effectiveType: 'house', areaM2: 50, erf: id, zoning: null, signals: [], version: 1 },
+const data = snapshot({
+  buildings: {
+    type: 'FeatureCollection',
+    features: [building('a', { status: 'confirmed', confidence: 0.9, lowConfidence: false }), building('b', { confidence: 0.55 }), building('c', { confidence: 0.3 })],
+  },
+  assumptionsOpen: 4,
 });
-const progress = { buildings: 3, confirmed: 1, notPresent: 0, added: 0, outstanding: 2, outstandingLowConfidence: 2, loadsEstimated: 0, loadsConfirmed: 0, buildingsWithoutLoad: 3, assumptionsOpen: 4, candidates: {} };
 
-async function setup() {
+async function setup(online = true) {
+  const t = syncTesting(online);
+  if (!online) await t.db.putSnapshot(data);
   TestBed.configureTestingModule({
     imports: [FieldPage],
     providers: [
-      provideHttpClient(), provideHttpClientTesting(), provideRouter([]),
+      ...t.providers, provideRouter([]),
       { provide: GeolocationService, useValue: { fix: signal({ lon: 28.105, lat: -25.515, accuracyM: 5 }), error: signal(null), start: () => undefined, stop: () => undefined } },
     ],
   }).overrideComponent(FieldPage, { remove: { imports: [FieldMap, BuildingPanel] }, add: { imports: [FieldMapStub, BuildingPanelStub] } });
@@ -53,68 +53,100 @@ async function setup() {
   fixture.componentRef.setInput('id', 'p1');
   const http = TestBed.inject(HttpTestingController);
   fixture.detectChanges();
-  http.expectOne('/api/projects/p1').flush({ id: 'p1', name: 'Soshanguve', rulesRef: 'eskom/0.1.0', authority: 'eskom', area: square, createdAt: '', updatedAt: '', version: 1 });
-  http.expectOne('/api/projects/p1/stands').flush({ type: 'FeatureCollection', features: [] });
-  http.expectOne('/api/projects/p1/buildings').flush({ type: 'FeatureCollection', features: [b('a', 0.9, 'confirmed'), b('b', 0.55), b('c', 0.3)] });
-  http.expectOne('/api/projects/p1/candidates').flush({ type: 'FeatureCollection', features: [] });
-  http.expectOne('/api/projects/p1/load-points').flush([]);
-  http.expectOne('/api/projects/p1/admd-form').flush({ rules_hash: 'x', indicators: [], multi_indicators: [], band_indicators: [], special_loads: {} });
-  http.expectOne('/api/projects/p1/field-progress').flush(progress);
-  await new Promise((r) => setTimeout(r));
+  await settle(2);
+  if (online) flushSnapshot(http, data);
+  await settle();
   await fixture.whenStable();
-  return { fixture, http, el: fixture.nativeElement as HTMLElement };
+  const stable = async () => {
+    await settle();
+    await fixture.whenStable();
+  };
+  return { ...t, fixture, http, stable, el: fixture.nativeElement as HTMLElement };
 }
 
-const settle = async (f: { whenStable(): Promise<unknown> }) => {
-  await new Promise((r) => setTimeout(r));
-  await f.whenStable();
-};
 const button = (el: HTMLElement, text: string) => [...el.querySelectorAll('button')].find((x) => x.textContent?.includes(text))!;
 
 describe('FieldPage', () => {
   it('shows progress and starts with the lowest-confidence building', async () => {
-    const { fixture, el } = await setup();
+    const { el, stable } = await setup();
     expect(el.textContent).toContain('1/3 inspected');
     expect(el.textContent).toContain('2 low-confidence left');
     expect(el.textContent).toContain('4 assumptions open');
+    expect(el.textContent).toContain('All synced');
+    expect(el.querySelector('header a')?.textContent).toContain('← Soshanguve');
 
     button(el, 'Start with lowest confidence').click();
-    await settle(fixture);
+    await stable();
     expect(el.querySelector('.panel-stub')?.textContent).toBe('c');
 
     button(el, 'Next to check').click();
-    await settle(fixture);
+    await stable();
     expect(el.querySelector('.panel-stub')?.textContent).toBe('b');
   });
 
-  it('adds a new building at the GPS position', async () => {
-    const { fixture, http, el } = await setup();
+  it('works offline from the data on the tablet and queues a new building', async () => {
+    const { el, stable, db, online, http } = await setup(false);
+    expect(el.textContent).toContain('Offline: working from the data saved on this tablet');
+    // Screens that need the server are not offered.
+    expect(el.querySelector('header strong')?.textContent).toBe('Soshanguve');
+    expect([...el.querySelectorAll('header a')].map((a) => a.textContent)).toEqual([]);
+    expect(el.textContent).toContain('1/3 inspected');
+
     button(el, '+ Building').click();
-    await settle(fixture);
+    await stable();
     button(el, 'Use my position').click();
-    await settle(fixture);
+    await stable();
     button(el, 'shop').click();
-    const req = http.expectOne({ method: 'POST', url: '/api/projects/p1/buildings/new' });
-    expect(req.request.body).toMatchObject({ type: 'shop', position: { lon: 28.105, lat: -25.515, accuracyM: 5 } });
-    req.flush({ id: 'n1', status: 'new', predictedType: 'shop', confirmedType: 'shop', effectiveType: 'shop', confidence: 1, erf: null, location: { type: 'Point', coordinates: [28.105, -25.515] }, inspectedAt: '', version: 1 });
-    await settle(fixture);
-    http.expectOne('/api/projects/p1/field-progress').flush({ ...progress, buildings: 4, added: 1 });
-    await settle(fixture);
-    expect(el.querySelector('.panel-stub')?.textContent).toBe('n1');
+    await stable();
+
+    const [op] = await db.ops();
+    expect(op.body).toMatchObject({ kind: 'addBuilding', req: { type: 'shop', position: { lon: 28.105, lat: -25.515, accuracyM: 5 } } });
+    expect(el.querySelector('.panel-stub')?.textContent).toBe((op.body as { req: { id: string } }).req.id);
     expect(el.textContent).toContain('2/4 inspected');
+    expect(el.textContent).toContain('1 on this tablet');
+
+    // Back online: the queue is sent, then the project fetched again for what others changed.
+    online.set(true);
+    await stable();
+    const id = (op.body as { req: { id: string } }).req.id;
+    http.expectOne({ method: 'POST', url: '/api/projects/p1/buildings/new' }).flush(buildingField(id, { status: 'new', effectiveType: 'shop', erf: '7001', version: 1 }));
+    await stable();
+    const added = { ...building(id, { status: 'new', effectiveType: 'shop', erf: '7001' }), geometry: { type: 'Point' as const, coordinates: [28.105, -25.515] as [number, number] } };
+    answerRefresh(http, { ...data, buildings: { ...data.buildings, features: [...data.buildings.features, added] }, assumptionsOpen: 5 });
+    await stable();
+    expect(el.textContent).toContain('All synced');
+    expect(el.textContent).toContain('2/4 inspected');
+    expect(el.textContent).toContain('5 assumptions open');
+    expect(el.textContent).not.toContain('Offline');
   });
 
   it('places a transformer candidate where the map is tapped', async () => {
-    const { fixture, http, el } = await setup();
+    const { fixture, el, stable, db } = await setup(false);
     button(el, '+ Transformer').click();
-    await settle(fixture);
+    await stable();
     fixture.debugElement.query((d) => d.name === 'app-field-map').componentInstance.mapTap.emit([28.106, -25.516]);
-    const req = http.expectOne((r) => r.method === 'PUT' && r.url.startsWith('/api/projects/p1/candidates/'));
-    expect(req.request.body).toMatchObject({ kind: 'transformer', geometry: { type: 'Point', coordinates: [28.106, -25.516] } });
-    req.flush({ type: 'Feature', id: 'c1', geometry: { type: 'Point', coordinates: [28.106, -25.516] }, properties: { kind: 'transformer', notes: null, createdAt: '', version: 1 } });
-    await settle(fixture);
-    http.expectOne('/api/projects/p1/field-progress').flush(progress);
-    await settle(fixture);
+    await stable();
+    expect((await db.ops())[0].body).toMatchObject({ kind: 'saveCandidate', req: { kind: 'transformer', geometry: { type: 'Point', coordinates: [28.106, -25.516] }, version: null } });
     expect(el.querySelector('aside h3')?.textContent).toContain('Transformer');
+  });
+
+  it('opens the sync panel with what needs a decision', async () => {
+    const { el, stable, db, fixture } = await setup(false);
+    await db.addOp({
+      id: 'o1', projectId: 'p1', state: 'rejected', error: 'The position is outside the project area.', createdAt: '2026-10-05T08:00:00.000Z',
+      body: { kind: 'addBuilding', req: { id: 'n1', inspectionId: 'i', type: 'house', position: { lon: 2.35, lat: 48.85, accuracyM: 3 }, capturedAt: '' } },
+    });
+    fixture.componentRef.setInput('id', 'p2');
+    await stable();
+    fixture.componentRef.setInput('id', 'p1');
+    await stable();
+    expect(button(el, '1 to decide')).toBeTruthy();
+    button(el, '1 to decide').click();
+    await stable();
+    expect(el.textContent).toContain('The server refused this change: The position is outside the project area.');
+    button(el, 'Discard').click();
+    await stable();
+    expect(await db.ops()).toEqual([]);
+    expect(el.textContent).toContain('All synced');
   });
 });

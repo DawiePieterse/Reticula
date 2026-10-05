@@ -15,10 +15,13 @@ public sealed class FieldService(ReticulaDbContext db, ICalcClient calc, TimePro
     public const string LoadPointSubject = "load_point";
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
-    /// <summary>Estimates (or re-estimates) the building's load and keeps its assumptions in step.</summary>
+    /// <summary>
+    /// Estimates (or re-estimates) the building's load and keeps its assumptions in step. The save is recorded as an
+    /// inspection with id <paramref name="opId"/> (generated on the device) so a change synced twice is applied once.
+    /// </summary>
     /// <exception cref="CalcRejectedException">Observations the rules file does not accept.</exception>
     public async Task<LoadPoint> EstimateLoadAsync(Project project, Building building, AdmdEstimateRequest request, string? erf,
-        uint? expectedVersion, Guid userId, CancellationToken ct)
+        uint? expectedVersion, Guid? opId, DateTimeOffset? capturedAt, Guid userId, CancellationToken ct)
     {
         var estimate = await calc.EstimateAdmdAsync(request with { Rules = project.RulesRef }, ct);
 
@@ -56,6 +59,8 @@ public sealed class FieldService(ReticulaDbContext db, ICalcClient calc, TimePro
             $"At {label}, {estimate.Missing.Count} indicator(s) not recorded and scored as zero: {string.Join(", ", estimate.Missing)}.",
             userId, now, ct);
 
+        db.Inspections.Add(new Inspection(opId ?? Guid.CreateVersion7(), project.Id, InspectionActions.Load, building.Id, null, estimate.Kind,
+            null, null, capturedAt ?? now, null, userId, now));
         await db.SaveChangesAsync(ct);
         return lp;
     }

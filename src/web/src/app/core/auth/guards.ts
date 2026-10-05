@@ -15,7 +15,7 @@ export const engineerGuard: CanActivateFn = () => {
   return auth.isEngineer() ? true : router.createUrlTree(['/projects']);
 };
 
-/** For screens that need the server. Field capture screens (Phase 1) will not use this. */
+/** For screens that need the server. The field screen does not use it: it works offline. */
 export const onlineGuard: CanActivateFn = () => {
   const online = inject(ConnectivityService).online();
   const router = inject(Router);

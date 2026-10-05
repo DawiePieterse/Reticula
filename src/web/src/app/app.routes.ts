@@ -25,9 +25,8 @@ export const routes: Routes = [
         loadComponent: () => import('./features/projects/project-edit').then((m) => m.ProjectEdit),
       },
       {
-        // Online-only until offline sync (plan item 1.8) lands.
+        // Works offline from the project data kept on the device (plan item 1.8).
         path: 'projects/:id/field',
-        canActivate: [onlineGuard],
         loadComponent: () => import('./features/field/field-page').then((m) => m.FieldPage),
       },
       {

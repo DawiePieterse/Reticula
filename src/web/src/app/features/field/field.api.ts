@@ -77,9 +77,12 @@ export interface CandidateRequest {
   kind: CandidateKind;
   geometry: CandidateGeometry;
   notes?: string | null;
+  /** The version seen; null to create. */
   version?: number | null;
   position?: GpsFix | null;
   capturedAt?: string;
+  /** Generated on the device so a change synced twice is applied once. */
+  opId?: string;
 }
 
 export interface LoadPoint {
@@ -109,6 +112,9 @@ export interface LoadRequest {
   overrideReason?: string | null;
   version?: number | null;
   loadClass?: string | null;
+  /** Generated on the device so a change synced twice is applied once. */
+  opId?: string;
+  capturedAt?: string;
 }
 
 /** The observation form, passed through from the calc service (snake_case). */
@@ -275,8 +281,9 @@ export class FieldApi {
     return this.http.get(`${this.base(projectId)}/load-schedule.csv`, { responseType: 'blob' });
   }
 
-  photos(projectId: string, buildingId: string): Observable<PhotoInfo[]> {
-    return this.http.get<PhotoInfo[]>(`${this.base(projectId)}/photos?buildingId=${buildingId}`);
+  /** Photo details (not the images) for the whole project. */
+  photos(projectId: string): Observable<PhotoInfo[]> {
+    return this.http.get<PhotoInfo[]>(`${this.base(projectId)}/photos`);
   }
 
   uploadPhoto(projectId: string, o: { id: string; blob: Blob; buildingId?: string; candidateId?: string; capturedAt: string }): Observable<PhotoInfo> {

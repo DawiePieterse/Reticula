@@ -16,14 +16,20 @@ public sealed record BuildingFieldDto(
     Guid Id, string Status, string PredictedType, string? ConfirmedType, string EffectiveType, double Confidence,
     string? Erf, PointDto Location, DateTimeOffset? InspectedAt, uint Version);
 
-public sealed record CandidateRequest(string Kind, GeometryInput Geometry, string? Notes, uint? Version, PositionDto? Position, DateTimeOffset? CapturedAt);
+/// <param name="Version">The candidate version the inspector saw; null to create. A mismatch returns 409 with the current state.</param>
+/// <param name="OpId">Generated on the device; a repeat with the same id is ignored and returns the current state.</param>
+public sealed record CandidateRequest(string Kind, GeometryInput Geometry, string? Notes, uint? Version, PositionDto? Position, DateTimeOffset? CapturedAt,
+    Guid? OpId = null);
 
 public sealed record CandidateProps(string Kind, string? Notes, DateTimeOffset CreatedAt, uint Version);
 
+/// <param name="Version">The load point version the inspector saw; null when the building had no load. A mismatch returns 409 with the current state.</param>
 /// <param name="LoadClass">A class the engineer chooses instead of the score; null to use the score.</param>
+/// <param name="OpId">Generated on the device; a repeat with the same id is ignored and returns the current state.</param>
+/// <param name="CapturedAt">When the load was recorded, by the device clock.</param>
 public sealed record LoadRequest(
     string Kind, Dictionary<string, JsonElement>? Observations, string? SpecialLoad, double? OverrideKva, string? OverrideReason, uint? Version,
-    string? LoadClass = null);
+    string? LoadClass = null, Guid? OpId = null, DateTimeOffset? CapturedAt = null);
 
 public sealed record LoadPointDto(
     Guid Id, Guid BuildingId, string Kind, string? SpecialLoad, JsonElement Observations, string? ClassOverride, string? IncomeBand, string? Category,

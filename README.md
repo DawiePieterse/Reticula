@@ -54,7 +54,7 @@ CI fails if the model has changes without a migration.
 
 ## Field work
 
-Importing layouts is described in `docs/imports.md`. Inspection, the income and ADMD tool, the assumptions register and the load schedule are described in `docs/field.md`.
+Importing layouts is described in `docs/imports.md`. Inspection, the income and ADMD tool, the assumptions register, the load schedule and working offline are described in `docs/field.md`.
 
 ## Operations
 
