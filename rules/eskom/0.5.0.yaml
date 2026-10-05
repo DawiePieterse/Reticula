@@ -10,7 +10,9 @@ notes: >-
   Rev 2 is current. Resistances and reactances are placeholders until the Eskom cable specification 240-56063805 is
   held. Single-phase ABC (one phase and an insulated neutral, 16 to 150 mm²) comes from a manufacturer's data sheet
   for a SANS 1418 product (CBi-electric african cables, February 2026; 16 mm² from its May 2006 edition), to confirm against the Eskom ABC
-  specification 240-84758170; the three-phase ABC-70 entry stays a placeholder until that specification is held.
+  specification 240-84758170. Three-phase ABC (three phases and an insulated neutral, 25 to 150 mm²) comes from M-TEC's
+  SANS 1418 data sheet (R06, January 2022); its current ratings are placeholders, because the sheet gives the same
+  rating for three-phase and single-phase bundles without stating conditions.
   Each conductor lists its placeholder fields under `placeholder`.
 
 standards:
@@ -26,18 +28,132 @@ standards:
 # Feeder cables are four-core; services two-core (single phase) or four-core (three phase) (§3.9.1 i)–j)).
 # r_ohm_per_km is DC at 20 °C; r_ac_ohm_per_km, where given, is AC at r_ac_temp_c (the conductor's operating temperature).
 conductors:
-  - code: ABC-70
-    description: 70 mm² ABC (placeholder impedance and rating)
+  - code: ABC-3C-25
+    description: 3 × 25 mm² Al ABC + 25 mm² Al insulated neutral (self-supporting), XLPE, 600/1000 V
+    kind: overhead
+    material: al
+    size_mm2: 25
+    cores: 4
+    uses: [feeder]
+    r_ohm_per_km: 1.2
+    r_ac_ohm_per_km: 1.535
+    r_ac_temp_c: 90
+    x_ohm_per_km: 0.091
+    rating_a: 105
+    ratings_a: { air: 105 }
+    fault_k: 0.092
+    placeholder: [rating_a, ratings_a]
+    rating_clause: "M-TEC data sheet AS3x, ABC self support SANS 1418, R06 2022-01-19: in air, conditions not stated, same as its single-phase rating (to confirm); 1 s symmetrical short circuit 2.3 kA"
+    clause: "M-TEC data sheet AS3x (R06, 2022-01-19), SANS 1418; manufacturer data, to confirm against Eskom 240-84758170"
+    index: MTEC-ABC-3C
+  - code: ABC-3C-35
+    description: 3 × 35 mm² Al ABC + 35 mm² Al insulated neutral (self-supporting), XLPE, 600/1000 V
+    kind: overhead
+    material: al
+    size_mm2: 35
+    cores: 4
+    uses: [feeder]
+    r_ohm_per_km: 0.868
+    r_ac_ohm_per_km: 1.113
+    r_ac_temp_c: 90
+    x_ohm_per_km: 0.09
+    rating_a: 144
+    ratings_a: { air: 144 }
+    fault_k: 0.09143
+    placeholder: [rating_a, ratings_a]
+    rating_clause: "M-TEC data sheet AS3x, ABC self support SANS 1418, R06 2022-01-19: in air, conditions not stated, same as its single-phase rating (to confirm); 1 s symmetrical short circuit 3.2 kA"
+    clause: "M-TEC data sheet AS3x (R06, 2022-01-19), SANS 1418; manufacturer data, to confirm against Eskom 240-84758170"
+    index: MTEC-ABC-3C
+  - code: ABC-3C-50
+    description: 3 × 50 mm² Al ABC + 50 mm² Al insulated neutral (self-supporting), XLPE, 600/1000 V
+    kind: overhead
+    material: al
+    size_mm2: 50
+    cores: 4
+    uses: [feeder]
+    r_ohm_per_km: 0.641
+    r_ac_ohm_per_km: 0.822
+    r_ac_temp_c: 90
+    x_ohm_per_km: 0.084
+    rating_a: 183
+    ratings_a: { air: 183 }
+    fault_k: 0.092
+    placeholder: [rating_a, ratings_a]
+    rating_clause: "M-TEC data sheet AS3x, ABC self support SANS 1418, R06 2022-01-19: in air, conditions not stated, same as its single-phase rating (to confirm); 1 s symmetrical short circuit 4.6 kA"
+    clause: "M-TEC data sheet AS3x (R06, 2022-01-19), SANS 1418; manufacturer data, to confirm against Eskom 240-84758170"
+    index: MTEC-ABC-3C
+  - code: ABC-3C-70
+    description: 3 × 70 mm² Al ABC + 70 mm² Al insulated neutral (self-supporting), XLPE, 600/1000 V
     kind: overhead
     material: al
     size_mm2: 70
+    cores: 4
     uses: [feeder]
     r_ohm_per_km: 0.443
-    x_ohm_per_km: 0.085
-    rating_a: 200
-    placeholder: [r_ohm_per_km, x_ohm_per_km, rating_a]
-    clause: "SANS1418 / Eskom 240-84758170 §TBD (placeholders until the ABC specification is held)"
-    index: ESKOM-CONDUCTOR
+    r_ac_ohm_per_km: 0.568
+    r_ac_temp_c: 90
+    x_ohm_per_km: 0.083
+    rating_a: 228
+    ratings_a: { air: 228 }
+    fault_k: 0.09143
+    placeholder: [rating_a, ratings_a]
+    rating_clause: "M-TEC data sheet AS3x, ABC self support SANS 1418, R06 2022-01-19: in air, conditions not stated, same as its single-phase rating (to confirm); 1 s symmetrical short circuit 6.4 kA"
+    clause: "M-TEC data sheet AS3x (R06, 2022-01-19), SANS 1418; manufacturer data, to confirm against Eskom 240-84758170"
+    index: MTEC-ABC-3C
+  - code: ABC-3C-95
+    description: 3 × 95 mm² Al ABC + 95 mm² Al insulated neutral (self-supporting), XLPE, 600/1000 V
+    kind: overhead
+    material: al
+    size_mm2: 95
+    cores: 4
+    uses: [feeder]
+    r_ohm_per_km: 0.32
+    r_ac_ohm_per_km: 0.411
+    r_ac_temp_c: 90
+    x_ohm_per_km: 0.08
+    rating_a: 277
+    ratings_a: { air: 277 }
+    fault_k: 0.09158
+    placeholder: [rating_a, ratings_a]
+    rating_clause: "M-TEC data sheet AS3x, ABC self support SANS 1418, R06 2022-01-19: in air, conditions not stated, same as its single-phase rating (to confirm); 1 s symmetrical short circuit 8.7 kA"
+    clause: "M-TEC data sheet AS3x (R06, 2022-01-19), SANS 1418; manufacturer data, to confirm against Eskom 240-84758170"
+    index: MTEC-ABC-3C
+  - code: ABC-3C-120
+    description: 3 × 120 mm² Al ABC + 120 mm² Al insulated neutral (self-supporting), XLPE, 600/1000 V
+    kind: overhead
+    material: al
+    size_mm2: 120
+    cores: 4
+    uses: [feeder]
+    r_ohm_per_km: 0.253
+    r_ac_ohm_per_km: 0.325
+    r_ac_temp_c: 90
+    x_ohm_per_km: 0.078
+    rating_a: 322
+    ratings_a: { air: 322 }
+    fault_k: 0.09167
+    placeholder: [rating_a, ratings_a]
+    rating_clause: "M-TEC data sheet AS3x, ABC self support SANS 1418, R06 2022-01-19: in air, conditions not stated, same as its single-phase rating (to confirm); 1 s symmetrical short circuit 11.0 kA"
+    clause: "M-TEC data sheet AS3x (R06, 2022-01-19), SANS 1418; manufacturer data, to confirm against Eskom 240-84758170"
+    index: MTEC-ABC-3C
+  - code: ABC-3C-150
+    description: 3 × 150 mm² Al ABC + 150 mm² Al insulated neutral (self-supporting), XLPE, 600/1000 V
+    kind: overhead
+    material: al
+    size_mm2: 150
+    cores: 4
+    uses: [feeder]
+    r_ohm_per_km: 0.206
+    r_ac_ohm_per_km: 0.265
+    r_ac_temp_c: 90
+    x_ohm_per_km: 0.077
+    rating_a: 340
+    ratings_a: { air: 340 }
+    fault_k: 0.08467
+    placeholder: [rating_a, ratings_a]
+    rating_clause: "M-TEC data sheet AS3x, ABC self support SANS 1418, R06 2022-01-19: in air, conditions not stated, same as its single-phase rating (to confirm); 1 s symmetrical short circuit 12.7 kA"
+    clause: "M-TEC data sheet AS3x (R06, 2022-01-19), SANS 1418; manufacturer data, to confirm against Eskom 240-84758170"
+    index: MTEC-ABC-3C
   - code: ABC-1C-16
     description: 16 mm² Al ABC, 1 phase + Al insulated neutral (self-supporting), XLPE, 600/1000 V
     kind: overhead

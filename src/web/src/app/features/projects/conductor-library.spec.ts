@@ -15,7 +15,7 @@ const abc1c: Conductor = {
   rAcTempC: 90, xOhmPerKm: 0.083, ratingA: 213, ratingsA: { air: 213 }, faultK: 0.09429, oneSecondKa: 6.6, placeholder: [],
 };
 const abc: Conductor = {
-  ...cable, code: 'ABC-70', kind: 'overhead', material: 'al', cores: null, ratingA: 200, ratingsA: {}, faultK: null, oneSecondKa: null,
+  ...cable, code: 'ABC-3C-70', kind: 'overhead', material: 'al', cores: null, ratingA: 200, ratingsA: {}, faultK: null, oneSecondKa: null,
   placeholder: ['r_ohm_per_km', 'x_ohm_per_km', 'rating_a'], ratingClause: '',
 };
 
@@ -48,7 +48,7 @@ describe('ConductorLibrary', () => {
     expect(cells(rows[0])).toEqual(['CU-4C-70', 'feeder', '210 A', '171 A', '205 A', '0.268', '—', '0.080', '8.05 kA']);
     // Ratings come from the standard; impedances are placeholders.
     expect([...rows[0].querySelectorAll('td.placeholder')].map((td) => td.textContent?.trim())).toEqual(['0.268', '0.080']);
-    expect(cells(rows[1])).toEqual(['ABC-70', 'feeder', '200 A in air (overhead)', '0.268', '—', '0.080', '—']);
+    expect(cells(rows[1])).toEqual(['ABC-3C-70', 'feeder', '200 A in air (overhead)', '0.268', '—', '0.080', '—']);
     expect(rows[1].querySelectorAll('td.placeholder')).toHaveLength(3);
     expect(rows[0].getAttribute('title')).toContain('Table 6');
     // Manufacturer data for single-phase ABC: AC resistance at 90 °C, nothing a placeholder.

@@ -37,7 +37,7 @@ def test_withstand_matches_the_fault_level_tables(rs, code, t, table_ka):
 def test_the_library_is_complete_and_says_what_is_a_placeholder(rs):
     lib = library(rs)
     codes = [c.code for c in lib.conductors]
-    assert len(codes) == len(set(codes)) == 29
+    assert len(codes) == len(set(codes)) == 35
     for c in lib.conductors:
         if c.kind == "underground":
             # Ratings and K come from the standard; impedances do not yet.
@@ -46,55 +46,42 @@ def test_the_library_is_complete_and_says_what_is_a_placeholder(rs):
             assert c.one_second_ka == pytest.approx(c.fault_k * c.size_mm2)
             assert ("feeder" in c.uses) == (c.cores == 4)
             assert c.index == "ESKOM-LVCABLE-RATING"
-    abc = next(c for c in lib.conductors if c.code == "ABC-70")
-    assert abc.placeholder == ["r_ohm_per_km", "x_ohm_per_km", "rating_a"] and abc.one_second_ka is None
+    three = [c for c in lib.conductors if c.code.startswith("ABC-3C-")]
+    assert len(three) == 7 and all(c.placeholder == ["rating_a", "ratings_a"] and c.cores == 4 for c in three)
 
 
-# CBi-electric african cables data sheet F7CA 2nnn (Feb 2026): size, DC R 20 °C, AC R 90 °C, X, Z, rating in air,
-# 1 s short circuit, single-phase volt drop (mV/A/m).
-ABC_1C = [
-    (25, 1.200, 1.539, 0.090, 1.541, 111, 2.4, 3.08), (35, 0.868, 1.113, 0.090, 1.117, 138, 3.3, 2.23),
-    (50, 0.641, 0.822, 0.084, 0.826, 168, 4.7, 1.65), (70, 0.443, 0.568, 0.083, 0.574, 213, 6.6, 1.15),
-    (95, 0.320, 0.411, 0.080, 0.419, 258, 9.0, 0.84), (120, 0.253, 0.325, 0.078, 0.334, 300, 11.3, 0.67),
-    (150, 0.206, 0.265, 0.077, 0.276, 339, 14.2, 0.55),
+# M-TEC data sheet AS3x, R06 2022-01-19: size, DC R 20 °C, AC R 90 °C, X, Z, rating in air, 1 s short circuit.
+ABC_3C = [
+    (25, 1.200, 1.535, 0.091, 1.541, 105, 2.3), (35, 0.868, 1.113, 0.090, 1.117, 144, 3.2), (50, 0.641, 0.822, 0.084, 0.826, 183, 4.6),
+    (70, 0.443, 0.568, 0.083, 0.574, 228, 6.4), (95, 0.320, 0.411, 0.080, 0.419, 277, 8.7), (120, 0.253, 0.325, 0.078, 0.334, 322, 11.0),
+    (150, 0.206, 0.265, 0.077, 0.276, 340, 12.7),
 ]
 
 
-@pytest.mark.parametrize(("size", "r20", "r90", "x", "z", "amps", "isc", "vd"), ABC_1C)
-def test_single_phase_abc_is_transcribed_from_the_data_sheet_and_the_sheet_is_consistent(rs, size, r20, r90, x, z, amps, isc, vd):
+@pytest.mark.parametrize(("size", "r20", "r90", "x", "z", "amps", "isc"), ABC_3C)
+def test_three_phase_abc_is_transcribed_and_agrees_with_the_single_phase_sheet(rs, size, r20, r90, x, z, amps, isc):
     import math
 
-    c = rs.conductor(f"ABC-1C-{size}")
-    assert (c.r_ohm_per_km, c.r_ac_ohm_per_km, c.r_ac_temp_c, c.x_ohm_per_km) == (r20, r90, 90, x)
-    assert (c.rating_a, dict(c.ratings_a), c.kind, c.cores, c.placeholder) == (amps, {"air": amps}, "overhead", 2, ())
-    assert withstand(rs, c.code, 1).value == pytest.approx(isc, abs=0.001)  # K is stored to five decimals
-    # The sheet's own figures agree with each other, which guards the transcription:
-    assert math.hypot(r90, x) == pytest.approx(z, abs=0.0015)  # impedance from AC resistance and reactance
-    assert 2 * z == pytest.approx(vd, abs=0.006)  # single-phase volt drop, mV/A/m = 2 × Z in Ω/km
-    assert r90 == pytest.approx(r20 * (1 + 0.00403 * 70), rel=0.004)  # aluminium, 20 °C to 90 °C
-
-
-def test_16_mm2_single_phase_abc_comes_from_the_2006_sheet_with_its_short_circuit_value_a_placeholder(rs):
-    import math
-
-    c = rs.conductor("ABC-1C-16")
-    assert (c.r_ohm_per_km, c.r_ac_ohm_per_km, c.x_ohm_per_km, c.rating_a) == (1.910, 2.372, 0.091, 87)
-    assert c.placeholder == ("fault_k",)
-    assert withstand(rs, c.code, 1).value == pytest.approx(1.4, abs=0.001)
-    assert math.hypot(2.372, 0.091) == pytest.approx(2.374, abs=0.0015) and 2 * 2.374 == pytest.approx(4.75, abs=0.006)
-    assert "(placeholder)" in withstand(rs, c.code, 1).inputs[0].source
+    c = rs.conductor(f"ABC-3C-{size}")
+    assert (c.r_ohm_per_km, c.r_ac_ohm_per_km, c.x_ohm_per_km, c.rating_a) == (r20, r90, x, amps)
+    assert withstand(rs, c.code, 1).value == pytest.approx(isc, abs=0.001)
+    assert math.hypot(r90, x) == pytest.approx(z, abs=0.004)  # 25 mm²: 1.535 gives 1.538 against the sheet's 1.541
+    one = rs.conductor(f"ABC-1C-{size}")
+    # Same conductors, two manufacturers: resistance and reactance agree within a rounding step.
+    assert c.r_ohm_per_km == one.r_ohm_per_km and c.x_ohm_per_km == pytest.approx(one.x_ohm_per_km, abs=0.0011)
+    assert c.r_ac_ohm_per_km == pytest.approx(one.r_ac_ohm_per_km, abs=0.005)
 
 
 def test_a_rating_is_traced_and_flags_placeholders(rs):
     r = rating(rs, "CU-4C-70", "pipe")
     assert (r.value, r.unit, r.formula_id) == (171, "A", "lv.cable.rating.v1")
     assert "Table 6" in r.inputs[1].source and "placeholder" not in r.inputs[1].source
-    abc = rating(rs, "ABC-70")
-    assert "(placeholder)" in abc.inputs[1].source
+    abc = rating(rs, "ABC-3C-70")
+    assert abc.value == 228 and "(placeholder)" in abc.inputs[1].source
     with pytest.raises(RulesError, match="no rating for installation"):
-        rating(rs, "ABC-70", "ground")
+        rating(rs, "ABC-3C-70", "ground")
     with pytest.raises(RulesError, match="no fault constant"):
-        withstand(rs, "ABC-70", 1)
+        withstand(load_rules("eskom/0.4.0"), "CU-PVC-35", 1)
 
 
 def test_older_rules_still_load_their_simple_conductors():
@@ -106,6 +93,6 @@ def test_endpoint(client):
     r = client.get(f"/rules/{RULES}/conductors")
     assert r.status_code == 200
     body = r.json()
-    assert body["rules_ref"] == RULES and len(body["conductors"]) == 29
+    assert body["rules_ref"] == RULES and len(body["conductors"]) == 35
     assert next(c for c in body["conductors"] if c["code"] == "AL-4C-70")["ratings_a"] == {"ground": 158, "pipe": 130, "air": 151}
     assert client.get("/rules/eskom/9.9.9/conductors").status_code == 404

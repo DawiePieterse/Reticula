@@ -25,7 +25,7 @@ G. **Single-phase ABC** (one aluminium XLPE phase with an insulated neutral, 25 
    - the 1 s short-circuit rating at 250 °C, from which `fault_k` is taken.
 
    Manufacturer data is not a placeholder, but it is to be confirmed against the Eskom ABC specification 240-84758170 (index id CBI-ABC-1C). The tests check the sheet's own figures against each other: volt drop is 2 × impedance, impedance comes from R and X, and the 90 °C resistance follows from the 20 °C one.
-H. The three-phase `ABC-70` entry stays a placeholder in every field until a three-core ABC data sheet or the Eskom specification is held.
+H. **Three-phase ABC** (three aluminium XLPE phases with an insulated neutral of the same size, 25 to 150 mm², `ABC-3C-*`) comes from M-TEC's SANS 1418 data sheet (R06, January 2022, index id MTEC-ABC-3C). It replaces the earlier `ABC-70` placeholder. Its resistance and reactance match the CBi sheets. Its current ratings stay placeholders, because the sheet gives three-phase bundles the same rating as single-phase ones and states no conditions. Its volt-drop columns are not used, because two are misprinted; volt drop is calculated.
 E. Rating and withstand are traced values (`lv.cable.rating.v1`, `lv.cable.withstand.v1`). A trace input that uses a placeholder says so in its source.
 F. The calc service serves the library at `GET /rules/{authority}/{version}/conductors`. The API serves the project's library at `/api/projects/{id}/conductors`. The project page lists it, with placeholder values in grey italics.
 
