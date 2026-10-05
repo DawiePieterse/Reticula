@@ -48,6 +48,8 @@ const NETWORK = 'network';
 const LV_BRANCHES = 'lv-branches';
 const LV_NODES = 'lv-nodes';
 const LV_ISSUES = 'lv-issues';
+const LV_SERVICES = 'lv-services';
+const LV_LOADS = 'lv-loads';
 
 export type AnyCollection = FeatureCollection<unknown, AnyGeometry> | null;
 
@@ -139,8 +141,9 @@ export class AreaMap implements OnDestroy {
       setWorkerUrl(new URL(WORKER_PATH, document.baseURI).href);
       const map = new Map({ container: this.mapEl().nativeElement, style: OSM_STYLE, center: SOUTH_AFRICA_CENTRE, zoom: 5 });
       map.addControl(new NavigationControl(), 'top-right');
-      map.on('load', () => {
-        for (const id of [CONTOURS, ROADS, STANDS, BUILDINGS, NETWORK, LV_BRANCHES, LV_NODES, LV_ISSUES, PREVIEW]) map.addSource(id, { type: 'geojson', data: emptyCollection(), promoteId: 'id' });
+      // Not 'load': that waits for the basemap tiles, so a slow or blocked tile server would hide the project's own layers.
+      map.on('style.load', () => {
+        for (const id of [CONTOURS, ROADS, STANDS, BUILDINGS, NETWORK, LV_SERVICES, LV_LOADS, LV_BRANCHES, LV_NODES, LV_ISSUES, PREVIEW]) map.addSource(id, { type: 'geojson', data: emptyCollection(), promoteId: 'id' });
         map.addLayer({ id: 'contours-line', type: 'line', source: CONTOURS, paint: { 'line-color': '#bc8f5a', 'line-width': 0.8, 'line-opacity': 0.8 } });
         map.addLayer({ id: 'contours-label', type: 'symbol', source: CONTOURS, minzoom: 15,
           layout: { 'symbol-placement': 'line', 'text-field': ['to-string', ['get', 'elevationM']], 'text-size': 10 },
@@ -165,6 +168,9 @@ export class AreaMap implements OnDestroy {
         map.addLayer({ id: 'network-point', type: 'circle', source: NETWORK, filter: ['==', ['geometry-type'], 'Point'],
           paint: { 'circle-color': assetColour, 'circle-radius': ['match', ['get', 'assetType'], 'pole', 3, 6] as never,
             'circle-stroke-color': ['case', ['get', 'incomplete'], '#fb8500', '#ffffff'] as never, 'circle-stroke-width': 2 } });
+        map.addLayer({ id: 'lv-service', type: 'line', source: LV_SERVICES, paint: { 'line-color': ['get', 'colour'] as never, 'line-width': 1.5 } });
+        map.addLayer({ id: 'lv-load', type: 'circle', source: LV_LOADS,
+          paint: { 'circle-radius': 3, 'circle-color': ['get', 'colour'] as never, 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1 } });
         map.addLayer({ id: 'lv-route', type: 'line', source: LV_BRANCHES, filter: ['==', ['get', 'kind'], 'route'],
           layout: { 'line-cap': 'round' }, paint: { 'line-color': ['get', 'colour'] as never, 'line-width': 3.5 } });
         map.addLayer({ id: 'lv-link', type: 'line', source: LV_BRANCHES, filter: ['==', ['get', 'kind'], 'link'],
@@ -264,6 +270,8 @@ export class AreaMap implements OnDestroy {
     this.setData(LV_BRANCHES, lv?.branches ?? null);
     this.setData(LV_NODES, lv?.nodes ?? null);
     this.setData(LV_ISSUES, lv?.issues ?? null);
+    this.setData(LV_SERVICES, lv?.services ?? null);
+    this.setData(LV_LOADS, lv?.loads ?? null);
   }
 
   private setData(source: string, data: AnyCollection): void {

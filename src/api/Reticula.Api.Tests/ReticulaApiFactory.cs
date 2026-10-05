@@ -220,6 +220,36 @@ public sealed class FakeCalc : ICalcClient
             new LvSummary(routes, 1, 1, 0, 0, 1, nodes.Count, routes, 100.0 * routes, 0));
     }
 
+    /// <summary>Set by a test to decide what load allocation returns. By default every estimated load goes in one box on the first branch, phase R.</summary>
+    public Func<string, CalcLvNetwork, IReadOnlyList<LvLoadIn>, CalcLvLoads> OnAllocateLvLoads { get; set; } = DefaultLvLoads;
+
+    public IReadOnlyList<LvLoadIn> LastLvLoads { get; private set; } = [];
+
+    public Task<CalcLvLoads> AllocateLvLoadsAsync(string rulesRef, CalcLvNetwork network, IReadOnlyList<LvLoadIn> loads, CancellationToken ct = default)
+    {
+        Throw();
+        LastLvLoads = loads;
+        return Task.FromResult(OnAllocateLvLoads(rulesRef, network, loads));
+    }
+
+    public static CalcLvLoads DefaultLvLoads(string rulesRef, CalcLvNetwork network, IReadOnlyList<LvLoadIn> loads)
+    {
+        var branch = network.Branches.FirstOrDefault();
+        var estimated = branch is null ? [] : loads.Where(l => l.Kva is not null).ToList();
+        var allocations = estimated.Select(l => new CalcLvAllocation(l.Id, l.BuildingId, l.Label, l.Kind, l.Kva!.Value, branch!.Id, null, 10,
+            branch.Coordinates[0], 12.5, "P1-1", "TX1-F1", 30, "R")).ToList();
+        var unestimated = loads.Where(l => l.Kva is null).ToList();
+        IReadOnlyList<LvIssue> issues = unestimated.Count == 0 ? [] : [new LvIssue("warning", "no_load", "No load estimate.", unestimated.Count, [], [])];
+        var kva = allocations.Sum(a => a.Kva);
+        return new CalcLvLoads(rulesRef, "0123456789abcdef", "test service practice", "pole_boxes", allocations,
+            allocations.Count == 0 ? [] : [new LvBox("P1-1", "N2", "TX1-F1", "R", allocations.Count, kva, 30)],
+            allocations.Count == 0 ? [] : [new LvFeederPhases("TX1-F1", new Dictionary<string, LvPhaseLoad>
+            {
+                ["R"] = new(allocations.Count, kva, 1), ["W"] = new(0, 0, 0), ["B"] = new(0, 0, 0),
+            }, 0, 200)],
+            issues, new LvLoadSummary(loads.Count, allocations.Count, 0, unestimated.Count, allocations.Count, 0, allocations.Count == 0 ? 0 : 1, kva, 12.5));
+    }
+
     private void Throw()
     {
         if (Unreachable) throw new CalcUnavailableException("Calc service unreachable.");

@@ -110,7 +110,7 @@ Deliverables: predicted building types, tablet inspection, income/ADMD tool, loa
 Deliverables: LV layout, phasing, conductor sizing, voltage drop, fault level, OH and UG checks.
 
 - [x] 2.1 Network model in Python (networkx graph + shapely geometry), serialisation to/from Postgres. (ADR 0006: marked LV routes and sites joined within the rules file's `lv_network` tolerances from eskom/0.3.0; radial check, feeders and distances; stored in PostGIS per project, flagged out of date when the marked routes or the rules change. Rules values stay placeholders until the Eskom standards are identified.)
-- [ ] 2.2 Load allocation to candidate LV routes; phase balancing (3-phase/1-phase per rules).
+- [x] 2.2 Load allocation to candidate LV routes; phase balancing (3-phase/1-phase per rules). (ADR 0007: services from LV poles through service distribution boxes, 2 boxes a pole, 4 loads a box, second box on another phase; boxes phased per feeder from the far end; eskom/0.4.0. The 40 m service reach and 15 kVA three-phase limit are placeholders. Overhead only: underground kiosks per Eskom 240-56030637 §3.10 e) still to model.)
 - [ ] 2.3 Conductor/cable library from rules file (SANS 1507 LV cables, ABC/bare OH conductors) with ratings.
 - [ ] 2.4 Voltage drop calc (NRS 048-2 limits), thermal loading, LV fault level at ends.
 - [ ] 2.5 Overhead checks: span, sag/tension, clearances, pole class, stays.
@@ -195,7 +195,7 @@ F. **Performance targets.** Field UI usable on mid-range Android tablet; 2,000-s
 - [ ] Check which authorities require DWG rather than DXF.
 - [ ] Choose which authority's rules to encode first (assumed Eskom).
 - [ ] Decide whether any design calculation must also run offline (assumed no).
-- [ ] Confirm current editions of NRS 034-1, NRS 048-2, NRS 097-2-1, SANS 10142-1, SANS 10098, SANS 780, SANS 1019, SANS 1507, SANS 97, IEC 60909, Red Book. (2026-10-05: none held yet. Eskom projects follow Eskom's own standards, numbers to identify. See docs/standards-index.md.)
+- [ ] Confirm current editions of NRS 034-1, NRS 048-2, NRS 097-2-1, SANS 10142-1, SANS 10098, SANS 780, SANS 1019, SANS 1507, SANS 97, IEC 60909, Red Book. (2026-10-05: none held yet. Eskom projects follow Eskom's own standards. Eskom 240-56030637 Rev 2, LV cable systems, now held and confirmed current, with five more Eskom numbers identified from it. See docs/standards-index.md.)
 - [ ] Confirm Google satellite and rooftop-image licence terms.
 - [ ] Confirm .NET + Python split vs Python-only back end (Decision A).
 

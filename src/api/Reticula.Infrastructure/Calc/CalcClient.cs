@@ -99,6 +99,13 @@ public sealed class CalcClient(HttpClient http) : ICalcClient
         return await ReadAsync<CalcLvNetwork>(r, ct);
     }
 
+    public async Task<CalcLvLoads> AllocateLvLoadsAsync(string rulesRef, CalcLvNetwork network, IReadOnlyList<LvLoadIn> loads, CancellationToken ct = default)
+    {
+        using var content = JsonContent.Create(new { rules = rulesRef, network, loads }, options: Json);
+        using var r = await SendAsync(() => http.PostAsync("/calc/lv/loads", content, ct), ct);
+        return await ReadAsync<CalcLvLoads>(r, ct);
+    }
+
     public async Task<MapExtract> ExtractMapAsync(double minLon, double minLat, double maxLon, double maxLat, CancellationToken ct = default)
     {
         using var content = JsonContent.Create(new { bbox = new[] { minLon, minLat, maxLon, maxLat } }, options: Json);

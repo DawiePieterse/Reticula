@@ -642,6 +642,72 @@
           "description": "Candidate site kinds that feed the LV network"
         }
       }
+    },
+    "lv_loads": {
+      "type": "object",
+      "description": "How loads connect to the LV network and are spread over the phases (Phase 2.2).",
+      "additionalProperties": false,
+      "required": [
+        "max_service_m",
+        "attach",
+        "single_phase_max_kva"
+      ],
+      "properties": {
+        "clause": {
+          "type": "string"
+        },
+        "index": {
+          "type": "string",
+          "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)+$",
+          "description": "Id of the clause in docs/standards-index.md"
+        },
+        "max_service_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Longest service connection from a building to its pole or route, in metres"
+        },
+        "attach": {
+          "type": "string",
+          "enum": [
+            "pole_boxes",
+            "nearest_point"
+          ],
+          "description": "pole_boxes: services from LV poles through service distribution boxes; nearest_point: to the nearest point on a route, phased per load"
+        },
+        "single_phase_max_kva": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Loads above this are supplied three-phase"
+        },
+        "boxes_per_pole": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Most service distribution boxes on one pole"
+        },
+        "box_loads": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Most loads on one box, all on the box's phase"
+        },
+        "second_box_other_phase": {
+          "type": "boolean",
+          "description": "A second box on a pole is on a different phase from the first"
+        }
+      },
+      "if": {
+        "properties": {
+          "attach": {
+            "const": "pole_boxes"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "boxes_per_pole",
+          "box_loads",
+          "second_box_other_phase"
+        ]
+      }
     }
   }
 }

@@ -39,6 +39,10 @@ public interface ICalcClient
     /// <exception cref="CalcRejectedException">The rules file has no lv_network section.</exception>
     Task<CalcLvNetwork> BuildLvNetworkAsync(string rulesRef, IReadOnlyList<LvCandidate> candidates, CancellationToken ct = default);
 
+    /// <summary>Connects each building's load to the LV network and spreads single-phase loads over the phases of their feeder.</summary>
+    /// <exception cref="CalcRejectedException">The rules file has no lv_loads section.</exception>
+    Task<CalcLvLoads> AllocateLvLoadsAsync(string rulesRef, CalcLvNetwork network, IReadOnlyList<LvLoadIn> loads, CancellationToken ct = default);
+
     Task<AdmdGroup> GroupAdmdAsync(string rulesRef, IReadOnlyList<AdmdGroupLoad> loads, CancellationToken ct = default);
 }
 

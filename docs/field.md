@@ -19,6 +19,7 @@ The engineer builds the LV network from these marks on the project screen (ADR 0
 - **End a route on the route it joins.** Ends within 2 m of a route are joined to it. Ends that stop 2 to 6 m short are flagged, and any further away are left apart.
 - **Mark the transformer or mini-sub within 30 m of its route**, and poles within 5 m.
 - **Keep LV routes radial.** A loop, or a route that joins two transformers, is reported for the engineer to decide where the open point goes.
+- **Mark every LV pole that will carry services.** Houses connect to poles through service distribution boxes, at most 2 boxes of 4 houses a pole, so a pole serves up to 8 houses within 40 m. Houses with no pole within reach, or only full ones, are reported (ADR 0007).
 
 ## Loads: the income and ADMD tool
 
