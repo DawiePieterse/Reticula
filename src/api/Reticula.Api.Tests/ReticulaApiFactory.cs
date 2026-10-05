@@ -117,6 +117,15 @@ public sealed class FakeCalc : ICalcClient
         return Task.FromResult(OnImport(request));
     }
 
+    /// <summary>Set by a test to decide what an OpenStreetMap fetch returns.</summary>
+    public Func<string, CalcImportResult> OnImportOsm { get; set; } = kind => new CalcImportResult(kind, "overpass", "WGS84", "OSM", [], [], []);
+
+    public Task<CalcImportResult> ImportOsmAsync(string kind, string areaGeoJson, CancellationToken ct = default)
+    {
+        Throw();
+        return Task.FromResult(OnImportOsm(kind));
+    }
+
     /// <summary>Simplified predictor: building=house tag, else residential zoning, else low-confidence "other".</summary>
     public Task<PredictionResult> PredictBuildingTypesAsync(string rulesRef, IReadOnlyList<BuildingPredictionInput> buildings, CancellationToken ct = default)
     {

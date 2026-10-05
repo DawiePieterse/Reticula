@@ -66,6 +66,7 @@ import { SyncPanel } from './sync/sync-panel';
       <div class="map-wrap">
         <app-field-map
           [stands]="stands()"
+          [network]="network()"
           [buildings]="buildings()"
           [candidates]="candidates()"
           [selectedId]="selectedId()"
@@ -196,6 +197,7 @@ export class FieldPage implements OnDestroy {
 
   protected readonly projectName = computed(() => this.sync.snapshot()?.projectName ?? 'Project');
   protected readonly stands = computed(() => this.sync.snapshot()?.stands ?? null);
+  protected readonly network = computed(() => this.sync.snapshot()?.network ?? null);
   protected readonly buildings = computed(() => this.sync.view()?.buildings ?? null);
   protected readonly candidates = computed(() => this.sync.view()?.candidates ?? null);
   protected readonly form = computed(() => this.sync.snapshot()?.form ?? null);

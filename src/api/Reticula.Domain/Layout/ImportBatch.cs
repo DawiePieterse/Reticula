@@ -40,5 +40,11 @@ public static class ImportKinds
 {
     public const string Stands = "stands";
     public const string Buildings = "buildings";
-    public static readonly IReadOnlyList<string> All = [Stands, Buildings];
+    public const string Roads = "roads";
+    public const string Contours = "contours";
+    public const string Network = "network";
+    public static readonly IReadOnlyList<string> All = [Stands, Buildings, Roads, Contours, Network];
+
+    /// <summary>Kinds that can be fetched from OpenStreetMap instead of a file.</summary>
+    public static readonly IReadOnlyList<string> FromOsm = [Buildings, Roads];
 }

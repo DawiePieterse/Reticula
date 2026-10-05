@@ -17,6 +17,7 @@ dependencies = [
     "pmtiles>=3.8.1",
     "pydantic>=2.13.5",
     "pyproj>=3.8.0",
+    "pyshp>=3.1.6",
     "python-multipart>=0.0.32",
     "pyyaml>=6.0.3",
     "shapely>=2.1.2",

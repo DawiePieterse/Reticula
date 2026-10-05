@@ -12,6 +12,7 @@ import { answerRefresh, building, buildingField, flushSnapshot, settle, snapshot
 @Component({ selector: 'app-field-map', template: '' })
 class FieldMapStub {
   readonly stands = input<unknown>();
+  readonly network = input<unknown>();
   readonly buildings = input<unknown>();
   readonly candidates = input<unknown>();
   readonly selectedId = input<string | null>();

@@ -9,9 +9,14 @@ public sealed record CalcIssue(string Severity, string Code, string Message, int
 
 public sealed record CalcLayer(string Name, int ClosedPolylines, int OpenPolylines, int Texts);
 
+/// <param name="Name">Road name, or the label of an existing network asset.</param>
+/// <param name="Category">Road class (OSM highway value), or the network asset type.</param>
+/// <param name="Missing">Network fields the asset's type needs but the file did not give.</param>
 public sealed record CalcFeature(
-    string Ref, PolygonDto Geometry, double AreaM2, string? Erf, string? Zoning, string? OsmId,
-    Dictionary<string, string> Tags, Dictionary<string, JsonElement> Attributes);
+    string Ref, GeoJsonGeometry Geometry, double AreaM2, string? Erf, string? Zoning, string? OsmId,
+    Dictionary<string, string> Tags, Dictionary<string, JsonElement> Attributes,
+    double LengthM = 0, string? Name = null, string? Category = null, double? ElevationM = null, double? VoltageKv = null,
+    double? RatingKva = null, double? CapacityKva = null, double? FaultLevelKa = null, IReadOnlyList<string>? Missing = null);
 
 public sealed record CalcImportResult(
     string Kind, string Format, string? SourceCrs, string CrsReason,

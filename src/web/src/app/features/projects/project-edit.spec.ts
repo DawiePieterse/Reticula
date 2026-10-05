@@ -18,6 +18,9 @@ class AreaMapStub {
   readonly stands = input<unknown>(null);
   readonly buildings = input<unknown>(null);
   readonly preview = input<unknown>(null);
+  readonly roads = input<unknown>(null);
+  readonly contours = input<unknown>(null);
+  readonly network = input<unknown>(null);
   readonly focusId = input<string | null>(null);
   readonly featureClick = output<string>();
 }

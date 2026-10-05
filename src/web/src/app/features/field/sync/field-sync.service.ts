@@ -477,9 +477,10 @@ export class FieldSync implements OnDestroy {
   }
 
   private async fetchSnapshot(projectId: string): Promise<FieldSnapshot> {
-    const [project, stands, buildings, candidates, loads, form, progress, photos] = await Promise.all([
+    const [project, stands, network, buildings, candidates, loads, form, progress, photos] = await Promise.all([
       firstValueFrom(this.projectsApi.get(projectId)),
       firstValueFrom(this.layout.stands(projectId)),
+      firstValueFrom(this.layout.network(projectId)),
       firstValueFrom(this.layout.buildings(projectId)),
       firstValueFrom(this.api.candidates(projectId)),
       firstValueFrom(this.api.loadPoints(projectId)),
@@ -490,7 +491,7 @@ export class FieldSync implements OnDestroy {
     const photoCounts: Record<string, number> = {};
     for (const p of photos) if (p.buildingId) photoCounts[p.buildingId] = (photoCounts[p.buildingId] ?? 0) + 1;
     return {
-      projectId, projectName: project.name, stands, buildings, candidates, loads, form,
+      projectId, projectName: project.name, stands, network, buildings, candidates, loads, form,
       assumptionsOpen: progress.assumptionsOpen, photoCounts, fetchedAt: now(),
     };
   }

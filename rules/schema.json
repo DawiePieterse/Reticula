@@ -61,6 +61,11 @@
         },
         "clause": {
           "type": "string"
+        },
+        "index": {
+          "type": "string",
+          "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)+$",
+          "description": "Id of the clause in docs/standards-index.md"
         }
       }
     },
@@ -105,6 +110,11 @@
           },
           "clause": {
             "type": "string"
+          },
+          "index": {
+            "type": "string",
+            "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)+$",
+            "description": "Id of the clause in docs/standards-index.md"
           }
         }
       }
@@ -233,6 +243,11 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1
+        },
+        "index": {
+          "type": "string",
+          "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)+$",
+          "description": "Id of the clause in docs/standards-index.md"
         }
       }
     },
@@ -404,6 +419,11 @@
                 },
                 "clause": {
                   "type": "string"
+                },
+                "index": {
+                  "type": "string",
+                  "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)+$",
+                  "description": "Id of the clause in docs/standards-index.md"
                 }
               }
             },
@@ -431,6 +451,11 @@
                 },
                 "clause": {
                   "type": "string"
+                },
+                "index": {
+                  "type": "string",
+                  "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)+$",
+                  "description": "Id of the clause in docs/standards-index.md"
                 }
               }
             }
@@ -448,6 +473,11 @@
         "design_table": {
           "type": "string",
           "description": "load_tables id used for classes and Herman-Beta"
+        },
+        "index": {
+          "type": "string",
+          "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)+$",
+          "description": "Id of the clause in docs/standards-index.md"
         }
       }
     },

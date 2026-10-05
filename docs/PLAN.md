@@ -92,7 +92,7 @@ Deliverables: running skeleton, auth, project CRUD, map, CI.
 
 Deliverables: predicted building types, tablet inspection, income/ADMD tool, load schedule; all offline-capable.
 
-- [~] 1.1 Importers: CAD (DXF) and KML stand layouts; contours (DXF/SHP/GeoTIFF); OSM building/road extract for area; authority network data (CSV/SHP/GeoJSON with required fields). (Done: stands from KML/KMZ/GeoJSON/DXF, buildings from Overpass/GeoJSON; see docs/imports.md. To do: roads, contours, authority network, live Overpass fetch.)
+- [~] 1.1 Importers: CAD (DXF) and KML stand layouts; contours (DXF/SHP/GeoTIFF); OSM building/road extract for area; authority network data (CSV/SHP/GeoJSON with required fields). (Done: stands, buildings, roads, contours and existing network from KML/KMZ/GeoJSON/DXF/zipped shapefile/CSV, with required-field checks; buildings and roads fetched live from OpenStreetMap; see docs/imports.md. To do: contours from a GeoTIFF elevation model.)
 - [x] 1.2 Import validation: CRS detection, duplicate stands, missing erf numbers flagged early.
 - [~] 1.3 Building-type predictor: rules on OSM tags, zoning, footprint area; rooftop-image classifier behind licence flag; output type + confidence + source. (Done: tags, zoning, footprint from the rules file. To do: rooftop images, pending licence.)
 - [x] 1.4 Inspection UI (tablet): map-first, one-tap confirm, type picker (house/shop/school/other/not present/new), photo capture, notes, GPS, timestamp. (docs/field.md)
@@ -180,7 +180,7 @@ Deliverables: LV layout, phasing, conductor sizing, voltage drop, fault level, O
 
 ## 6. Cross-cutting workstreams
 
-A. **Standards clause index.** `/docs/standards-index.md` mapping each check to standard, clause and edition; every rules-file entry references an index id. Must be checked against current editions before Phase 2.
+A. **Standards clause index.** `/docs/standards-index.md` mapping each check to standard, clause and edition; every rules-file entry references an index id. Must be checked against current editions before Phase 2. (Drafted 2026-10-05 with every clause *to confirm*; rules files may carry `index` ids from 0.3.0, checked by the calc tests.)
 B. **Validation library.** `/test-cases/<topic>/case-N/{inputs.json, expected.json, source.md}`; CI fails on tolerance breach. Grows every phase.
 C. **Offline and sync.** Designed in Phase 1, regression-tested every phase.
 D. **Traceability.** Enforced by a Python decorator/record type; a lint rule fails any calc output lacking inputs, formula id and clause ref.
@@ -195,7 +195,7 @@ F. **Performance targets.** Field UI usable on mid-range Android tablet; 2,000-s
 - [ ] Check which authorities require DWG rather than DXF.
 - [ ] Choose which authority's rules to encode first (assumed Eskom).
 - [ ] Decide whether any design calculation must also run offline (assumed no).
-- [ ] Confirm current editions of NRS 034-1, NRS 048-2, NRS 097-2-1, SANS 10142-1, SANS 10098, SANS 780, SANS 1019, SANS 1507, SANS 97, IEC 60909, Red Book.
+- [ ] Confirm current editions of NRS 034-1, NRS 048-2, NRS 097-2-1, SANS 10142-1, SANS 10098, SANS 780, SANS 1019, SANS 1507, SANS 97, IEC 60909, Red Book. (2026-10-05: none held yet. Eskom projects follow Eskom's own standards, numbers to identify. See docs/standards-index.md.)
 - [ ] Confirm Google satellite and rooftop-image licence terms.
 - [ ] Confirm .NET + Python split vs Python-only back end (Decision A).
 
@@ -206,7 +206,7 @@ F. **Performance targets.** Field UI usable on mid-range Android tablet; 2,000-s
 ### Setup
 - [ ] Decisions A–I confirmed by engineer
 - [ ] Open items resolved or explicitly deferred
-- [ ] Standards clause index drafted
+- [x] Standards clause index drafted (clauses still to confirm by the engineer)
 - [x] Phase 0 complete
 
 ### Build
