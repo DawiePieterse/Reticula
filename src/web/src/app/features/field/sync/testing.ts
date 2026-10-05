@@ -80,6 +80,7 @@ function responses(s: FieldSnapshot): [string, object][] {
   return [
     [base, { id: s.projectId, name: s.projectName, rulesRef: 'eskom/0.2.0', authority: 'eskom', area: null, createdAt: '', updatedAt: '', version: 1 }],
     [`${base}/stands`, s.stands],
+    [`${base}/network`, s.network ?? { type: 'FeatureCollection', features: [] }],
     [`${base}/buildings`, s.buildings],
     [`${base}/candidates`, s.candidates],
     [`${base}/load-points`, s.loads],

@@ -55,6 +55,13 @@ public sealed class CalcClient(HttpClient http) : ICalcClient
         return await ReadAsync<CalcImportResult>(r, ct);
     }
 
+    public async Task<CalcImportResult> ImportOsmAsync(string kind, string areaGeoJson, CancellationToken ct = default)
+    {
+        using var content = JsonContent.Create(new { kind, area = JsonDocument.Parse(areaGeoJson).RootElement }, options: Json);
+        using var r = await SendAsync(() => http.PostAsync("/geo/osm", content, ct), ct);
+        return await ReadAsync<CalcImportResult>(r, ct);
+    }
+
     public async Task<PredictionResult> PredictBuildingTypesAsync(string rulesRef, IReadOnlyList<BuildingPredictionInput> buildings, CancellationToken ct = default)
     {
         using var content = JsonContent.Create(new { rules = rulesRef, buildings }, options: Json);

@@ -11,7 +11,8 @@ const building = (id: string, confidence: number, low: boolean, erf: string): Fe
   properties: { predictedType: 'house', confidence, source: 'footprint:80 m²', lowConfidence: low, status: 'predicted', confirmedType: null, effectiveType: 'house', areaM2: 80, erf, zoning: null, signals: [], version: 1 },
 });
 
-const summary = { stands: 2, standsWithoutErf: 0, buildings: 3, lowConfidence: 2, inspected: 0, predictedByType: { house: 3 } };
+const summary = { stands: 2, standsWithoutErf: 0, buildings: 3, lowConfidence: 2, inspected: 0, predictedByType: { house: 3 }, roads: 0, contours: 0, networkAssets: 0, networkIncomplete: 0 };
+const empty = { type: 'FeatureCollection', features: [] };
 
 const preview = (issues: ImportResponse['issues'], featureCount = 2): ImportResponse => ({
   batchId: null, committed: false, format: 'kml', sourceCrs: 'WGS84', crsReason: 'KML is always longitude/latitude',
@@ -35,8 +36,11 @@ async function setup(canEdit = true) {
   fixture.componentInstance.focus.subscribe((id) => focused.push(id));
   const http = TestBed.inject(HttpTestingController);
   fixture.detectChanges();
-  const flushLayout = () => {
-    http.expectOne('/api/projects/p1/layout-summary').flush(summary);
+  const flushLayout = (over: Partial<typeof summary> = {}, network: object = empty) => {
+    http.expectOne('/api/projects/p1/layout-summary').flush({ ...summary, ...over });
+    http.expectOne('/api/projects/p1/roads').flush(empty);
+    http.expectOne('/api/projects/p1/contours').flush(empty);
+    http.expectOne('/api/projects/p1/network').flush(network);
     http.expectOne('/api/projects/p1/stands').flush({ type: 'FeatureCollection', features: [] });
     http.expectOne('/api/projects/p1/buildings').flush({
       type: 'FeatureCollection',
@@ -123,5 +127,67 @@ describe('ProjectLayout', () => {
     const { el } = await setup(false);
     expect(el.querySelector('fieldset.import')).toBeNull();
     expect(el.querySelector('table.low')).not.toBeNull();
+  });
+
+  it('fetches roads from OpenStreetMap without a file, then imports them', async () => {
+    const { fixture, http, el, flushLayout } = await setup();
+    const kind = el.querySelector<HTMLSelectElement>('select[name="kind"]')!;
+    kind.value = 'roads';
+    kind.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+    expect(el.querySelector('input[type="file"]')!.getAttribute('accept')).toContain('.zip');
+
+    button(el, 'Fetch from OpenStreetMap').click();
+    const check = http.expectOne('/api/projects/p1/imports');
+    const form = check.request.body as FormData;
+    expect([form.get('source'), form.get('kind'), form.get('dryRun'), form.get('file')]).toEqual(['osm', 'roads', 'true', null]);
+    check.flush({ ...preview([], 12), format: 'overpass' });
+    await settle(fixture);
+    expect(el.textContent).toContain('12 roads found in OpenStreetMap');
+
+    button(el, 'Import 12 roads').click();
+    const commit = http.expectOne('/api/projects/p1/imports');
+    expect((commit.request.body as FormData).get('source')).toBe('osm');
+    commit.flush({ ...preview([], 12), committed: true, batchId: 'b1' });
+    await settle(fixture);
+    flushLayout({ roads: 12 });
+    await settle(fixture);
+    expect(el.textContent).toContain('12 roads');
+  });
+
+  it('offers OpenStreetMap only for buildings and roads, and CSV for the existing network', async () => {
+    const { fixture, el } = await setup();
+    const kind = el.querySelector<HTMLSelectElement>('select[name="kind"]')!;
+    expect(button(el, 'Fetch from OpenStreetMap')).toBeUndefined();
+    kind.value = 'network';
+    kind.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+    expect(button(el, 'Fetch from OpenStreetMap')).toBeUndefined();
+    expect(el.querySelector('input[type="file"]')!.getAttribute('accept')).toContain('.csv');
+    expect(el.textContent).toContain('CSV with lon and lat columns');
+  });
+
+  it('counts the existing network and passes it to the map', async () => {
+    TestBed.resetTestingModule();
+    const { fixture, http, layers } = await (async () => {
+      TestBed.configureTestingModule({ imports: [ProjectLayout], providers: [provideHttpClient(), provideHttpClientTesting()] });
+      const f = TestBed.createComponent(ProjectLayout);
+      f.componentRef.setInput('projectId', 'p1');
+      const got: LayoutLayers[] = [];
+      f.componentInstance.layersChange.subscribe((l) => got.push(l));
+      f.detectChanges();
+      return { fixture: f, http: TestBed.inject(HttpTestingController), layers: got };
+    })();
+    const net = { type: 'FeatureCollection', features: [{ type: 'Feature', id: 'n1', geometry: { type: 'Point', coordinates: [28.1, -25.52] },
+      properties: { assetType: 'transformer', label: 'TRF 1', voltageKv: null, ratingKva: null, capacityKva: null, faultLevelKa: null, missing: ['rating_kva'] } }] };
+    http.expectOne('/api/projects/p1/layout-summary').flush({ ...summary, networkAssets: 1, networkIncomplete: 1 });
+    http.expectOne('/api/projects/p1/stands').flush(empty);
+    http.expectOne('/api/projects/p1/buildings').flush(empty);
+    http.expectOne('/api/projects/p1/roads').flush(empty);
+    http.expectOne('/api/projects/p1/contours').flush(empty);
+    http.expectOne('/api/projects/p1/network').flush(net);
+    await settle(fixture);
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('1 existing network (1 incomplete)');
+    expect(layers.at(-1)!.network!.features[0].properties.label).toBe('TRF 1');
   });
 });

@@ -5,6 +5,7 @@ using Reticula.Domain.Layout;
 using Reticula.Domain.Projects;
 using Reticula.Infrastructure.Calc;
 using Reticula.Infrastructure.Data;
+using NetTopologySuite.Geometries;
 using Reticula.Infrastructure.Geo;
 
 namespace Reticula.Infrastructure.Layout;
@@ -17,54 +18,90 @@ public sealed class LayoutService(ReticulaDbContext db, ICalcClient calc, TimePr
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     /// <summary>
-    /// Reads the file through the calc service. With <paramref name="dryRun"/> nothing is stored.
-    /// Otherwise, unless the file has errors, replaces the project's stands (or its not-yet-inspected
-    /// buildings) with the file's features and refreshes building predictions.
+    /// Reads the file through the calc service. With <paramref name="dryRun"/> nothing is stored. Otherwise, unless the
+    /// file has errors, replaces the project's features of that kind with the file's (for buildings, only those not yet
+    /// inspected) and refreshes building predictions.
     /// </summary>
     public async Task<ImportOutcome> ImportAsync(
         Project project, string kind, string fileName, byte[] data, string? sourceCrs, string? layer,
         bool dryRun, Guid userId, CancellationToken ct)
     {
-        var area = JsonSerializer.Serialize(PolygonDto.From(project.Area), Json);
-        var result = await calc.ImportAsync(new CalcImportRequest(new MemoryStream(data), fileName, kind, sourceCrs, layer, area), ct);
+        var result = await calc.ImportAsync(new CalcImportRequest(new MemoryStream(data), fileName, kind, sourceCrs, layer, AreaJson(project)), ct);
         if (dryRun || result.HasErrors) return new ImportOutcome(result, null);
+        return new ImportOutcome(result, await StoreAsync(project, kind, fileName, Convert.ToHexStringLower(SHA256.HashData(data)), result, userId, ct));
+    }
 
+    /// <summary>As <see cref="ImportAsync"/>, with buildings or roads fetched from OpenStreetMap for the project area.</summary>
+    public async Task<ImportOutcome> ImportOsmAsync(Project project, string kind, bool dryRun, Guid userId, CancellationToken ct)
+    {
+        var result = await calc.ImportOsmAsync(kind, AreaJson(project), ct);
+        if (dryRun || result.HasErrors) return new ImportOutcome(result, null);
+        var hash = Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(result.Features, Json)));
+        return new ImportOutcome(result, await StoreAsync(project, kind, OsmFileName, hash, result, userId, ct));
+    }
+
+    public const string OsmFileName = "OpenStreetMap (Overpass)";
+
+    private async Task<ImportBatch> StoreAsync(Project project, string kind, string fileName, string sha256, CalcImportResult result, Guid userId, CancellationToken ct)
+    {
         var now = time.GetUtcNow();
         var batch = new ImportBatch(Guid.CreateVersion7(), project.Id, kind, fileName, result.Format, result.SourceCrs,
-            result.CrsReason, result.Features.Count, JsonSerializer.Serialize(result.Issues, Json),
-            Convert.ToHexStringLower(SHA256.HashData(data)), userId, now);
+            result.CrsReason, result.Features.Count, JsonSerializer.Serialize(result.Issues, Json), sha256, userId, now);
 
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         db.ImportBatches.Add(batch);
+        string Attributes(CalcFeature f) => JsonSerializer.Serialize(f.Attributes, Json);
 
-        if (kind == ImportKinds.Stands)
+        switch (kind)
         {
-            await db.Buildings.Where(b => b.ProjectId == project.Id).ExecuteUpdateAsync(s => s.SetProperty(b => b.StandId, (Guid?)null), ct);
-            await db.Stands.Where(s => s.ProjectId == project.Id).ExecuteDeleteAsync(ct);
-            foreach (var f in result.Features)
-            {
-                if (!f.Geometry.TryToPolygon(out var polygon, out _)) continue;
-                db.Stands.Add(new Stand(Guid.CreateVersion7(), project.Id, batch.Id, f.Ref, f.Erf, f.Zoning, polygon!, f.AreaM2,
-                    JsonSerializer.Serialize(f.Attributes, Json)));
-            }
-        }
-        else
-        {
-            // Buildings already seen on site are kept; only map-derived ones are replaced.
-            await db.Buildings.Where(b => b.ProjectId == project.Id && b.Status == BuildingStatus.Predicted).ExecuteDeleteAsync(ct);
-            foreach (var f in result.Features)
-            {
-                if (!f.Geometry.TryToPolygon(out var polygon, out _)) continue;
-                db.Buildings.Add(new Building(Guid.CreateVersion7(), project.Id, batch.Id, f.Ref, f.OsmId, polygon!, f.AreaM2,
-                    JsonSerializer.Serialize(f.Tags, Json), now));
-            }
+            case ImportKinds.Stands:
+                await db.Buildings.Where(b => b.ProjectId == project.Id).ExecuteUpdateAsync(s => s.SetProperty(b => b.StandId, (Guid?)null), ct);
+                await db.Stands.Where(s => s.ProjectId == project.Id).ExecuteDeleteAsync(ct);
+                foreach (var f in result.Features)
+                    if (f.Geometry.TryToPolygon(out var polygon, out _))
+                        db.Stands.Add(new Stand(Guid.CreateVersion7(), project.Id, batch.Id, f.Ref, f.Erf, f.Zoning, polygon!, f.AreaM2, Attributes(f)));
+                break;
+            case ImportKinds.Buildings:
+                // Buildings already seen on site are kept; only map-derived ones are replaced.
+                await db.Buildings.Where(b => b.ProjectId == project.Id && b.Status == BuildingStatus.Predicted).ExecuteDeleteAsync(ct);
+                foreach (var f in result.Features)
+                    if (f.Geometry.TryToPolygon(out var polygon, out _))
+                        db.Buildings.Add(new Building(Guid.CreateVersion7(), project.Id, batch.Id, f.Ref, f.OsmId, polygon!, f.AreaM2,
+                            JsonSerializer.Serialize(f.Tags, Json), now));
+                break;
+            case ImportKinds.Roads:
+                await db.Roads.Where(r => r.ProjectId == project.Id).ExecuteDeleteAsync(ct);
+                foreach (var f in result.Features)
+                    if (f.Geometry.ToGeometry() is LineString line)
+                        db.Roads.Add(new Road(Guid.CreateVersion7(), project.Id, batch.Id, f.Ref, f.OsmId, Clip(f.Name, 200), Clip(f.Category, 50), line, f.LengthM, Attributes(f)));
+                break;
+            case ImportKinds.Contours:
+                await db.Contours.Where(c => c.ProjectId == project.Id).ExecuteDeleteAsync(ct);
+                foreach (var f in result.Features)
+                    if (f.Geometry.ToGeometry() is LineString line && f.ElevationM is { } z)
+                        db.Contours.Add(new Contour(Guid.CreateVersion7(), project.Id, batch.Id, f.Ref, z, line));
+                break;
+            case ImportKinds.Network:
+                await db.NetworkAssets.Where(a => a.ProjectId == project.Id).ExecuteDeleteAsync(ct);
+                foreach (var f in result.Features)
+                    if (f.Geometry.ToGeometry() is Point or LineString)
+                        db.NetworkAssets.Add(new NetworkAsset(Guid.CreateVersion7(), project.Id, batch.Id, f.Ref, Clip(f.Category, 30) ?? "other",
+                            Clip(f.Name, 100), f.Geometry.ToGeometry()!, f.VoltageKv, f.RatingKva, f.CapacityKva, f.FaultLevelKa,
+                            JsonSerializer.Serialize(f.Missing ?? [], Json), Attributes(f)));
+                break;
+            default:
+                throw new ArgumentException($"Unknown import kind '{kind}'.", nameof(kind));
         }
 
         await db.SaveChangesAsync(ct);
-        await RefreshBuildingsAsync(project, ct);
+        if (kind is ImportKinds.Stands or ImportKinds.Buildings) await RefreshBuildingsAsync(project, ct);
         await tx.CommitAsync(ct);
-        return new ImportOutcome(result, batch);
+        return batch;
     }
+
+    private static string AreaJson(Project project) => JsonSerializer.Serialize(PolygonDto.From(project.Area), Json);
+
+    private static string? Clip(string? s, int max) => s is null ? null : s.Length > max ? s[..max] : s;
 
     /// <summary>Links each building to the stand it mostly sits on, copies that stand's zoning, and re-predicts types.</summary>
     public async Task RefreshBuildingsAsync(Project project, CancellationToken ct)

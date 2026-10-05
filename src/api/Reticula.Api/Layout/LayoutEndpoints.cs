@@ -26,7 +26,15 @@ public sealed record BuildingProps(
     string PredictedType, double Confidence, string Source, bool LowConfidence, string Status, string? ConfirmedType,
     string EffectiveType, double AreaM2, string? Erf, string? Zoning, JsonElement Signals, uint Version);
 
-public sealed record PreviewProps(string Ref, string? Erf, double AreaM2);
+public sealed record PreviewProps(string Ref, string? Erf, double AreaM2, string? Name = null, string? Category = null, double? ElevationM = null);
+
+public sealed record RoadProps(string? Name, string? RoadClass, double LengthM, string? OsmId);
+
+public sealed record ContourProps(double ElevationM);
+
+/// <param name="Missing">Fields the asset's type needs that the authority's data did not give.</param>
+public sealed record NetworkProps(string AssetType, string? Label, double? VoltageKv, double? RatingKva, double? CapacityKva,
+    double? FaultLevelKa, IReadOnlyList<string> Missing);
 
 public sealed record ImportResponse(
     Guid? BatchId, bool Committed, string Format, string? SourceCrs, string CrsReason, int FeatureCount,
@@ -36,7 +44,7 @@ public sealed record ImportBatchDto(Guid Id, string Kind, string FileName, strin
     JsonElement Issues, DateTimeOffset CreatedAt);
 
 public sealed record LayoutSummary(int Stands, int StandsWithoutErf, int Buildings, int LowConfidence, int Inspected,
-    IReadOnlyDictionary<string, int> PredictedByType);
+    IReadOnlyDictionary<string, int> PredictedByType, int Roads = 0, int Contours = 0, int NetworkAssets = 0, int NetworkIncomplete = 0);
 
 public static class LayoutEndpoints
 {
@@ -52,37 +60,51 @@ public static class LayoutEndpoints
         g.MapGet("/imports", ListImports);
         g.MapGet("/stands", Stands);
         g.MapGet("/buildings", Buildings);
+        g.MapGet("/roads", Roads);
+        g.MapGet("/contours", Contours);
+        g.MapGet("/network", Network);
         g.MapGet("/layout-summary", Summary);
         g.MapPost("/predictions", Repredict).RequireAuthorization(Policies.Engineer);
         return app;
     }
 
     private static async Task<Results<Ok<ImportResponse>, Created<ImportResponse>, NotFound, ValidationProblem, BadRequest<ImportResponse>>> Import(
-        Guid projectId, IFormFile file, [FromForm] string kind, [FromForm] string? sourceCrs, [FromForm] string? layer, [FromForm] bool? dryRun,
-        ReticulaDbContext db, LayoutService layout, ClaimsPrincipal user, CancellationToken ct)
+        Guid projectId, IFormFile? file, [FromForm] string kind, [FromForm] string? source, [FromForm] string? sourceCrs, [FromForm] string? layer,
+        [FromForm] bool? dryRun, ReticulaDbContext db, LayoutService layout, ClaimsPrincipal user, CancellationToken ct)
     {
         var project = await db.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.Id == projectId && p.ArchivedAt == null, ct);
         if (project is null) return TypedResults.NotFound();
 
+        // source=osm fetches buildings or roads for the project area from OpenStreetMap instead of reading a file.
+        var fromOsm = source == "osm";
         var errors = new Dictionary<string, string[]>();
         if (!ImportKinds.All.Contains(kind)) errors["kind"] = [$"Kind must be one of: {string.Join(", ", ImportKinds.All)}."];
-        if (file.Length == 0) errors["file"] = ["The file is empty."];
-        if (file.Length > MaxUploadBytes) errors["file"] = ["The file is larger than 50 MB."];
+        if (source is not (null or "" or "file" or "osm")) errors["source"] = ["Source must be file or osm."];
+        if (fromOsm && !ImportKinds.FromOsm.Contains(kind)) errors["source"] = [$"Only {string.Join(" and ", ImportKinds.FromOsm)} can be fetched from OpenStreetMap."];
+        if (!fromOsm && file is null) errors["file"] = ["Choose a file."];
+        if (!fromOsm && file is { Length: 0 }) errors["file"] = ["The file is empty."];
+        if (!fromOsm && file is { Length: > MaxUploadBytes }) errors["file"] = ["The file is larger than 50 MB."];
         if (errors.Count > 0) return TypedResults.ValidationProblem(errors);
-
-        byte[] data;
-        await using (var s = file.OpenReadStream())
-        using (var ms = new MemoryStream((int)file.Length))
-        {
-            await s.CopyToAsync(ms, ct);
-            data = ms.ToArray();
-        }
 
         ImportOutcome outcome;
         try
         {
             var userId = Guid.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!);
-            outcome = await layout.ImportAsync(project, kind, file.FileName, data, sourceCrs, layer, dryRun ?? false, userId, ct);
+            if (fromOsm)
+            {
+                outcome = await layout.ImportOsmAsync(project, kind, dryRun ?? false, userId, ct);
+            }
+            else
+            {
+                byte[] data;
+                await using (var s = file!.OpenReadStream())
+                using (var ms = new MemoryStream((int)file.Length))
+                {
+                    await s.CopyToAsync(ms, ct);
+                    data = ms.ToArray();
+                }
+                outcome = await layout.ImportAsync(project, kind, file.FileName, data, sourceCrs, layer, dryRun ?? false, userId, ct);
+            }
         }
         catch (CalcRejectedException e)
         {
@@ -91,7 +113,8 @@ public static class LayoutEndpoints
 
         var r = outcome.Result;
         var preview = dryRun == true
-            ? GeoFeatureCollection<PreviewProps>.Of(r.Features.Select(f => new GeoFeature<PreviewProps>("Feature", f.Ref, f.Geometry, new PreviewProps(f.Ref, f.Erf, f.AreaM2))))
+            ? GeoFeatureCollection<PreviewProps>.Of(r.Features.Select(f => new GeoFeature<PreviewProps>("Feature", f.Ref, f.Geometry,
+                new PreviewProps(f.Ref, f.Erf, f.AreaM2, f.Name, f.Category, f.ElevationM))))
             : null;
         var response = new ImportResponse(outcome.Batch?.Id, outcome.Batch is not null, r.Format, r.SourceCrs, r.CrsReason, r.Features.Count, r.Issues, r.Layers, preview);
 
@@ -131,6 +154,29 @@ public static class LayoutEndpoints
                 JsonDocument.Parse(x.b.PredictionSignalsJson).RootElement.Clone(), x.b.Version)))));
     }
 
+    private static async Task<Ok<GeoFeatureCollection<RoadProps>>> Roads(Guid projectId, ReticulaDbContext db, CancellationToken ct)
+    {
+        var rows = await db.Roads.AsNoTracking().Where(r => r.ProjectId == projectId).OrderBy(r => r.Name).ToListAsync(ct);
+        return TypedResults.Ok(GeoFeatureCollection<RoadProps>.Of(rows.Select(r =>
+            new GeoFeature<RoadProps>("Feature", r.Id.ToString(), LineStringDto.From(r.Geometry), new RoadProps(r.Name, r.RoadClass, r.LengthM, r.OsmId)))));
+    }
+
+    private static async Task<Ok<GeoFeatureCollection<ContourProps>>> Contours(Guid projectId, ReticulaDbContext db, CancellationToken ct)
+    {
+        var rows = await db.Contours.AsNoTracking().Where(c => c.ProjectId == projectId).OrderBy(c => c.ElevationM).ToListAsync(ct);
+        return TypedResults.Ok(GeoFeatureCollection<ContourProps>.Of(rows.Select(c =>
+            new GeoFeature<ContourProps>("Feature", c.Id.ToString(), LineStringDto.From(c.Geometry), new ContourProps(c.ElevationM)))));
+    }
+
+    private static async Task<Ok<GeoFeatureCollection<NetworkProps>>> Network(Guid projectId, ReticulaDbContext db, CancellationToken ct)
+    {
+        var rows = await db.NetworkAssets.AsNoTracking().Where(a => a.ProjectId == projectId).OrderBy(a => a.AssetType).ThenBy(a => a.Label).ToListAsync(ct);
+        return TypedResults.Ok(GeoFeatureCollection<NetworkProps>.Of(rows.Select(a => new GeoFeature<NetworkProps>(
+            "Feature", a.Id.ToString(), GeometryInput.ToDto(a.Geometry),
+            new NetworkProps(a.AssetType, a.Label, a.VoltageKv, a.RatingKva, a.CapacityKva, a.FaultLevelKa,
+                JsonSerializer.Deserialize<List<string>>(a.MissingJson) ?? [])))));
+    }
+
     private static async Task<Results<Ok<LayoutSummary>, NotFound>> Summary(Guid projectId, ReticulaDbContext db, CancellationToken ct)
     {
         if (!await db.Projects.AnyAsync(p => p.Id == projectId && p.ArchivedAt == null, ct)) return TypedResults.NotFound();
@@ -144,7 +190,11 @@ public static class LayoutEndpoints
             await buildings.CountAsync(ct),
             await buildings.CountAsync(b => b.Status == BuildingStatus.Predicted && b.LowConfidence, ct),
             await buildings.CountAsync(b => b.Status != BuildingStatus.Predicted, ct),
-            byType));
+            byType,
+            await db.Roads.CountAsync(r => r.ProjectId == projectId, ct),
+            await db.Contours.CountAsync(c => c.ProjectId == projectId, ct),
+            await db.NetworkAssets.CountAsync(a => a.ProjectId == projectId, ct),
+            await db.NetworkAssets.CountAsync(a => a.ProjectId == projectId && a.MissingJson != "[]", ct)));
     }
 
     private static async Task<Results<NoContent, NotFound>> Repredict(Guid projectId, ReticulaDbContext db, LayoutService layout, CancellationToken ct)

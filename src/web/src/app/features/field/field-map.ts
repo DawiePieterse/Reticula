@@ -2,7 +2,7 @@ import { Component, ElementRef, OnDestroy, afterNextRender, computed, effect, in
 import type { FeatureCollection as GjCollection } from 'geojson';
 import type { GeoJSONSource, Map as MlMap, MapMouseEvent } from 'maplibre-gl';
 import { Position, bounds } from '../projects/geo';
-import { AnyGeometry, BUILDING_COLOURS, FeatureCollection } from '../projects/layout.api';
+import { AnyGeometry, BUILDING_COLOURS, FeatureCollection, NETWORK_COLOURS, flagIncomplete } from '../projects/layout.api';
 import { CANDIDATE_COLOURS, GpsFix } from './field.api';
 import { basemapStyle } from './map/basemap';
 import { LocalMapPack } from './map/map-pack.store';
@@ -10,7 +10,7 @@ import { LocalMapPack } from './map/map-pack.store';
 export type FieldMode = 'select' | 'building' | 'site' | 'route';
 
 const WORKER_PATH = 'maplibre/maplibre-gl-worker.mjs';
-const SOURCES = ['stands', 'buildings', 'candidates', 'draft', 'gps'] as const;
+const SOURCES = ['stands', 'network', 'buildings', 'candidates', 'draft', 'gps'] as const;
 type Coll = FeatureCollection<unknown, AnyGeometry> | null;
 
 /** Field map: tap a building or candidate to select it, tap to place, or tap out a route. */
@@ -38,6 +38,8 @@ type Coll = FeatureCollection<unknown, AnyGeometry> | null;
 })
 export class FieldMap implements OnDestroy {
   readonly stands = input<Coll>(null);
+  /** The authority's existing network, drawn for reference. */
+  readonly network = input<Coll>(null);
   readonly buildings = input<Coll>(null);
   readonly candidates = input<Coll>(null);
   readonly selectedId = input<string | null>(null);
@@ -75,6 +77,7 @@ export class FieldMap implements OnDestroy {
 
   constructor() {
     effect(() => this.set('stands', this.stands()));
+    effect(() => this.set('network', flagIncomplete(this.network())));
     effect(() => {
       const b = this.buildings();
       untracked(() => {
@@ -108,6 +111,12 @@ export class FieldMap implements OnDestroy {
       map.on('style.load', () => {
         for (const s of SOURCES) map.addSource(s, { type: 'geojson', data: { type: 'FeatureCollection', features: [] }, promoteId: 'id' });
         map.addLayer({ id: 'stands-line', type: 'line', source: 'stands', paint: { 'line-color': '#6e7781', 'line-width': 1 } });
+        const assetColour = ['match', ['get', 'assetType'], ...Object.entries(NETWORK_COLOURS).flat(), '#8c959f'] as never;
+        map.addLayer({ id: 'network-line', type: 'line', source: 'network', filter: ['==', ['geometry-type'], 'LineString'],
+          paint: { 'line-color': assetColour, 'line-width': 2, 'line-opacity': 0.8 } });
+        map.addLayer({ id: 'network-point', type: 'circle', source: 'network', filter: ['==', ['geometry-type'], 'Point'],
+          paint: { 'circle-color': assetColour, 'circle-radius': ['match', ['get', 'assetType'], 'pole', 3, 6] as never,
+            'circle-stroke-color': ['case', ['get', 'incomplete'], '#fb8500', '#ffffff'] as never, 'circle-stroke-width': 1.5 } });
         const typeColour = ['match', ['get', 'effectiveType'], ...Object.entries(BUILDING_COLOURS).flat(), BUILDING_COLOURS['other']] as never;
         map.addLayer({
           id: 'buildings-fill', type: 'fill', source: 'buildings', filter: ['==', ['geometry-type'], 'Polygon'],
@@ -139,6 +148,7 @@ export class FieldMap implements OnDestroy {
         map.addLayer({ id: 'gps', type: 'circle', source: 'gps', paint: { 'circle-radius': 7, 'circle-color': '#0969da', 'circle-stroke-color': '#fff', 'circle-stroke-width': 3 } });
 
         this.set('stands', this.stands());
+        this.set('network', flagIncomplete(this.network()));
         this.set('buildings', this.buildings());
         this.set('candidates', this.candidates());
         this.set('gps', this.gpsCollection() as never);

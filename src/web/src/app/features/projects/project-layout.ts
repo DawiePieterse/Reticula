@@ -8,21 +8,38 @@ import { GeoJsonPolygon } from './geo';
 import {
   BUILDING_COLOURS,
   BuildingProps,
+  ContourProps,
   FeatureCollection,
+  GeoJsonLineString,
   GeoJsonPoint,
   ImportKind,
   ImportResponse,
   LayoutApi,
   LayoutSummary,
+  Network,
+  OSM_KINDS,
   PreviewProps,
+  RoadProps,
   StandProps,
 } from './layout.api';
 
 export interface LayoutLayers {
   stands: FeatureCollection<StandProps> | null;
   buildings: FeatureCollection<BuildingProps, GeoJsonPolygon | GeoJsonPoint> | null;
-  preview: FeatureCollection<PreviewProps> | null;
+  preview: FeatureCollection<PreviewProps, GeoJsonPolygon | GeoJsonPoint | GeoJsonLineString> | null;
+  roads: FeatureCollection<RoadProps, GeoJsonLineString> | null;
+  contours: FeatureCollection<ContourProps, GeoJsonLineString> | null;
+  network: Network | null;
 }
+
+/** What each kind is, where it usually comes from, and the files it can be read from. */
+const KINDS: { value: ImportKind; label: string; accept: string; hint: string }[] = [
+  { value: 'stands', label: 'Stands (planner layout)', accept: '.kml,.kmz,.geojson,.json,.dxf,.zip', hint: 'Closed outlines with erf numbers.' },
+  { value: 'buildings', label: 'Buildings (OpenStreetMap)', accept: '.geojson,.json,.zip', hint: 'Footprints, from a file or straight from OpenStreetMap.' },
+  { value: 'roads', label: 'Roads', accept: '.kml,.kmz,.geojson,.json,.dxf,.zip', hint: 'Lines with street names: from the planner, or straight from OpenStreetMap.' },
+  { value: 'contours', label: 'Contours (survey)', accept: '.geojson,.json,.dxf,.zip,.kml', hint: 'Lines with an elevation attribute or z value.' },
+  { value: 'network', label: 'Existing network (authority)', accept: '.csv,.geojson,.json,.dxf,.zip,.kml', hint: 'Transformers, poles, lines and connection points with type, kVA and voltage.' },
+];
 
 const CRS_OPTIONS = [
   { value: '', label: 'Detect automatically' },
@@ -31,7 +48,7 @@ const CRS_OPTIONS = [
   ...[34, 35, 36].map((z) => ({ value: `UTM${z}S`, label: `UTM ${z}S` })),
 ];
 
-/** Imports stands and buildings for a project and lists the buildings to check first. */
+/** Imports a project's layout, survey, network and map data, and lists the buildings to check first. */
 @Component({
   selector: 'app-project-layout',
   imports: [FormsModule, PercentPipe, DecimalPipe],
@@ -49,6 +66,11 @@ const CRS_OPTIONS = [
             }
           }
           <li [class.warn]="s.lowConfidence > 0">{{ s.lowConfidence }} low confidence</li>
+          @if (s.roads) { <li>{{ s.roads }} roads</li> }
+          @if (s.contours) { <li>{{ s.contours }} contours</li> }
+          @if (s.networkAssets) {
+            <li>{{ s.networkAssets }} existing network @if (s.networkIncomplete) { <span class="warn">({{ s.networkIncomplete }} incomplete)</span> }</li>
+          }
         </ul>
       }
 
@@ -58,12 +80,13 @@ const CRS_OPTIONS = [
           <div class="row">
             <label>What
               <select [ngModel]="kind()" (ngModelChange)="kind.set($event); resetPreview()" name="kind">
-                <option value="stands">Stands (planner layout)</option>
-                <option value="buildings">Buildings (OpenStreetMap)</option>
+                @for (k of kinds; track k.value) { <option [value]="k.value">{{ k.label }}</option> }
               </select>
+              <span class="muted">{{ kindInfo().hint }}</span>
             </label>
             <label>File
-              <input type="file" accept=".kml,.kmz,.geojson,.json,.dxf" (change)="onFile($event)" />
+              <input type="file" [attr.accept]="kindInfo().accept" (change)="onFile($event)" />
+              <span class="muted">KML, GeoJSON, DXF, zipped shapefile{{ kind() === 'network' ? ' or CSV with lon and lat columns' : '' }}</span>
             </label>
             <label>Coordinates
               <select [ngModel]="sourceCrs()" (ngModelChange)="sourceCrs.set($event); resetPreview()" name="crs">
@@ -75,7 +98,7 @@ const CRS_OPTIONS = [
                 <select [ngModel]="layer()" (ngModelChange)="layer.set($event); check()" name="layer">
                   <option value="">All layers</option>
                   @for (l of result()!.layers; track l.name) {
-                    <option [value]="l.name">{{ l.name }} ({{ l.closedPolylines }} closed, {{ l.texts }} texts)</option>
+                    <option [value]="l.name">{{ l.name }} ({{ layerSummary(l) }})</option>
                   }
                 </select>
               </label>
@@ -83,6 +106,9 @@ const CRS_OPTIONS = [
           </div>
           <div class="actions">
             <button type="button" (click)="check()" [disabled]="!file() || busy()">Check file</button>
+            @if (osmKinds.includes(kind())) {
+              <button type="button" (click)="fetchOsm()" [disabled]="busy()">Fetch from OpenStreetMap</button>
+            }
             <button type="button" class="primary" (click)="commit()" [disabled]="!canCommit() || busy()">
               Import {{ result()?.featureCount ?? '' }} {{ kind() }}
             </button>
@@ -92,7 +118,7 @@ const CRS_OPTIONS = [
           @if (result(); as r) {
             <div class="result" aria-live="polite">
               <p>
-                {{ r.featureCount }} {{ kind() }} found in {{ r.format.toUpperCase() }}.
+                {{ r.featureCount }} {{ kind() }} found {{ source() === 'osm' ? 'in OpenStreetMap' : 'in ' + r.format.toUpperCase() }}.
                 Coordinates: <strong>{{ r.sourceCrs ?? 'unknown' }}</strong> ({{ r.crsReason }}).
               </p>
               @if (r.issues.length) {
@@ -173,13 +199,21 @@ export class ProjectLayout {
   protected readonly types = ['house', 'shop', 'school', 'other'];
   protected readonly colours = BUILDING_COLOURS;
   protected readonly crsOptions = CRS_OPTIONS;
+  protected readonly kinds = KINDS;
+  protected readonly osmKinds = OSM_KINDS;
 
   protected readonly summary = signal<LayoutSummary | null>(null);
   private readonly stands = signal<FeatureCollection<StandProps> | null>(null);
   private readonly buildings = signal<FeatureCollection<BuildingProps, GeoJsonPolygon | GeoJsonPoint> | null>(null);
+  private readonly roads = signal<LayoutLayers['roads']>(null);
+  private readonly contours = signal<LayoutLayers['contours']>(null);
+  private readonly network = signal<LayoutLayers['network']>(null);
 
   protected readonly kind = signal<ImportKind>('stands');
+  protected readonly kindInfo = computed(() => KINDS.find((k) => k.value === this.kind())!);
   protected readonly file = signal<File | null>(null);
+  /** Where the checked data came from: the chosen file, or OpenStreetMap. */
+  protected readonly source = signal<'file' | 'osm'>('file');
   protected readonly sourceCrs = signal('');
   protected readonly layer = signal('');
   protected readonly result = signal<ImportResponse | null>(null);
@@ -207,7 +241,22 @@ export class ProjectLayout {
     });
   }
 
+  protected layerSummary(l: { closedPolylines: number; openPolylines: number; texts: number; lines?: number; points?: number }): string {
+    const parts = [
+      l.closedPolylines && `${l.closedPolylines} closed`, l.openPolylines && `${l.openPolylines} open`,
+      l.lines && `${l.lines} lines`, l.points && `${l.points} points`, l.texts && `${l.texts} texts`,
+    ].filter(Boolean);
+    return parts.join(', ') || 'empty';
+  }
+
+  /** Checks what OpenStreetMap has for the project area; Import then stores it. */
+  protected async fetchOsm(): Promise<void> {
+    this.source.set('osm');
+    await this.check();
+  }
+
   protected onFile(event: Event): void {
+    this.source.set('file');
     this.file.set((event.target as HTMLInputElement).files?.[0] ?? null);
     this.layer.set('');
     this.resetPreview();
@@ -247,14 +296,17 @@ export class ProjectLayout {
   }
 
   private async send(dryRun: boolean): Promise<ImportResponse | null> {
+    const osm = this.source() === 'osm';
     const file = this.file();
-    if (!file) return null;
+    if (!osm && !file) return null;
     this.busy.set(true);
     this.problem.set(null);
     this.message.set(null);
     try {
       const r = await firstValueFrom(
-        this.api.import(this.projectId(), { kind: this.kind(), file, sourceCrs: this.sourceCrs(), layer: this.layer(), dryRun }),
+        this.api.import(this.projectId(), osm
+          ? { kind: this.kind(), source: 'osm', dryRun }
+          : { kind: this.kind(), file: file!, sourceCrs: this.sourceCrs(), layer: this.layer(), dryRun }),
       );
       this.result.set(r);
       return r;
@@ -265,7 +317,7 @@ export class ProjectLayout {
         return null;
       }
       const p = toApiProblem(e);
-      this.problem.set(p.fieldErrors['file']?.[0] ?? p.fieldErrors['kind']?.[0] ?? p.message);
+      this.problem.set(p.fieldErrors['file']?.[0] ?? p.fieldErrors['source']?.[0] ?? p.fieldErrors['kind']?.[0] ?? p.message);
       return null;
     } finally {
       this.busy.set(false);
@@ -274,21 +326,29 @@ export class ProjectLayout {
 
   private async reload(id: string): Promise<void> {
     try {
-      const [summary, stands, buildings] = await Promise.all([
+      const [summary, stands, buildings, roads, contours, network] = await Promise.all([
         firstValueFrom(this.api.summary(id)),
         firstValueFrom(this.api.stands(id)),
         firstValueFrom(this.api.buildings(id)),
+        firstValueFrom(this.api.roads(id)),
+        firstValueFrom(this.api.contours(id)),
+        firstValueFrom(this.api.network(id)),
       ]);
       this.summary.set(summary);
       this.stands.set(stands);
       this.buildings.set(buildings);
+      this.roads.set(roads);
+      this.contours.set(contours);
+      this.network.set(network);
       this.emitLayers(null);
     } catch (e) {
       this.problem.set(toApiProblem(e).message);
     }
   }
 
-  private emitLayers(preview: FeatureCollection<PreviewProps> | null): void {
-    this.layersChange.emit({ stands: this.stands(), buildings: this.buildings(), preview });
+  private emitLayers(preview: LayoutLayers['preview']): void {
+    this.layersChange.emit({
+      stands: this.stands(), buildings: this.buildings(), preview, roads: this.roads(), contours: this.contours(), network: this.network(),
+    });
   }
 }

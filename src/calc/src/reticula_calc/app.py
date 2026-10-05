@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import json
-from typing import Annotated
+from typing import Annotated, get_args
 
 from fastapi import FastAPI, File, Form, HTTPException, Response, UploadFile
+from pydantic import BaseModel, Field
 
 from . import __version__
 from .calcs.admd import (
@@ -20,7 +21,8 @@ from .calcs.admd import (
 )
 from .calcs.voltage_drop import VoltageDropRequest, VoltageDropResult, voltage_drop
 from .geo import crs as crs_mod
-from .geo.importers import ImportResult, UnreadableFileError, import_file
+from .geo.importers import ImportResult, Kind, UnreadableFileError, import_file
+from .geo.osm import OsmError, OsmKind, fetch_osm
 from .geo.predict import PredictRequest, PredictResponse, predict
 from .logging_setup import configure_logging, log_requests
 from .maps.extract import ExtractRequest, MapSourceError, extract_configured
@@ -69,8 +71,8 @@ async def geo_import(
     layer: Annotated[str | None, Form()] = None,
     area: Annotated[str | None, Form(description="Project area as a GeoJSON Polygon")] = None,
 ) -> ImportResult:
-    if kind not in ("stands", "buildings"):
-        raise HTTPException(status_code=422, detail="kind must be 'stands' or 'buildings'")
+    if kind not in get_args(Kind):
+        raise HTTPException(status_code=422, detail=f"kind must be one of: {', '.join(get_args(Kind))}")
     data = await file.read(MAX_IMPORT_BYTES + 1)
     if len(data) > MAX_IMPORT_BYTES:
         raise HTTPException(status_code=413, detail="File is larger than 50 MB")
@@ -78,6 +80,21 @@ async def geo_import(
         area_geojson = json.loads(area) if area else None
         return import_file(file.filename or "upload", data, kind, source_crs or None, layer or None, area_geojson)  # type: ignore[arg-type]
     except (UnreadableFileError, crs_mod.CrsError, ValueError) as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+class OsmImportRequest(BaseModel):
+    kind: OsmKind
+    area: dict = Field(description="Project area as a GeoJSON Polygon")
+
+
+@app.post("/geo/osm")
+def geo_osm(req: OsmImportRequest) -> ImportResult:
+    """Buildings or roads for the project area, fetched from OpenStreetMap and checked like an imported file."""
+    try:
+        data = fetch_osm(req.kind, req.area)
+        return import_file("openstreetmap.json", data, req.kind, area=req.area)
+    except (OsmError, UnreadableFileError) as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
 

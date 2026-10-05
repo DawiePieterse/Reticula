@@ -18,6 +18,10 @@ public interface ICalcClient
     /// <exception cref="CalcRejectedException">The file cannot be read or the options are invalid.</exception>
     Task<CalcImportResult> ImportAsync(CalcImportRequest request, CancellationToken ct = default);
 
+    /// <summary>Buildings or roads for the area, fetched from OpenStreetMap by the calc service and checked like a file.</summary>
+    /// <exception cref="CalcRejectedException">OpenStreetMap could not be reached, or the area is too large.</exception>
+    Task<CalcImportResult> ImportOsmAsync(string kind, string areaGeoJson, CancellationToken ct = default);
+
     /// <exception cref="CalcRejectedException">The rules file has no prediction section.</exception>
     Task<PredictionResult> PredictBuildingTypesAsync(string rulesRef, IReadOnlyList<BuildingPredictionInput> buildings, CancellationToken ct = default);
 

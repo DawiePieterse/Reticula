@@ -1,5 +1,5 @@
 import { GeoJsonPolygon } from '../../projects/geo';
-import { BuildingProps, Feature, FeatureCollection, GeoJsonPoint, StandProps } from '../../projects/layout.api';
+import { BuildingProps, Feature, FeatureCollection, GeoJsonPoint, Network, StandProps } from '../../projects/layout.api';
 import {
   AdmdForm,
   BuildingField,
@@ -22,6 +22,8 @@ export interface FieldSnapshot {
   projectId: string;
   projectName: string;
   stands: FeatureCollection<StandProps>;
+  /** The authority's existing network, for reference on site. Absent in copies saved before it was kept. */
+  network?: Network;
   buildings: Buildings;
   candidates: Candidates;
   loads: LoadPoint[];

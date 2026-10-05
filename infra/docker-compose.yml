@@ -27,6 +27,8 @@ services:
       RETICULA_RULES_DIR: /rules
       # Basemap that offline map packs are cut from: a PMTiles URL, or a file under ./maps (see docs/operations.md).
       RETICULA_MAP_SOURCE: "${RETICULA_MAP_SOURCE:-}"
+      # OpenStreetMap Overpass server for fetching buildings and roads; empty uses the main public one.
+      RETICULA_OVERPASS_URL: "${RETICULA_OVERPASS_URL:-}"
     volumes: ["../rules:/rules:ro", "./maps:/maps:ro"]
     ports: ["8001:8001"]
 

@@ -28,6 +28,10 @@ Offline map packs (plan item 1.9) are cut by the calc service from one large PMT
 
 The pack files live in the file store next to photos, and are backed up with them. A rebuilt pack replaces the old file.
 
+## OpenStreetMap fetches
+
+**Fetch from OpenStreetMap** on the project screen asks an Overpass server for the project area's buildings or roads. The calc service sends the request; `RETICULA_OVERPASS_URL` names the server (default `https://overpass-api.de/api/interpreter`). The public servers are shared and rate-limited. A busy server answers 429 or 504, and the app says to try again in a minute. Run your own Overpass instance, or use one you pay for, if the team imports often.
+
 ## Backups
 
 The compose file runs two backup services that write to the `backups` volume:

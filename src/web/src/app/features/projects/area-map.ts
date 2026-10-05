@@ -13,7 +13,7 @@ import {
 import type { Feature as GjFeature, FeatureCollection as GjCollection } from 'geojson';
 import type { GeoJSONSource, Map as MlMap, MapMouseEvent, StyleSpecification } from 'maplibre-gl';
 import { GeoJsonPolygon, Position, bounds } from './geo';
-import { AnyGeometry, BUILDING_COLOURS, FeatureCollection } from './layout.api';
+import { AnyGeometry, BUILDING_COLOURS, FeatureCollection, NETWORK_COLOURS, flagIncomplete } from './layout.api';
 import { PolygonDraw } from './polygon-draw';
 
 const OSM_STYLE: StyleSpecification = {
@@ -41,8 +41,11 @@ const DRAW_SOURCE = 'area-draw';
 const STANDS = 'stands';
 const BUILDINGS = 'buildings';
 const PREVIEW = 'preview';
+const ROADS = 'roads';
+const CONTOURS = 'contours';
+const NETWORK = 'network';
 
-type AnyCollection = FeatureCollection<unknown, AnyGeometry> | null;
+export type AnyCollection = FeatureCollection<unknown, AnyGeometry> | null;
 
 /** MapLibre map that shows a project area and, when editable, lets the user tap out a polygon. */
 @Component({
@@ -83,6 +86,9 @@ export class AreaMap implements OnDestroy {
   readonly stands = input<AnyCollection>(null);
   readonly buildings = input<AnyCollection>(null);
   readonly preview = input<AnyCollection>(null);
+  readonly roads = input<AnyCollection>(null);
+  readonly contours = input<AnyCollection>(null);
+  readonly network = input<AnyCollection>(null);
   /** Building to zoom to and highlight. */
   readonly focusId = input<string | null>(null);
   readonly featureClick = output<string>();
@@ -106,6 +112,9 @@ export class AreaMap implements OnDestroy {
 
     effect(() => this.setData(STANDS, this.stands()));
     effect(() => this.setData(BUILDINGS, this.buildings()));
+    effect(() => this.setData(ROADS, this.roads()));
+    effect(() => this.setData(CONTOURS, this.contours()));
+    effect(() => this.setData(NETWORK, flagIncomplete(this.network())));
     effect(() => {
       const p = this.preview();
       untracked(() => {
@@ -124,7 +133,12 @@ export class AreaMap implements OnDestroy {
       const map = new Map({ container: this.mapEl().nativeElement, style: OSM_STYLE, center: SOUTH_AFRICA_CENTRE, zoom: 5 });
       map.addControl(new NavigationControl(), 'top-right');
       map.on('load', () => {
-        for (const id of [STANDS, BUILDINGS, PREVIEW]) map.addSource(id, { type: 'geojson', data: emptyCollection(), promoteId: 'id' });
+        for (const id of [CONTOURS, ROADS, STANDS, BUILDINGS, NETWORK, PREVIEW]) map.addSource(id, { type: 'geojson', data: emptyCollection(), promoteId: 'id' });
+        map.addLayer({ id: 'contours-line', type: 'line', source: CONTOURS, paint: { 'line-color': '#bc8f5a', 'line-width': 0.8, 'line-opacity': 0.8 } });
+        map.addLayer({ id: 'contours-label', type: 'symbol', source: CONTOURS, minzoom: 15,
+          layout: { 'symbol-placement': 'line', 'text-field': ['to-string', ['get', 'elevationM']], 'text-size': 10 },
+          paint: { 'text-color': '#8a5a2b', 'text-halo-color': '#fff', 'text-halo-width': 1 } });
+        map.addLayer({ id: 'roads-line', type: 'line', source: ROADS, paint: { 'line-color': '#9a6700', 'line-width': 2, 'line-opacity': 0.7 } });
         map.addLayer({ id: 'stands-line', type: 'line', source: STANDS, paint: { 'line-color': '#6e7781', 'line-width': 1 } });
         map.addLayer({
           id: 'buildings-fill', type: 'fill', source: BUILDINGS,
@@ -135,7 +149,17 @@ export class AreaMap implements OnDestroy {
         });
         map.addLayer({ id: 'buildings-low', type: 'line', source: BUILDINGS, filter: ['==', ['get', 'lowConfidence'], true], paint: { 'line-color': '#cf222e', 'line-width': 1.5 } });
         map.addLayer({ id: 'buildings-focus', type: 'line', source: BUILDINGS, filter: ['==', ['id'], ''], paint: { 'line-color': '#fb8500', 'line-width': 4 } });
-        map.addLayer({ id: 'preview-line', type: 'line', source: PREVIEW, paint: { 'line-color': '#fb8500', 'line-width': 2, 'line-dasharray': [2, 1] } });
+        const assetColour = ['match', ['get', 'assetType'], ...Object.entries(NETWORK_COLOURS).flat(), '#8c959f'] as never;
+        const lineWidth = ['match', ['get', 'assetType'], ['mv_line', 'mv_cable'], 3, 2] as never;
+        map.addLayer({ id: 'network-line', type: 'line', source: NETWORK, filter: ['all', ['==', ['geometry-type'], 'LineString'], ['!', ['in', 'cable', ['get', 'assetType']]]] as never,
+          paint: { 'line-color': assetColour, 'line-width': lineWidth } });
+        map.addLayer({ id: 'network-cable', type: 'line', source: NETWORK, filter: ['all', ['==', ['geometry-type'], 'LineString'], ['in', 'cable', ['get', 'assetType']]] as never,
+          paint: { 'line-color': assetColour, 'line-width': lineWidth, 'line-dasharray': [3, 2] } });
+        map.addLayer({ id: 'network-point', type: 'circle', source: NETWORK, filter: ['==', ['geometry-type'], 'Point'],
+          paint: { 'circle-color': assetColour, 'circle-radius': ['match', ['get', 'assetType'], 'pole', 3, 6] as never,
+            'circle-stroke-color': ['case', ['get', 'incomplete'], '#fb8500', '#ffffff'] as never, 'circle-stroke-width': 2 } });
+        map.addLayer({ id: 'preview-line', type: 'line', source: PREVIEW, filter: ['!=', ['geometry-type'], 'Point'], paint: { 'line-color': '#fb8500', 'line-width': 2, 'line-dasharray': [2, 1] } });
+        map.addLayer({ id: 'preview-point', type: 'circle', source: PREVIEW, filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-color': '#fb8500', 'circle-radius': 5 } });
         map.on('click', 'buildings-fill', (e) => {
           const id = e.features?.[0]?.id;
           if (id !== undefined && !this.drawing()) this.featureClick.emit(String(id));
@@ -149,6 +173,9 @@ export class AreaMap implements OnDestroy {
         this.setData(STANDS, this.stands());
         this.setData(BUILDINGS, this.buildings());
         this.setData(PREVIEW, this.preview());
+        this.setData(ROADS, this.roads());
+        this.setData(CONTOURS, this.contours());
+        this.setData(NETWORK, flagIncomplete(this.network()));
       });
       map.on('click', (e: MapMouseEvent) => {
         if (!this.drawing()) return;
@@ -245,3 +272,4 @@ function positionsOf(g: AnyGeometry): Position[] {
 function emptyCollection(): GjCollection {
   return { type: 'FeatureCollection', features: [] };
 }
+
