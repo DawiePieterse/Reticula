@@ -32,6 +32,9 @@ class ConductorOut(BaseModel):
     cores: int | None
     uses: list[str]
     r_ohm_per_km: float
+    """DC at 20 °C."""
+    r_ac_ohm_per_km: float | None
+    r_ac_temp_c: float | None
     x_ohm_per_km: float
     rating_a: float
     ratings_a: dict[str, float]
@@ -57,7 +60,8 @@ def library(rules: RuleSet) -> Library:
 def _out(c: Conductor) -> ConductorOut:
     return ConductorOut(
         code=c.code, description=c.description, kind=c.kind, material=c.material, size_mm2=c.size_mm2, cores=c.cores,
-        uses=list(c.uses), r_ohm_per_km=c.r_ohm_per_km, x_ohm_per_km=c.x_ohm_per_km, rating_a=c.rating_a,
+        uses=list(c.uses), r_ohm_per_km=c.r_ohm_per_km, r_ac_ohm_per_km=c.r_ac_ohm_per_km, r_ac_temp_c=c.r_ac_temp_c,
+        x_ohm_per_km=c.x_ohm_per_km, rating_a=c.rating_a,
         ratings_a=dict(c.ratings_a), fault_k=c.fault_k,
         one_second_ka=round(c.fault_k * c.size_mm2, 3) if c.fault_k and c.size_mm2 else None,
         placeholder=list(c.placeholder), clause=c.clause, rating_clause=c.rating_clause, index=c.index,

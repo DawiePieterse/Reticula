@@ -52,6 +52,9 @@ class Conductor:
     placeholder: tuple[str, ...] = ()
     rating_clause: str = ""
     index: str = ""
+    r_ac_ohm_per_km: float | None = None
+    """AC resistance at r_ac_temp_c, where the source gives it."""
+    r_ac_temp_c: float | None = None
 
 
 @dataclass(frozen=True)
@@ -94,6 +97,8 @@ def _conductor(c: dict[str, Any]) -> Conductor:
         placeholder=tuple(c.get("placeholder", ())),
         rating_clause=c.get("rating_clause", ""),
         index=c.get("index", ""),
+        r_ac_ohm_per_km=float(c["r_ac_ohm_per_km"]) if "r_ac_ohm_per_km" in c else None,
+        r_ac_temp_c=float(c["r_ac_temp_c"]) if "r_ac_temp_c" in c else None,
     )
 
 

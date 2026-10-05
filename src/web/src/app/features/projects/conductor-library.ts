@@ -16,7 +16,7 @@ import { Conductor, ConductorLibrary as Library, LvNetworkApi } from './lv-netwo
         <table class="conductors">
           <thead>
             <tr>
-              <th>Code</th><th>Use</th><th>In ground</th><th>In pipe</th><th>In air</th><th>R Ω/km</th><th>X Ω/km</th><th>1 s withstand</th>
+              <th>Code</th><th>Use</th><th>In ground</th><th>In pipe</th><th>In air</th><th>R 20 °C Ω/km</th><th>R AC Ω/km</th><th>X Ω/km</th><th>1 s withstand</th>
             </tr>
           </thead>
           <tbody>
@@ -29,9 +29,12 @@ import { Conductor, ConductorLibrary as Library, LvNetworkApi } from './lv-netwo
                     <td [class.placeholder]="isPlaceholder(c, 'ratings_a')">{{ c.ratingsA[at] ?? '—' }} A</td>
                   }
                 } @else {
-                  <td colspan="3" [class.placeholder]="isPlaceholder(c, 'rating_a')">{{ c.ratingA }} A overhead</td>
+                  <td colspan="3" [class.placeholder]="isPlaceholder(c, 'rating_a')">{{ c.ratingA }} A in air (overhead)</td>
                 }
                 <td [class.placeholder]="isPlaceholder(c, 'r_ohm_per_km')">{{ c.rOhmPerKm | number: '1.3-4' }}</td>
+                <td [class.placeholder]="isPlaceholder(c, 'r_ac_ohm_per_km')">
+                  {{ c.rAcOhmPerKm === null ? '—' : (c.rAcOhmPerKm | number: '1.3-4') + ' at ' + c.rAcTempC + ' °C' }}
+                </td>
                 <td [class.placeholder]="isPlaceholder(c, 'x_ohm_per_km')">{{ c.xOhmPerKm | number: '1.3-3' }}</td>
                 <td [class.placeholder]="isPlaceholder(c, 'fault_k')">{{ c.oneSecondKa === null ? '—' : (c.oneSecondKa | number: '1.2-2') + ' kA' }}</td>
               </tr>
@@ -40,7 +43,8 @@ import { Conductor, ConductorLibrary as Library, LvNetworkApi } from './lv-netwo
         </table>
         <p class="muted small">
           <span class="placeholder">Grey italics</span> are placeholders, not yet from the governing standard; designs that use them are not fit to
-          submit. Underground ratings are at the standard conditions of Eskom 240-56030637 Rev 2 §3.9.1 o), before de-rating.
+          submit. Underground ratings are at the standard conditions of Eskom 240-56030637 Rev 2 §3.9.1 o), before de-rating. Single-phase ABC
+          (ABC-1C) is manufacturer data for a SANS 1418 product, to confirm against the Eskom ABC specification.
           Hover a row for its source.
         </p>
       } @else if (open() && !problem()) {

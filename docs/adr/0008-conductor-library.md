@@ -17,7 +17,15 @@ D. Resistances and reactances are placeholders, because the standard does not gi
    - Resistance is the IEC 60228 class 2 maximum DC resistance at 20 °C.
    - Reactance is 0,08 Ω/km.
 
-   They stay placeholders until the Eskom cable specification 240-56063805 is held. The ABC entry stays a placeholder in every field until the ABC specification 240-84758170 is held.
+   They stay placeholders until the Eskom cable specification 240-56063805 is held.
+G. **Single-phase ABC** (one aluminium XLPE phase with an insulated neutral, 25 to 150 mm², `ABC-1C-*`) comes from a manufacturer's data sheet for a SANS 1418 product: CBi-electric african cables F7CA 2nnn, February 2026, supplied by the engineer. It gives:
+   - DC resistance at 20 °C, and AC resistance at 90 °C (`r_ac_ohm_per_km`, `r_ac_temp_c`), which voltage drop needs
+   - reactance
+   - the rating in air in shade (still air, 35 °C, SANS 10198-14)
+   - the 1 s short-circuit rating at 250 °C, from which `fault_k` is taken.
+
+   Manufacturer data is not a placeholder, but it is to be confirmed against the Eskom ABC specification 240-84758170 (index id CBI-ABC-1C). The tests check the sheet's own figures against each other: volt drop is 2 × impedance, impedance comes from R and X, and the 90 °C resistance follows from the 20 °C one.
+H. The three-phase `ABC-70` entry stays a placeholder in every field until a three-core ABC data sheet or the Eskom specification is held.
 E. Rating and withstand are traced values (`lv.cable.rating.v1`, `lv.cable.withstand.v1`). A trace input that uses a placeholder says so in its source.
 F. The calc service serves the library at `GET /rules/{authority}/{version}/conductors`. The API serves the project's library at `/api/projects/{id}/conductors`. The project page lists it, with placeholder values in grey italics.
 

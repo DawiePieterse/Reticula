@@ -46,8 +46,11 @@ public sealed record CalcLvLoads(string RulesRef, string RulesHash, string Claus
 /// <param name="RatingsA">Continuous rating by installation: ground, pipe, air.</param>
 /// <param name="OneSecondKa">Short-circuit withstand for 1 s, from FaultK.</param>
 /// <param name="Placeholder">Fields whose values are placeholders, not yet from the governing standard.</param>
+/// <param name="ROhmPerKm">DC resistance at 20 °C.</param>
+/// <param name="RAcOhmPerKm">AC resistance at RAcTempC, where the source gives it.</param>
 public sealed record CalcConductor(string Code, string Description, string Kind, string? Material, double? SizeMm2, int? Cores,
     IReadOnlyList<string> Uses, double ROhmPerKm, double XOhmPerKm, double RatingA, IReadOnlyDictionary<string, double> RatingsA,
-    double? FaultK, double? OneSecondKa, IReadOnlyList<string> Placeholder, string Clause, string RatingClause, string Index);
+    double? FaultK, double? OneSecondKa, IReadOnlyList<string> Placeholder, string Clause, string RatingClause, string Index,
+    double? RAcOhmPerKm = null, double? RAcTempC = null);
 
 public sealed record CalcConductorLibrary(string RulesRef, string RulesHash, IReadOnlyList<CalcConductor> Conductors);

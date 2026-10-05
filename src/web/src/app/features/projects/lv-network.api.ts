@@ -219,7 +219,11 @@ export interface Conductor {
   sizeMm2: number | null;
   cores: number | null;
   uses: ('feeder' | 'service')[];
+  /** DC resistance at 20 °C. */
   rOhmPerKm: number;
+  /** AC resistance at rAcTempC, where the source gives it. */
+  rAcOhmPerKm: number | null;
+  rAcTempC: number | null;
   xOhmPerKm: number;
   ratingA: number;
   /** Rating by installation: ground, pipe, air. */

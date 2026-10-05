@@ -77,6 +77,14 @@ The engineer designs Eskom projects to Eskom's own standards. Where a document n
 | SANS10098-LIGHT | Public lighting levels and layout | SANS 10098 | to confirm part | not listed in rules | later: public lighting | not yet used |
 | REDBOOK-LAYOUT | Township layout and servitude guidance for services | Red Book (Guidelines for Human Settlement Planning and Design) | to confirm chapter | not listed in rules | later: servitude and clash checks | not yet used |
 
+### Manufacturer data
+
+Product data for equipment made to a listed standard, used where the governing Eskom specification is not yet held. Each row names the data sheet and its date; values are to be confirmed against the Eskom specification once it is held.
+
+| Id | Check or value | Source | Used by | Status |
+| --- | --- | --- | --- | --- |
+| CBI-ABC-1C | Single-phase LV ABC, 1 × Al XLPE phase + Al XLPE insulated neutral, 25–150 mm²: DC resistance at 20 °C, AC resistance at 90 °C, reactance, rating in air in shade (still air, 35 °C, SANS 10198-14), 1 s short-circuit rating at 250 °C | CBi-electric african cables data sheet F7CA 2nnn, *Low voltage ABC cable data sheet*, last updated February 2026; SANS 1418, 600/1000 V | `eskom/*` rules from 0.5.0: `conductors[ABC-1C-*]` | transcribed 2026-10-05, supplied by the engineer; tests check the sheet's own consistency (volt drop = 2 × impedance, impedance from R and X, 90 °C resistance from 20 °C); to confirm against Eskom 240-84758170 |
+
 ### Not standards
 
 These values are Reticula's own and say so in their `clause` text. They are listed so the register is complete.

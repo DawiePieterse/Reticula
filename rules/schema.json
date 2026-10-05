@@ -179,7 +179,8 @@
                 "x_ohm_per_km",
                 "rating_a",
                 "ratings_a",
-                "fault_k"
+                "fault_k",
+                "r_ac_ohm_per_km"
               ]
             },
             "description": "Fields whose values are placeholders, not yet from the governing standard"
@@ -187,6 +188,15 @@
           "rating_clause": {
             "type": "string",
             "description": "Where the ratings and fault constant come from, when that differs from clause"
+          },
+          "r_ac_ohm_per_km": {
+            "type": "number",
+            "minimum": 0,
+            "description": "AC resistance at r_ac_temp_c, ohm/km"
+          },
+          "r_ac_temp_c": {
+            "type": "number",
+            "description": "Conductor temperature for r_ac_ohm_per_km, °C"
           }
         }
       }

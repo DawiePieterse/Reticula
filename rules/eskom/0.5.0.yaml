@@ -8,8 +8,10 @@ notes: >-
   As 0.4.0, with the conductor library replaced. Underground cable current ratings and short-circuit constants are
   transcribed from Eskom 240-56030637 Rev 2 (LV cable systems), Tables 6 and 7 and §3.9.1 m); the engineer confirmed
   Rev 2 is current. Resistances and reactances are placeholders until the Eskom cable specification 240-56063805 is
-  held, and the overhead ABC entry stays a placeholder until the ABC specification 240-84758170 is held. Each
-  conductor lists its placeholder fields under `placeholder`.
+  held. Single-phase ABC (one phase and an insulated neutral, 25 to 150 mm²) comes from a manufacturer's data sheet
+  for a SANS 1418 product (CBi-electric african cables, February 2026), to confirm against the Eskom ABC
+  specification 240-84758170; the three-phase ABC-70 entry stays a placeholder until that specification is held.
+  Each conductor lists its placeholder fields under `placeholder`.
 
 standards:
   NRS034-1: "2024"      # TODO confirm edition
@@ -22,6 +24,7 @@ standards:
 # conditions of 240-56030637 §3.9.1 o): 70 °C conductor, 25 °C soil, 30 °C air, 1,2 K·m/W, 0,5 m deep, load factor 1,
 # thermally independent). ratings_a gives the rating in ground, in pipes and in air. fault_k is K in I = K·A/√t, kA.
 # Feeder cables are four-core; services two-core (single phase) or four-core (three phase) (§3.9.1 i)–j)).
+# r_ohm_per_km is DC at 20 °C; r_ac_ohm_per_km, where given, is AC at r_ac_temp_c (the conductor's operating temperature).
 conductors:
   - code: ABC-70
     description: 70 mm² ABC (placeholder impedance and rating)
@@ -35,6 +38,132 @@ conductors:
     placeholder: [r_ohm_per_km, x_ohm_per_km, rating_a]
     clause: "SANS1418 / Eskom 240-84758170 §TBD (placeholders until the ABC specification is held)"
     index: ESKOM-CONDUCTOR
+  - code: ABC-1C-25
+    description: 25 mm² Al ABC, 1 phase + Al insulated neutral (self-supporting), XLPE, 600/1000 V
+    kind: overhead
+    material: al
+    size_mm2: 25
+    cores: 2
+    uses: [feeder, service]
+    r_ohm_per_km: 1.2
+    r_ac_ohm_per_km: 1.539
+    r_ac_temp_c: 90
+    x_ohm_per_km: 0.09
+    rating_a: 111
+    ratings_a: { air: 111 }
+    fault_k: 0.096
+    placeholder: []
+    rating_clause: "CBi-electric african cables data sheet F7CA 2nnn (Feb 2026): in air in shade, still air, 35 °C (SANS 10198-14); 1 s short circuit 2.4 kA at 250 °C"
+    clause: "CBi-electric african cables data sheet F7CA 2nnn (Feb 2026), SANS 1418; manufacturer data, to confirm against Eskom 240-84758170"
+    index: CBI-ABC-1C
+  - code: ABC-1C-35
+    description: 35 mm² Al ABC, 1 phase + Al insulated neutral (self-supporting), XLPE, 600/1000 V
+    kind: overhead
+    material: al
+    size_mm2: 35
+    cores: 2
+    uses: [feeder, service]
+    r_ohm_per_km: 0.868
+    r_ac_ohm_per_km: 1.113
+    r_ac_temp_c: 90
+    x_ohm_per_km: 0.09
+    rating_a: 138
+    ratings_a: { air: 138 }
+    fault_k: 0.09429
+    placeholder: []
+    rating_clause: "CBi-electric african cables data sheet F7CA 2nnn (Feb 2026): in air in shade, still air, 35 °C (SANS 10198-14); 1 s short circuit 3.3 kA at 250 °C"
+    clause: "CBi-electric african cables data sheet F7CA 2nnn (Feb 2026), SANS 1418; manufacturer data, to confirm against Eskom 240-84758170"
+    index: CBI-ABC-1C
+  - code: ABC-1C-50
+    description: 50 mm² Al ABC, 1 phase + Al insulated neutral (self-supporting), XLPE, 600/1000 V
+    kind: overhead
+    material: al
+    size_mm2: 50
+    cores: 2
+    uses: [feeder, service]
+    r_ohm_per_km: 0.641
+    r_ac_ohm_per_km: 0.822
+    r_ac_temp_c: 90
+    x_ohm_per_km: 0.084
+    rating_a: 168
+    ratings_a: { air: 168 }
+    fault_k: 0.094
+    placeholder: []
+    rating_clause: "CBi-electric african cables data sheet F7CA 2nnn (Feb 2026): in air in shade, still air, 35 °C (SANS 10198-14); 1 s short circuit 4.7 kA at 250 °C"
+    clause: "CBi-electric african cables data sheet F7CA 2nnn (Feb 2026), SANS 1418; manufacturer data, to confirm against Eskom 240-84758170"
+    index: CBI-ABC-1C
+  - code: ABC-1C-70
+    description: 70 mm² Al ABC, 1 phase + Al insulated neutral (self-supporting), XLPE, 600/1000 V
+    kind: overhead
+    material: al
+    size_mm2: 70
+    cores: 2
+    uses: [feeder, service]
+    r_ohm_per_km: 0.443
+    r_ac_ohm_per_km: 0.568
+    r_ac_temp_c: 90
+    x_ohm_per_km: 0.083
+    rating_a: 213
+    ratings_a: { air: 213 }
+    fault_k: 0.09429
+    placeholder: []
+    rating_clause: "CBi-electric african cables data sheet F7CA 2nnn (Feb 2026): in air in shade, still air, 35 °C (SANS 10198-14); 1 s short circuit 6.6 kA at 250 °C"
+    clause: "CBi-electric african cables data sheet F7CA 2nnn (Feb 2026), SANS 1418; manufacturer data, to confirm against Eskom 240-84758170"
+    index: CBI-ABC-1C
+  - code: ABC-1C-95
+    description: 95 mm² Al ABC, 1 phase + Al insulated neutral (self-supporting), XLPE, 600/1000 V
+    kind: overhead
+    material: al
+    size_mm2: 95
+    cores: 2
+    uses: [feeder, service]
+    r_ohm_per_km: 0.32
+    r_ac_ohm_per_km: 0.411
+    r_ac_temp_c: 90
+    x_ohm_per_km: 0.08
+    rating_a: 258
+    ratings_a: { air: 258 }
+    fault_k: 0.09474
+    placeholder: []
+    rating_clause: "CBi-electric african cables data sheet F7CA 2nnn (Feb 2026): in air in shade, still air, 35 °C (SANS 10198-14); 1 s short circuit 9.0 kA at 250 °C"
+    clause: "CBi-electric african cables data sheet F7CA 2nnn (Feb 2026), SANS 1418; manufacturer data, to confirm against Eskom 240-84758170"
+    index: CBI-ABC-1C
+  - code: ABC-1C-120
+    description: 120 mm² Al ABC, 1 phase + Al insulated neutral (self-supporting), XLPE, 600/1000 V
+    kind: overhead
+    material: al
+    size_mm2: 120
+    cores: 2
+    uses: [feeder, service]
+    r_ohm_per_km: 0.253
+    r_ac_ohm_per_km: 0.325
+    r_ac_temp_c: 90
+    x_ohm_per_km: 0.078
+    rating_a: 300
+    ratings_a: { air: 300 }
+    fault_k: 0.09417
+    placeholder: []
+    rating_clause: "CBi-electric african cables data sheet F7CA 2nnn (Feb 2026): in air in shade, still air, 35 °C (SANS 10198-14); 1 s short circuit 11.3 kA at 250 °C"
+    clause: "CBi-electric african cables data sheet F7CA 2nnn (Feb 2026), SANS 1418; manufacturer data, to confirm against Eskom 240-84758170"
+    index: CBI-ABC-1C
+  - code: ABC-1C-150
+    description: 150 mm² Al ABC, 1 phase + Al insulated neutral (self-supporting), XLPE, 600/1000 V
+    kind: overhead
+    material: al
+    size_mm2: 150
+    cores: 2
+    uses: [feeder, service]
+    r_ohm_per_km: 0.206
+    r_ac_ohm_per_km: 0.265
+    r_ac_temp_c: 90
+    x_ohm_per_km: 0.077
+    rating_a: 339
+    ratings_a: { air: 339 }
+    fault_k: 0.09467
+    placeholder: []
+    rating_clause: "CBi-electric african cables data sheet F7CA 2nnn (Feb 2026): in air in shade, still air, 35 °C (SANS 10198-14); 1 s short circuit 14.2 kA at 250 °C"
+    clause: "CBi-electric african cables data sheet F7CA 2nnn (Feb 2026), SANS 1418; manufacturer data, to confirm against Eskom 240-84758170"
+    index: CBI-ABC-1C
   - code: CU-2C-16
     description: 16 mm² Cu 2-core PVC/SWA/PVC 600/1000 V
     kind: underground
