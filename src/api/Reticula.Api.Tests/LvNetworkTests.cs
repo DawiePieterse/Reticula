@@ -114,6 +114,79 @@ public class LvNetworkTests(ReticulaApiFactory factory)
         }
     }
 
+    private static async Task<Guid> AddHouseAsync(HttpClient client, Guid projectId, double dx, bool withLoad)
+    {
+        var id = Guid.NewGuid();
+        var r = await client.PostAsJsonAsync($"/api/projects/{projectId}/buildings/new",
+            new NewBuildingRequest(id, Guid.NewGuid(), "house", new PositionDto(Lon + dx, Lat + 0.0001, 3), DateTimeOffset.UtcNow, null));
+        r.EnsureSuccessStatusCode();
+        if (withLoad)
+            (await client.PutAsJsonAsync($"/api/projects/{projectId}/buildings/{id}/load", new LoadRequest("residential", [], null, null, null, null)))
+                .EnsureSuccessStatusCode();
+        return id;
+    }
+
+    [Fact]
+    public async Task Connects_the_loads_and_stores_their_boxes_and_phases()
+    {
+        factory.Calc.OnBuildLvNetwork = FakeCalc.DefaultLvNetwork;
+        factory.Calc.OnAllocateLvLoads = FakeCalc.DefaultLvLoads;
+        var (client, projectId) = await NewProjectAsync();
+        await MarkAsync(client, projectId, "transformer", Point());
+        await MarkAsync(client, projectId, "lv_route", Line());
+        var house = await AddHouseAsync(client, projectId, 0.0005, withLoad: true);
+        var bare = await AddHouseAsync(client, projectId, 0.001, withLoad: false);
+
+        await client.PostAsync($"/api/projects/{projectId}/lv-network", null);
+        // Every building goes to the calc service: with its load point and kVA, or without when it has no estimate.
+        var sent = factory.Calc.LastLvLoads.ToDictionary(l => Guid.Parse(l.BuildingId));
+        Assert.Equal((1.5, "residential"), (sent[house].Kva, sent[house].Kind));
+        Assert.NotEqual(house.ToString(), sent[house].Id);
+        Assert.Equal((null, bare.ToString()), (sent[bare].Kva, sent[bare].Id));
+        Assert.Equal(Lon + 0.0005, sent[house].Coordinates[0], 9);
+
+        var net = (await GetAsync(client, projectId))!;
+        Assert.Null(net.Stale);
+        var loads = Assert.IsType<LvLoadsDto>(net.Loads);
+        var c = Assert.Single(loads.Connections);
+        Assert.Equal((house, "P1-1", "R", "TX1-F1", 12.5, "B1"), (c.BuildingId, c.Box, c.Phase, c.Feeder, c.ServiceM, c.Branch));
+        Assert.Equal([[Lon + 0.0005, Lat + 0.0001], [Lon, Lat]], c.Service);
+        Assert.Equal(("P1-1", 1), (loads.Boxes[0].Id, loads.Boxes[0].Loads));
+        Assert.Equal((1, 1), (loads.Feeders[0].Phases["R"].Customers, loads.Feeders[0].Phases["R"].Boxes));
+        Assert.Equal((2, 1, 1, 1), (loads.Summary.Loads, loads.Summary.Allocated, loads.Summary.Unestimated, loads.Summary.Boxes));
+        Assert.Equal("test service practice", loads.Clause);
+        Assert.Contains(net.Issues, i => i.Code == "no_load");
+
+        // Estimating the bare building's load makes the network out of date.
+        (await client.PutAsJsonAsync($"/api/projects/{projectId}/buildings/{bare}/load", new LoadRequest("residential", [], null, null, null, null)))
+            .EnsureSuccessStatusCode();
+        Assert.Contains("loads changed", (await GetAsync(client, projectId))!.Stale);
+        await client.PostAsync($"/api/projects/{projectId}/lv-network", null);
+        Assert.Equal(2, (await GetAsync(client, projectId))!.Loads!.Connections.Count);
+    }
+
+    [Fact]
+    public async Task Rules_without_load_settings_still_build_the_network_and_say_why_loads_are_missing()
+    {
+        factory.Calc.OnBuildLvNetwork = FakeCalc.DefaultLvNetwork;
+        factory.Calc.OnAllocateLvLoads = (rules, _, _) => throw new CalcRejectedException($"rules {rules} has no lv_loads section");
+        try
+        {
+            var (client, projectId) = await NewProjectAsync();
+            await MarkAsync(client, projectId, "lv_route", Line());
+            var r = await client.PostAsync($"/api/projects/{projectId}/lv-network", null);
+            Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+            var net = (await GetAsync(client, projectId))!;
+            Assert.Null(net.Loads);
+            Assert.Single(net.Branches);
+            Assert.Contains(net.Issues, i => i.Code == "loads_skipped" && i.Message.Contains("lv_loads"));
+        }
+        finally
+        {
+            factory.Calc.OnAllocateLvLoads = FakeCalc.DefaultLvLoads;
+        }
+    }
+
     [Fact]
     public async Task Rules_without_lv_tolerances_are_refused_and_only_engineers_build()
     {

@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { FEEDER_COLOURS, LvLayers, LvNetwork, UNFED_COLOUR, lvLayers } from './lv-network.api';
+import { FEEDER_COLOURS, LvLayers, LvLoads, LvNetwork, PHASE_COLOURS, UNFED_COLOUR, lvLayers } from './lv-network.api';
 import { LvNetworkPanel } from './lv-network-panel';
 
 const URL = '/api/projects/p1/lv-network';
@@ -25,7 +25,26 @@ export function network(over: Partial<LvNetwork> = {}): LvNetwork {
       { id: 'B2', kind: 'route', fromNode: 'N2', toNode: 'N4', coordinates: [[28.1, -25.5198], [28.094, -25.5198]], lengthM: 650, candidateId: 'r1', feeder: 'TX1-F2' },
       { id: 'B3', kind: 'link', fromNode: 'N1', toNode: 'N2', coordinates: [[28.1, -25.52], [28.1, -25.5198]], lengthM: 20, candidateId: 'c1', feeder: null },
     ],
+    loads: null,
     ...over,
+  };
+}
+
+export function loads(): LvLoads {
+  const conn = (id: string, phase: 'R' | 'W' | 'B' | 'RWB' | null, box: string | null) => ({
+    loadPointId: id, buildingId: `b-${id}`, label: id, kind: 'residential' as const, kva: 2, branch: 'B1', node: 'N3', offsetM: 600,
+    serviceM: 18, box, feeder: phase ? 'TX1-F1' : null, distanceM: phase ? 620 : null, phase,
+    service: [[28.1061, -25.5196], [28.106, -25.5198]] as [number, number][],
+  });
+  return {
+    clause: 'Eskom LV service practice as described by the engineer',
+    summary: { loads: 10, allocated: 9, unallocated: 0, unestimated: 1, onFeeders: 8, threePhase: 1, boxes: 3, allocatedKva: 33.5, longestServiceM: 37.6 },
+    feeders: [{
+      feeder: 'TX1-F1', threePhase: 1, unbalancePct: 4.2,
+      phases: { R: { customers: 5, kva: 12.5, boxes: 1 }, W: { customers: 4, kva: 10, boxes: 1 }, B: { customers: 3, kva: 9, boxes: 1 } },
+    }],
+    boxes: [],
+    connections: [conn('7001', 'R', 'P1-1'), conn('7002', 'RWB', null), conn('7003', null, 'P4-1')],
   };
 }
 
@@ -102,7 +121,39 @@ describe('LvNetworkPanel', () => {
   });
 });
 
+describe('LvNetworkPanel loads', () => {
+  it('shows how loads are connected and spread over the phases', async () => {
+    const unallocated = { severity: 'error' as const, code: 'unallocated', message: 'Buildings more than 40 m from the LV network have no service connection.', count: 1, samples: ['7009'], at: [[28.2, -25.5] as [number, number]] };
+    const { el, layers } = await setup(true, network({ loads: loads(), issues: [unallocated] }));
+    // A load problem is not a feeder problem: the feeders are still worked out.
+    expect(el.textContent).not.toContain('Feeders are worked out only');
+    const chips = el.querySelectorAll('ul.chips')[1].textContent!.replace(/\s+/g, ' ');
+    expect(chips).toContain('9 of 10 buildings connected');
+    expect(chips).toContain('3 service boxes');
+    expect(chips).toContain('1 three-phase');
+    expect(chips).toContain('longest service 38 m');
+    expect([...el.querySelectorAll('.phases th')].map((th) => th.textContent?.trim())).toEqual(['Feeder', 'Red', 'White', 'Blue', 'Unbalance']);
+    expect([...el.querySelectorAll('.phases tbody td')].map((td) => td.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
+      'TX1-F1', '5 · 12.5 kVA (1 box)', '4 · 10 kVA (1 box)', '3 · 9 kVA (1 box)', '4.2 %',
+    ]);
+    expect(el.textContent).toContain('Connected using Eskom LV service practice as described by the engineer.');
+    expect(layers.at(-1)!.services.features).toHaveLength(3);
+  });
+
+  it('says nothing about loads when the rules have no service settings', async () => {
+    const { el } = await setup(true, network());
+    expect(el.textContent).not.toContain('Loads and phases');
+  });
+});
+
 describe('lvLayers', () => {
+  it('colours services by phase', () => {
+    const l = lvLayers(network({ loads: loads() }));
+    expect(l.services.features.map((f) => f.properties.colour)).toEqual([PHASE_COLOURS.R, PHASE_COLOURS.RWB, UNFED_COLOUR]);
+    expect(l.loads.features[0]).toMatchObject({ geometry: { type: 'Point', coordinates: [28.1061, -25.5196] }, properties: { box: 'P1-1', label: '7001' } });
+    expect(lvLayers(network()).services.features).toEqual([]);
+  });
+
   it('colours branches by feeder and greys out what nothing feeds', () => {
     const n = network();
     const l = lvLayers({ ...n, branches: [...n.branches, { ...n.branches[0], id: 'B4', feeder: null }] });

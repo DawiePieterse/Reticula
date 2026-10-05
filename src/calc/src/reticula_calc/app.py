@@ -25,6 +25,7 @@ from .geo.importers import ImportResult, Kind, UnreadableFileError, import_file
 from .geo.osm import OsmError, OsmKind, fetch_osm
 from .geo.predict import PredictRequest, PredictResponse, predict
 from .logging_setup import configure_logging, log_requests
+from .lv.loads import AllocateRequest, LoadAllocation, allocate
 from .lv.network import BuildRequest, LvNetwork, build_network
 from .maps.extract import ExtractRequest, MapSourceError, extract_configured
 from .rules import RulesError, list_rules, load_rules
@@ -66,6 +67,15 @@ def calc_lv_network(req: BuildRequest) -> LvNetwork:
     """Joins the LV routes and sites marked in the field into a node-branch network and checks that it is radial."""
     try:
         return build_network(req, load_rules(req.rules))
+    except RulesError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+@app.post("/calc/lv/loads")
+def calc_lv_loads(req: AllocateRequest) -> LoadAllocation:
+    """Connects each building's load to the LV network and spreads single-phase loads over the phases of their feeder."""
+    try:
+        return allocate(req, load_rules(req.rules))
     except RulesError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 

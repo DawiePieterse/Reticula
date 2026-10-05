@@ -15,9 +15,18 @@ public sealed record LvNodeDto(string Id, string Kind, double[] Coordinates, str
 
 public sealed record LvBranchDto(string Id, string Kind, string FromNode, string ToNode, double[][] Coordinates, double LengthM, Guid? CandidateId, string? Feeder);
 
+/// <param name="Service">From the building to where the service meets the network, as [lon, lat] positions.</param>
+public sealed record LvLoadDto(Guid LoadPointId, Guid BuildingId, string? Label, string Kind, double Kva, string Branch, string? Node, double OffsetM,
+    double ServiceM, string? Box, string? Feeder, double? DistanceM, string? Phase, double[][] Service);
+
+/// <summary>How the loads are connected and phased (plan 2.2).</summary>
+public sealed record LvLoadsDto(string Clause, LvLoadSummary Summary, IReadOnlyList<LvFeederPhases> Feeders, IReadOnlyList<LvBox> Boxes,
+    IReadOnlyList<LvLoadDto> Connections);
+
 /// <param name="Stale">Why the network no longer matches the marked routes and sites or the project's rules; null when it does.</param>
 public sealed record LvNetworkDto(Guid Id, string RulesRef, string RulesHash, string Clause, DateTimeOffset BuiltAt, string? Stale,
-    LvSummary Summary, IReadOnlyList<LvFeeder> Feeders, IReadOnlyList<LvIssue> Issues, IReadOnlyList<LvNodeDto> Nodes, IReadOnlyList<LvBranchDto> Branches);
+    LvSummary Summary, IReadOnlyList<LvFeeder> Feeders, IReadOnlyList<LvIssue> Issues, IReadOnlyList<LvNodeDto> Nodes, IReadOnlyList<LvBranchDto> Branches,
+    LvLoadsDto? Loads);
 
 /// <param name="Network">The project's LV network, or null before it is first built.</param>
 public sealed record LvNetworkStatus(LvNetworkDto? Network);
@@ -71,6 +80,20 @@ public static class LvNetworkEndpoints
             JsonSerializer.Deserialize<List<LvIssue>>(n.IssuesJson, json) ?? [],
             [.. nodes.Select(x => new LvNodeDto(x.Key, x.Kind, [x.Geometry.X, x.Geometry.Y], x.Label, x.CandidateId, x.Feeder, x.DistanceM))],
             [.. branches.Select(x => new LvBranchDto(x.Key, x.Kind, x.FromKey, x.ToKey, [.. x.Geometry.Coordinates.Select(c => new[] { c.X, c.Y })],
-                x.LengthM, x.CandidateId, x.Feeder))]);
+                x.LengthM, x.CandidateId, x.Feeder))],
+            await LoadsAsync(db, n, ct));
+    }
+
+    private static async Task<LvLoadsDto?> LoadsAsync(ReticulaDbContext db, LvNetwork n, CancellationToken ct)
+    {
+        if (n.LoadsSummaryJson is null) return null;
+        var rows = await db.LvLoads.AsNoTracking().Where(x => x.NetworkId == n.Id).OrderBy(x => x.Feeder).ThenBy(x => x.DistanceM).ThenBy(x => x.Label)
+            .ToListAsync(ct);
+        var json = LvNetworkService.Json;
+        return new LvLoadsDto(n.LoadsClause ?? "", JsonSerializer.Deserialize<LvLoadSummary>(n.LoadsSummaryJson, json)!,
+            JsonSerializer.Deserialize<List<LvFeederPhases>>(n.PhasesJson, json) ?? [],
+            JsonSerializer.Deserialize<List<LvBox>>(n.BoxesJson, json) ?? [],
+            [.. rows.Select(x => new LvLoadDto(x.LoadPointId, x.BuildingId, x.Label, x.Kind, x.Kva, x.BranchKey, x.NodeKey, x.OffsetM, x.ServiceM,
+                x.Box, x.Feeder, x.DistanceM, x.Phase, [.. x.Service.Coordinates.Select(c => new[] { c.X, c.Y })]))]);
     }
 }

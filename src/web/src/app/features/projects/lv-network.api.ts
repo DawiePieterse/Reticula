@@ -61,6 +61,69 @@ export interface LvSummary {
   unfedLengthM: number;
 }
 
+export type LvPhase = 'R' | 'W' | 'B' | 'RWB';
+
+/** One building's service connection (plan 2.2). */
+export interface LvConnection {
+  loadPointId: string;
+  buildingId: string;
+  /** Erf number, when the building is on a stand. */
+  label: string | null;
+  kind: 'residential' | 'special';
+  kva: number;
+  branch: string;
+  node: string | null;
+  offsetM: number;
+  serviceM: number;
+  /** Service distribution box on a pole, e.g. P3-1; null for three-phase loads. */
+  box: string | null;
+  feeder: string | null;
+  distanceM: number | null;
+  phase: LvPhase | null;
+  /** From the building to where the service meets the network. */
+  service: Position[];
+}
+
+export interface LvBox {
+  id: string;
+  pole: string;
+  feeder: string | null;
+  phase: 'R' | 'W' | 'B' | null;
+  loads: number;
+  kva: number;
+  distanceM: number | null;
+}
+
+export interface LvPhaseLoad { customers: number; kva: number; boxes: number }
+
+export interface LvFeederPhases {
+  feeder: string;
+  phases: Record<'R' | 'W' | 'B', LvPhaseLoad>;
+  threePhase: number;
+  /** Largest difference between a phase's kVA and the mean of the three, as a percentage of the mean. */
+  unbalancePct: number;
+}
+
+export interface LvLoadSummary {
+  loads: number;
+  allocated: number;
+  unallocated: number;
+  unestimated: number;
+  onFeeders: number;
+  threePhase: number;
+  boxes: number;
+  allocatedKva: number;
+  longestServiceM: number;
+}
+
+export interface LvLoads {
+  clause: string;
+  summary: LvLoadSummary;
+  feeders: LvFeederPhases[];
+  boxes: LvBox[];
+  connections: LvConnection[];
+}
+
 export interface LvNetwork {
   id: string;
   rulesRef: string;
@@ -75,25 +138,36 @@ export interface LvNetwork {
   issues: LvIssue[];
   nodes: LvNode[];
   branches: LvBranch[];
+  /** How loads are connected and phased; null when the rules file has no service settings. */
+  loads: LvLoads | null;
 }
 
 /** Feeder colours, in feeder order; branches nothing feeds are grey. */
 export const FEEDER_COLOURS = ['#1f6feb', '#bf3989', '#1a7f37', '#9a6700', '#8250df', '#0969da', '#cf222e', '#116329'];
 export const UNFED_COLOUR = '#8c959f';
 
+/** Red, white and blue phases; white is drawn dark grey so it shows on a light map. Three-phase is purple. */
+export const PHASE_COLOURS: Record<LvPhase, string> = { R: '#cf222e', W: '#57606a', B: '#0969da', RWB: '#8250df' };
+export const PHASE_NAMES: Record<'R' | 'W' | 'B', string> = { R: 'Red', W: 'White', B: 'Blue' };
+
 export interface LvBranchProps { kind: LvBranch['kind']; feeder: string | null; colour: string; lengthM: number }
 export interface LvNodeProps { kind: LvNodeKind; label: string | null; feeder: string | null }
 export interface LvIssueProps { severity: LvIssue['severity']; code: string; message: string }
+export interface LvServiceProps { phase: LvPhase | null; colour: string; box: string | null; label: string | null }
 
 /** The network as map layers. */
 export interface LvLayers {
   branches: FeatureCollection<LvBranchProps, GeoJsonLineString>;
   nodes: FeatureCollection<LvNodeProps, GeoJsonPoint>;
   issues: FeatureCollection<LvIssueProps, GeoJsonPoint>;
+  /** Service connections, coloured by phase, and a dot at each building. */
+  services: FeatureCollection<LvServiceProps, GeoJsonLineString>;
+  loads: FeatureCollection<LvServiceProps, GeoJsonPoint>;
 }
 
 export function lvLayers(net: LvNetwork): LvLayers {
   const order = new Map(net.feeders.map((f, i) => [f.id, i]));
+  const connections = net.loads?.connections ?? [];
   const colour = (feeder: string | null) => (feeder !== null && order.has(feeder) ? FEEDER_COLOURS[order.get(feeder)! % FEEDER_COLOURS.length] : UNFED_COLOUR);
   return {
     branches: {
@@ -117,7 +191,23 @@ export function lvLayers(net: LvNetwork): LvLayers {
         properties: { severity: i.severity, code: i.code, message: i.message },
       }))),
     },
+    services: {
+      type: 'FeatureCollection',
+      features: connections.map((c) => ({
+        type: 'Feature', id: c.loadPointId, geometry: { type: 'LineString', coordinates: c.service }, properties: serviceProps(c),
+      })),
+    },
+    loads: {
+      type: 'FeatureCollection',
+      features: connections.map((c) => ({
+        type: 'Feature', id: c.loadPointId, geometry: { type: 'Point', coordinates: c.service[0] }, properties: serviceProps(c),
+      })),
+    },
   };
+}
+
+function serviceProps(c: LvConnection): LvServiceProps {
+  return { phase: c.phase, colour: c.phase ? PHASE_COLOURS[c.phase] : UNFED_COLOUR, box: c.box, label: c.label };
 }
 
 @Injectable({ providedIn: 'root' })

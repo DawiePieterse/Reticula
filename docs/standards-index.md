@@ -63,6 +63,7 @@ The engineer designs Eskom projects to Eskom's own standards. Their document num
 | ESKOM-DERATE | Cable current derating for soil, depth and grouping | Eskom distribution standard, number to identify | to confirm | to identify | Phase 2.6 | to identify |
 | ESKOM-OHL | Overhead line spans, sag and tension, clearances, poles and stays | Eskom distribution standard, number to identify | to confirm | to identify | Phase 2.5 | to identify |
 | ESKOM-MINISUB | Transformer and mini-sub selection and standard sizes | Eskom distribution standard, number to identify | to confirm | to identify | Phases 3.1–3.2 | to identify |
+| ESKOM-SERVICE | Service connections and phasing: longest service, where services connect, when a supply is three-phase | Eskom distribution standard, number to identify | to confirm | to identify | `eskom/*` rules: `lv_loads` (from eskom/0.4.0) | to identify: 2 boxes a pole, 4 loads a box and the second box on another phase are the engineer's stated practice (2026-10-05); 40 m and 15 kVA are placeholders |
 
 ### Later and supporting
 

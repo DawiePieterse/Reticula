@@ -1,0 +1,24 @@
+# Eskom residential distribution rules: 0.3.0 plus LV load allocation and phasing (Phase 2.2).
+# Only the keys below differ from the base file. Every value must be checked before use in a design.
+base: eskom/0.3.0
+authority: eskom
+version: 0.4.0
+effective_date: 2026-10-05
+notes: >-
+  As 0.3.0, plus how loads connect to the LV network and are spread over the phases. The service length and
+  three-phase threshold are placeholders until the Eskom planning standard is identified (docs/standards-index.md).
+  Not for design use until checked against the original standards.
+
+# LV loads (Phase 2.2): how buildings are connected to the LV network and spread over the red, white and blue phases.
+# Overhead practice as described by the engineer (2026-10-05): houses are connected from LV poles through service
+# distribution boxes, at most two boxes on a pole and four loads on a box, all on the box's phase; a second box on a
+# pole is on a different phase from the first.
+lv_loads:
+  clause: "Eskom LV service practice as described by the engineer 2026-10-05; standard number to identify (reach and three-phase limit are placeholders)"
+  index: ESKOM-SERVICE
+  attach: pole_boxes          # pole_boxes: services from LV poles through boxes; nearest_point: to the nearest point on a route
+  boxes_per_pole: 2
+  box_loads: 4
+  second_box_other_phase: true
+  max_service_m: 40           # PLACEHOLDER: longest service connection from a building to its pole
+  single_phase_max_kva: 15    # PLACEHOLDER: loads above this are supplied three-phase, on their own service

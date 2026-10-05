@@ -2,7 +2,7 @@ import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { toApiProblem } from '../../core/api-problem';
-import { FEEDER_COLOURS, LvLayers, LvNetwork, LvNetworkApi, lvLayers } from './lv-network.api';
+import { FEEDER_COLOURS, LvLayers, LvNetwork, LvNetworkApi, PHASE_COLOURS, PHASE_NAMES, lvLayers } from './lv-network.api';
 
 /** The LV network model (plan 2.1): the marked LV routes and sites joined into a network, with its feeders and what to fix. */
 @Component({
@@ -41,7 +41,7 @@ import { FEEDER_COLOURS, LvLayers, LvNetwork, LvNetworkApi, lvLayers } from './l
               </li>
             }
           </ul>
-          @if (errors() > 0) {
+          @if (topologyErrors() > 0) {
             <p class="muted">Feeders are worked out only for parts fed by one source with no loops. Fix the routes in the field, then build again.</p>
           }
         } @else {
@@ -64,9 +64,50 @@ import { FEEDER_COLOURS, LvLayers, LvNetwork, LvNetworkApi, lvLayers } from './l
             </tbody>
           </table>
         }
+        @if (n.loads; as l) {
+          <h4>Loads and phases</h4>
+          <ul class="chips" aria-label="Loads summary">
+            <li [class.warn]="l.summary.allocated < l.summary.loads">{{ l.summary.allocated }} of {{ l.summary.loads }} buildings connected</li>
+            @if (l.summary.boxes) { <li>{{ l.summary.boxes }} service boxes</li> }
+            @if (l.summary.threePhase) { <li>{{ l.summary.threePhase }} three-phase</li> }
+            <li>{{ l.summary.allocatedKva | number: '1.0-1' }} kVA ADMD connected</li>
+            @if (l.summary.allocated) { <li>longest service {{ l.summary.longestServiceM | number: '1.0-0' }} m</li> }
+          </ul>
+          @if (l.feeders.length) {
+            <table class="phases">
+              <thead>
+                <tr>
+                  <th>Feeder</th>
+                  @for (ph of phaseKeys; track ph) { <th><span class="swatch" [style.background]="phaseColours[ph]"></span>{{ phaseNames[ph] }}</th> }
+                  <th>Unbalance</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (f of l.feeders; track f.feeder) {
+                  <tr>
+                    <td>{{ f.feeder }}</td>
+                    @for (ph of phaseKeys; track ph) {
+                      <td>
+                        {{ f.phases[ph].customers }} · {{ f.phases[ph].kva | number: '1.0-1' }} kVA
+                        @if (f.phases[ph].boxes) { <span class="muted">({{ f.phases[ph].boxes }} {{ f.phases[ph].boxes === 1 ? 'box' : 'boxes' }})</span> }
+                      </td>
+                    }
+                    <td>{{ f.unbalancePct | number: '1.0-1' }} %</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+            <p class="muted small">
+              Customers and ADMD on each phase. Three-phase loads count on every phase with a third of their kVA. Unbalance is the largest
+              difference from the mean of the three phases. Design currents per section follow with the voltage-drop checks.
+            </p>
+          }
+          <p class="muted small">Connected using {{ l.clause }}.</p>
+        }
+
         <p class="muted small">
           Built {{ n.builtAt | date: 'd MMM y, HH:mm' }} with rules {{ n.rulesRef }} ({{ n.rulesHash }}). Joined using {{ n.clause }}.
-          Conductors, loads and checks follow in later steps.
+          Conductors and checks follow in later steps.
         </p>
       } @else if (loaded()) {
         <p class="muted">
@@ -86,6 +127,7 @@ import { FEEDER_COLOURS, LvLayers, LvNetwork, LvNetworkApi, lvLayers } from './l
     .ok { color: var(--ok); }
     .swatch { display: inline-block; width: .7rem; height: .7rem; border-radius: 2px; margin-right: .35rem; vertical-align: middle; }
     .small { font-size: .85rem; }
+    h4 { margin: 1.25rem 0 .5rem; }
   `,
 })
 export class LvNetworkPanel {
@@ -99,7 +141,8 @@ export class LvNetworkPanel {
   protected readonly loaded = signal(false);
   protected readonly busy = signal(false);
   protected readonly problem = signal<string | null>(null);
-  protected readonly errors = computed(() => this.network()?.issues.filter((i) => i.severity === 'error').length ?? 0);
+  /** Loops and tied sources: the errors that stop feeders being worked out. */
+  protected readonly topologyErrors = computed(() => this.network()?.issues.filter((i) => i.code === 'loop' || i.code === 'sources_tied').length ?? 0);
 
   constructor() {
     effect(() => {
@@ -107,6 +150,10 @@ export class LvNetworkPanel {
       untracked(() => void this.load(id));
     });
   }
+
+  protected readonly phaseKeys = ['R', 'W', 'B'] as const;
+  protected readonly phaseColours = PHASE_COLOURS;
+  protected readonly phaseNames = PHASE_NAMES;
 
   protected colour(i: number): string {
     return FEEDER_COLOURS[i % FEEDER_COLOURS.length];

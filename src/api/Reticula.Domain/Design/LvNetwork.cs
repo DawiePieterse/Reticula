@@ -12,7 +12,8 @@ public sealed class LvNetwork
     private LvNetwork() { } // EF
 
     public LvNetwork(Guid id, Guid projectId, string rulesRef, string rulesHash, string clause, string summaryJson, string feedersJson,
-        string issuesJson, int errorCount, Guid builtBy, DateTimeOffset builtAt)
+        string issuesJson, int errorCount, Guid builtBy, DateTimeOffset builtAt, string? loadsClause = null, string? loadsSummaryJson = null,
+        string phasesJson = "[]", string boxesJson = "[]")
     {
         Id = id;
         ProjectId = projectId;
@@ -25,6 +26,10 @@ public sealed class LvNetwork
         ErrorCount = errorCount;
         BuiltBy = builtBy;
         BuiltAt = builtAt;
+        LoadsClause = loadsClause;
+        LoadsSummaryJson = loadsSummaryJson;
+        PhasesJson = phasesJson;
+        BoxesJson = boxesJson;
     }
 
     public Guid Id { get; private set; }
@@ -42,6 +47,75 @@ public sealed class LvNetwork
     public int ErrorCount { get; private set; }
     public Guid BuiltBy { get; private set; }
     public DateTimeOffset BuiltAt { get; private set; }
+
+    /// <summary>Where the service and phasing rules come from; null when the rules file has none and loads were not connected.</summary>
+    public string? LoadsClause { get; private set; }
+
+    /// <summary>Counts of loads connected, not connected and without an estimate; null when loads were not connected.</summary>
+    public string? LoadsSummaryJson { get; private set; }
+
+    /// <summary>Customers, kVA and boxes on each phase of each feeder.</summary>
+    public string PhasesJson { get; private set; } = "[]";
+
+    /// <summary>Service distribution boxes on poles, with their phase and loads.</summary>
+    public string BoxesJson { get; private set; } = "[]";
+}
+
+/// <summary>
+/// One building's load as connected to the LV network (plan 2.2): where its service meets the network and which phase it is on.
+/// A snapshot taken when the network was built; the load point and building ids are kept without foreign keys.
+/// </summary>
+public sealed class LvLoad
+{
+    private LvLoad() { } // EF
+
+    public LvLoad(Guid id, Guid networkId, Guid loadPointId, Guid buildingId, string? label, string kind, double kva, string branchKey,
+        string? nodeKey, double offsetM, double serviceM, string? box, string? feeder, double? distanceM, string? phase, LineString service)
+    {
+        Box = box;
+        Id = id;
+        NetworkId = networkId;
+        LoadPointId = loadPointId;
+        BuildingId = buildingId;
+        Label = label;
+        Kind = kind;
+        Kva = kva;
+        BranchKey = branchKey;
+        NodeKey = nodeKey;
+        OffsetM = offsetM;
+        ServiceM = serviceM;
+        Feeder = feeder;
+        DistanceM = distanceM;
+        Phase = phase;
+        Service = service;
+    }
+
+    public Guid Id { get; private set; }
+    public Guid NetworkId { get; private set; }
+    public Guid LoadPointId { get; private set; }
+    public Guid BuildingId { get; private set; }
+
+    /// <summary>Erf number, when the building is on a stand.</summary>
+    public string? Label { get; private set; }
+    public string Kind { get; private set; } = "";
+    public double Kva { get; private set; }
+
+    /// <summary>The branch the service connects to, and where along it from its from_node.</summary>
+    public string BranchKey { get; private set; } = "";
+    public string? NodeKey { get; private set; }
+    public double OffsetM { get; private set; }
+    public double ServiceM { get; private set; }
+
+    /// <summary>The service distribution box on the pole, e.g. P3-1; null for three-phase loads.</summary>
+    public string? Box { get; private set; }
+    public string? Feeder { get; private set; }
+    public double? DistanceM { get; private set; }
+
+    /// <summary>R, W or B for single-phase loads, RWB for three-phase; null off a feeder.</summary>
+    public string? Phase { get; private set; }
+
+    /// <summary>From the building to where the service meets the network.</summary>
+    public LineString Service { get; private set; } = null!;
 }
 
 public static class LvNodeKinds

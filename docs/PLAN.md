@@ -110,7 +110,7 @@ Deliverables: predicted building types, tablet inspection, income/ADMD tool, loa
 Deliverables: LV layout, phasing, conductor sizing, voltage drop, fault level, OH and UG checks.
 
 - [x] 2.1 Network model in Python (networkx graph + shapely geometry), serialisation to/from Postgres. (ADR 0006: marked LV routes and sites joined within the rules file's `lv_network` tolerances from eskom/0.3.0; radial check, feeders and distances; stored in PostGIS per project, flagged out of date when the marked routes or the rules change. Rules values stay placeholders until the Eskom standards are identified.)
-- [ ] 2.2 Load allocation to candidate LV routes; phase balancing (3-phase/1-phase per rules).
+- [x] 2.2 Load allocation to candidate LV routes; phase balancing (3-phase/1-phase per rules). (ADR 0007: services from LV poles through service distribution boxes, 2 boxes a pole, 4 loads a box, second box on another phase; boxes phased per feeder from the far end; eskom/0.4.0. The 40 m service reach and 15 kVA three-phase limit are placeholders.)
 - [ ] 2.3 Conductor/cable library from rules file (SANS 1507 LV cables, ABC/bare OH conductors) with ratings.
 - [ ] 2.4 Voltage drop calc (NRS 048-2 limits), thermal loading, LV fault level at ends.
 - [ ] 2.5 Overhead checks: span, sag/tension, clearances, pole class, stays.
