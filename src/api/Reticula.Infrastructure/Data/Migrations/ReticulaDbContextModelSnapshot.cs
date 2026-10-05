@@ -951,6 +951,84 @@ namespace Reticula.Infrastructure.Data.Migrations
                     b.ToTable("stands", (string)null);
                 });
 
+            modelBuilder.Entity("Reticula.Domain.Maps.MapPack", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("BuiltAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("built_at");
+
+                    b.Property<Guid>("BuiltBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("built_by");
+
+                    b.Property<double>("MaxLat")
+                        .HasColumnType("double precision")
+                        .HasColumnName("max_lat");
+
+                    b.Property<double>("MaxLon")
+                        .HasColumnType("double precision")
+                        .HasColumnName("max_lon");
+
+                    b.Property<int>("MaxZoom")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_zoom");
+
+                    b.Property<double>("MinLat")
+                        .HasColumnType("double precision")
+                        .HasColumnName("min_lat");
+
+                    b.Property<double>("MinLon")
+                        .HasColumnType("double precision")
+                        .HasColumnName("min_lon");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("sha256");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("size_bytes");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("source");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("storage_key");
+
+                    b.Property<int>("TileCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("tile_count");
+
+                    b.HasKey("Id")
+                        .HasName("pk_map_packs");
+
+                    b.HasIndex("BuiltBy")
+                        .HasDatabaseName("ix_map_packs_built_by");
+
+                    b.HasIndex("ProjectId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_map_packs_project_id");
+
+                    b.ToTable("map_packs", (string)null);
+                });
+
             modelBuilder.Entity("Reticula.Domain.Projects.Project", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1341,6 +1419,23 @@ namespace Reticula.Infrastructure.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_stands_projects_project_id");
+                });
+
+            modelBuilder.Entity("Reticula.Domain.Maps.MapPack", b =>
+                {
+                    b.HasOne("Reticula.Infrastructure.Identity.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("BuiltBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_map_packs_users_built_by");
+
+                    b.HasOne("Reticula.Domain.Projects.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_map_packs_projects_project_id");
                 });
 
             modelBuilder.Entity("Reticula.Domain.Projects.Project", b =>

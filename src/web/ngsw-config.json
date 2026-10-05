@@ -18,6 +18,17 @@
       }
     },
     {
+      "name": "map-assets",
+      "installMode": "prefetch",
+      "updateMode": "prefetch",
+      "resources": {
+        "files": [
+          "/map-assets/**/*.pbf",
+          "/map-assets/sprites/**"
+        ]
+      }
+    },
+    {
       "name": "assets",
       "installMode": "lazy",
       "updateMode": "prefetch",

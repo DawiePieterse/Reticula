@@ -10,6 +10,8 @@ import { BuildingPanel, SelectedBuilding } from './building-panel';
 import { BUILDING_TYPES, CANDIDATE_LABELS, CandidateKind, Candidates, ROUTE_KINDS, SITE_KINDS, toPoint } from './field.api';
 import { FieldMap, FieldMode } from './field-map';
 import { GeolocationService } from './geolocation.service';
+import { MapPackPanel } from './map/map-pack-panel';
+import { MapPacks } from './map/map-packs.service';
 import { FieldSync, NotOnDevice, stored } from './sync/field-sync.service';
 import { FieldLoad, candidateKey } from './sync/outbox';
 import { SyncPanel } from './sync/sync-panel';
@@ -20,7 +22,7 @@ import { SyncPanel } from './sync/sync-panel';
  */
 @Component({
   selector: 'app-field-page',
-  imports: [FormsModule, RouterLink, DatePipe, FieldMap, BuildingPanel, SyncPanel],
+  imports: [FormsModule, RouterLink, DatePipe, FieldMap, BuildingPanel, SyncPanel, MapPackPanel],
   template: `
     <div class="field">
       <header class="bar">
@@ -44,7 +46,10 @@ import { SyncPanel } from './sync/sync-panel';
         @if (connectivity.online()) { <a [routerLink]="['/projects', id(), 'loads']">Loads</a> }
       </header>
       @if (!connectivity.online() && sync.snapshot(); as s) {
-        <p class="offline" role="status">Offline: working from the data saved on this tablet on {{ s.fetchedAt | date: 'd MMM, HH:mm' }}. Changes stay here until you are online.</p>
+        <p class="offline" role="status">
+          Offline: working from the data saved on this tablet on {{ s.fetchedAt | date: 'd MMM, HH:mm' }}. Changes stay here until you are online.
+          @if (!maps.local()) { No offline map is saved, so the background map is blank. }
+        </p>
       }
 
       <nav class="tools" aria-label="Tools">
@@ -66,6 +71,7 @@ import { SyncPanel } from './sync/sync-panel';
           [selectedId]="selectedId()"
           [mode]="mode()"
           [gps]="gps.fix()"
+          [pack]="maps.local()"
           (buildingSelect)="selectBuilding($event)"
           (candidateSelect)="selectCandidate($event)"
           (mapTap)="onTap($event)"
@@ -133,6 +139,7 @@ import { SyncPanel } from './sync/sync-panel';
               <h3>Field inspection</h3>
               <p>Tap a building to confirm it, or start with the least certain ones.</p>
               <button type="button" class="primary" (click)="next()" [disabled]="!outstanding().length">Start with lowest confidence</button>
+              <app-map-pack-panel />
             }
           }
         }
@@ -178,6 +185,7 @@ export class FieldPage implements OnDestroy {
   protected readonly sync = inject(FieldSync);
   protected readonly connectivity = inject(ConnectivityService);
   protected readonly gps = inject(GeolocationService);
+  protected readonly maps = inject(MapPacks);
 
   protected readonly types = BUILDING_TYPES;
   protected readonly colours = BUILDING_COLOURS;
@@ -345,6 +353,7 @@ export class FieldPage implements OnDestroy {
 
   private async load(id: string): Promise<void> {
     this.problem.set(null);
+    void this.maps.open(id);
     try {
       await this.sync.open(id);
     } catch (e) {

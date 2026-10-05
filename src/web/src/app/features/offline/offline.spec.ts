@@ -17,6 +17,7 @@ describe('Offline', () => {
     expect(link.textContent).toBe('Soshanguve');
     expect(link.getAttribute('href')).toBe('/projects/p1/field');
     expect(el.textContent).toContain('1 change to sync');
+    expect(el.textContent).toContain('no offline map');
   });
 
   it('says how to make a project available offline when none is saved', async () => {

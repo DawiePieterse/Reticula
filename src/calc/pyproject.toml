@@ -14,6 +14,7 @@ dependencies = [
     "networkx>=3.7",
     "numpy>=2.4.6",
     "pandapower>=3.5.5",
+    "pmtiles>=3.8.1",
     "pydantic>=2.13.5",
     "pyproj>=3.8.0",
     "python-multipart>=0.0.32",

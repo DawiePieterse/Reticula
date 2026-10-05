@@ -2,6 +2,7 @@ import { DatePipe } from '@angular/common';
 import { Component, effect, inject, signal, untracked } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ConnectivityService } from '../../core/connectivity.service';
+import { MAP_PACK_STORE } from '../field/map/map-pack.store';
 import { CachedProjectInfo, FieldSync } from '../field/sync/field-sync.service';
 
 @Component({
@@ -24,6 +25,7 @@ import { CachedProjectInfo, FieldSync } from '../field/sync/field-sync.service';
               saved {{ p.fetchedAt | date: 'd MMM, HH:mm' }}
               @if (p.queued) { · {{ p.queued }} change{{ p.queued === 1 ? '' : 's' }} to sync }
               @if (p.needsDecision) { · {{ p.needsDecision }} to decide }
+              · {{ mapped().has(p.projectId) ? 'map saved' : 'no offline map' }}
             </span>
           </li>
         }
@@ -40,13 +42,18 @@ import { CachedProjectInfo, FieldSync } from '../field/sync/field-sync.service';
 export class Offline {
   protected readonly connectivity = inject(ConnectivityService);
   private readonly sync = inject(FieldSync);
+  private readonly maps = inject(MAP_PACK_STORE);
   protected readonly projects = signal<CachedProjectInfo[]>([]);
+  protected readonly mapped = signal(new Set<string>());
 
   constructor() {
     effect(() => {
       this.sync.queued();
       this.sync.needsDecision();
-      untracked(() => void this.sync.cachedProjects().then((p) => this.projects.set(p), () => this.projects.set([])));
+      untracked(() => {
+        void this.sync.cachedProjects().then((p) => this.projects.set(p), () => this.projects.set([]));
+        void this.maps.projectIds().then((ids) => this.mapped.set(new Set(ids)), () => undefined);
+      });
     });
   }
 }

@@ -27,6 +27,10 @@ public interface ICalcClient
     /// <exception cref="CalcRejectedException">Unknown option, bad number or missing rules section.</exception>
     Task<AdmdEstimate> EstimateAdmdAsync(AdmdEstimateRequest request, CancellationToken ct = default);
 
+    /// <summary>The basemap for a box as a PMTiles archive, cut from the calc service's configured map source.</summary>
+    /// <exception cref="CalcRejectedException">No map source is configured, it cannot be read, or the box is too large.</exception>
+    Task<MapExtract> ExtractMapAsync(double minLon, double minLat, double maxLon, double maxLat, CancellationToken ct = default);
+
     Task<AdmdGroup> GroupAdmdAsync(string rulesRef, IReadOnlyList<AdmdGroupLoad> loads, CancellationToken ct = default);
 }
 

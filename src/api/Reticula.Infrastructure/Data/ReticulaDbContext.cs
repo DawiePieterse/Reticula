@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Reticula.Domain.Field;
 using Reticula.Domain.Jobs;
 using Reticula.Domain.Layout;
+using Reticula.Domain.Maps;
 using Reticula.Domain.Projects;
 using Reticula.Infrastructure.Identity;
 
@@ -22,6 +23,7 @@ public sealed class ReticulaDbContext(DbContextOptions<ReticulaDbContext> option
     public DbSet<Candidate> Candidates => Set<Candidate>();
     public DbSet<LoadPoint> LoadPoints => Set<LoadPoint>();
     public DbSet<Assumption> Assumptions => Set<Assumption>();
+    public DbSet<MapPack> MapPacks => Set<MapPack>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -196,6 +198,18 @@ public sealed class ReticulaDbContext(DbContextOptions<ReticulaDbContext> option
             e.Property(x => x.Version).IsRowVersion();
             e.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne<Building>().WithMany().HasForeignKey(x => x.BuildingId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<MapPack>(e =>
+        {
+            e.ToTable("map_packs");
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.ProjectId).IsUnique();
+            e.Property(x => x.StorageKey).HasMaxLength(300).IsRequired();
+            e.Property(x => x.Sha256).HasMaxLength(64).IsRequired();
+            e.Property(x => x.Source).HasMaxLength(300).IsRequired();
+            e.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.BuiltBy).OnDelete(DeleteBehavior.Restrict);
         });
 
         b.Entity<Assumption>(e =>

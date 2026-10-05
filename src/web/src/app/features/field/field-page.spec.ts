@@ -6,6 +6,7 @@ import { BuildingPanel } from './building-panel';
 import { FieldMap } from './field-map';
 import { FieldPage } from './field-page';
 import { GeolocationService } from './geolocation.service';
+import { MAP_PACK_STORE, MemoryMapPackStore } from './map/map-pack.store';
 import { answerRefresh, building, buildingField, flushSnapshot, settle, snapshot, syncTesting } from './sync/testing';
 
 @Component({ selector: 'app-field-map', template: '' })
@@ -16,6 +17,7 @@ class FieldMapStub {
   readonly selectedId = input<string | null>();
   readonly mode = input<string>();
   readonly gps = input<unknown>();
+  readonly pack = input<unknown>();
   readonly buildingSelect = output<string>();
   readonly candidateSelect = output<string>();
   readonly mapTap = output<[number, number]>();
@@ -39,13 +41,15 @@ const data = snapshot({
   assumptionsOpen: 4,
 });
 
-async function setup(online = true) {
+async function setup(online = true, savedMap = false) {
   const t = syncTesting(online);
   if (!online) await t.db.putSnapshot(data);
+  const maps = new MemoryMapPackStore();
+  if (savedMap) await maps.put({ projectId: 'p1', packId: 'm1', sizeBytes: 3, builtAt: '', source: 's', savedAt: '2026-10-05T07:00:00Z', bytes: new ArrayBuffer(3) });
   TestBed.configureTestingModule({
     imports: [FieldPage],
     providers: [
-      ...t.providers, provideRouter([]),
+      ...t.providers, provideRouter([]), { provide: MAP_PACK_STORE, useValue: maps },
       { provide: GeolocationService, useValue: { fix: signal({ lon: 28.105, lat: -25.515, accuracyM: 5 }), error: signal(null), start: () => undefined, stop: () => undefined } },
     ],
   }).overrideComponent(FieldPage, { remove: { imports: [FieldMap, BuildingPanel] }, add: { imports: [FieldMapStub, BuildingPanelStub] } });
@@ -54,7 +58,10 @@ async function setup(online = true) {
   const http = TestBed.inject(HttpTestingController);
   fixture.detectChanges();
   await settle(2);
-  if (online) flushSnapshot(http, data);
+  if (online) {
+    flushSnapshot(http, data);
+    http.expectOne('/api/projects/p1/map-pack').flush({ pack: null, job: null });
+  }
   await settle();
   await fixture.whenStable();
   const stable = async () => {
@@ -87,6 +94,7 @@ describe('FieldPage', () => {
   it('works offline from the data on the tablet and queues a new building', async () => {
     const { el, stable, db, online, http } = await setup(false);
     expect(el.textContent).toContain('Offline: working from the data saved on this tablet');
+    expect(el.textContent).toContain('No offline map is saved');
     // Screens that need the server are not offered.
     expect(el.querySelector('header strong')?.textContent).toBe('Soshanguve');
     expect([...el.querySelectorAll('header a')].map((a) => a.textContent)).toEqual([]);
@@ -118,6 +126,14 @@ describe('FieldPage', () => {
     expect(el.textContent).toContain('2/4 inspected');
     expect(el.textContent).toContain('5 assumptions open');
     expect(el.textContent).not.toContain('Offline');
+  });
+
+  it('draws the map saved on the tablet', async () => {
+    const { fixture, el } = await setup(false, true);
+    const map = fixture.debugElement.query((d) => d.name === 'app-field-map').componentInstance as FieldMapStub;
+    expect((map.pack() as { packId: string }).packId).toBe('m1');
+    expect(el.textContent).not.toContain('No offline map is saved');
+    expect(el.textContent).toContain('Saved on this tablet 5 Oct');
   });
 
   it('places a transformer candidate where the map is tapped', async () => {

@@ -8,6 +8,9 @@ public interface IFileStore
 {
     Task SaveAsync(string key, Stream content, CancellationToken ct = default);
     Task<Stream?> OpenReadAsync(string key, CancellationToken ct = default);
+
+    /// <summary>Removes the file; a missing file is not an error.</summary>
+    Task DeleteAsync(string key, CancellationToken ct = default);
 }
 
 /// <summary>Stores files under Storage:Root (default ./data/files). An S3/MinIO store replaces this in production.</summary>
@@ -32,6 +35,12 @@ public sealed partial class FileSystemFileStore(IConfiguration config) : IFileSt
     {
         var path = PathFor(key);
         return Task.FromResult<Stream?>(File.Exists(path) ? File.OpenRead(path) : null);
+    }
+
+    public Task DeleteAsync(string key, CancellationToken ct = default)
+    {
+        File.Delete(PathFor(key));
+        return Task.CompletedTask;
     }
 
     private string PathFor(string key)
