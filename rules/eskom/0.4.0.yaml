@@ -18,7 +18,7 @@ lv_loads:
   index: ESKOM-SERVICE
   attach: pole_boxes          # pole_boxes: services from LV poles through boxes; nearest_point: to the nearest point on a route
   boxes_per_pole: 2
-  box_loads: 4
+  box_loads: 4                # a box is filled before the next is started
   second_box_other_phase: true
   max_service_m: 40           # PLACEHOLDER: longest service connection from a building to its pole
   single_phase_max_kva: 15    # PLACEHOLDER: loads above this are supplied three-phase, on their own service

@@ -11,14 +11,14 @@ C. **Services come from LV poles through service distribution boxes** (`attach: 
    - Every load on a box is on the box's phase.
    - A second box on a pole is on a different phase from the first.
    - Each load goes to the nearest pole with room within the service reach (40 m, a placeholder). Pairs are taken nearest first, so a full pole passes loads to the next nearest one.
-   - A pole's loads fill its boxes in order around the pole, starting after the widest gap, so neighbours share a box.
+   - A pole's loads fill its boxes in order around the pole, starting after the widest gap, so neighbours share a box. A box is filled to 4 before the next is started (engineer, 2026-10-05).
 D. A building is never connected to a bare route. With no pole within reach, or only full poles, it is reported for the engineer to mark another pole. A building more than the reach from the network is reported too.
 E. Loads above `single_phase_max_kva` (15 kVA, a placeholder) are three-phase. Each gets its own service from the nearest pole, takes no box space, and counts a third of its kVA on each phase.
 F. A building without a load estimate is reported and left out. Its load is never guessed.
 G. **Phasing works per feeder, from the far end.** Each box goes to the phase with the least kVA so far, skipping the phase already used by the other box on its pole. This keeps the load beyond any point of the feeder as even as boxes allow. Ties go to the phase with fewer customers, then red, white, blue.
 H. The balancing uses ADMD (kVA per consumer after diversity). Design currents per section, and the voltage drop they cause, are plan 2.4.
 I. A connection is stored against a branch at a distance from its upstream end, plus the node when it is at a pole. The network itself is not split. Each building's connection goes in `lv_loads`, with its service line, box, feeder and phase. Boxes, per-phase totals and the summary are stored on the network row.
-J. `attach: nearest_point` connects each load to the nearest point on a route and phases loads one by one. It is a stopgap. Eskom 240-56030637 Rev 2 says underground LV feeders supply metering kiosks and never customers directly (§2.3.1, §3.5.3). At each kiosk, MCBs on one phase are grouped, at most 4 per phase, and the kiosk is balanced (§3.10 e)). Underground networks need kiosks modelled the way poles and boxes are; until then `nearest_point` must not be used for an Eskom underground design.
+J. `attach: nearest_point` connects each load to the nearest point on a route and phases loads one by one. It is a stopgap. Eskom 240-56030637 Rev 2 says underground LV feeders supply metering kiosks and never customers directly (§2.3.1, §3.5.3). At each kiosk, MCBs on one phase are grouped, at most 4 per phase, and the kiosk is balanced (§3.10 e)). Underground networks need kiosks modelled the way poles and boxes are; until then `nearest_point` must not be used for an Eskom underground design. The engineer chose (2026-10-05) to finish plan 2.2 for overhead networks and model kiosks later.
 
 ## Consequences
 
