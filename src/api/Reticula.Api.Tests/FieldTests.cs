@@ -288,6 +288,57 @@ public class FieldTests(ReticulaApiFactory factory)
         Assert.Contains("castle", await r.Content.ReadAsStringAsync());
     }
 
+    [Fact]
+    public async Task Candidate_change_synced_twice_is_applied_once()
+    {
+        var ctx = await SetupAsync();
+        var url = $"/api/projects/{ctx.ProjectId}/candidates/{Guid.NewGuid()}";
+        var point = new GeometryInput("Point", JsonSerializer.SerializeToElement(new[] { Lon, Lat }));
+        var create = new CandidateRequest("pole", point, "Corner", null, null, DateTimeOffset.UtcNow, Guid.NewGuid());
+        Assert.Equal(HttpStatusCode.Created, (await ctx.Engineer.PutAsJsonAsync(url, create)).StatusCode);
+
+        // The device did not hear back and sends the create again: no conflict, nothing applied twice.
+        var again = await ctx.Engineer.PutAsJsonAsync(url, create);
+        Assert.Equal(HttpStatusCode.OK, again.StatusCode);
+        var current = (await again.Content.ReadFromJsonAsync<GeoFeature<CandidateProps>>())!;
+        Assert.Equal("Corner", current.Properties.Notes);
+
+        var edit = create with { Notes = "Corner, next to the tap", Version = current.Properties.Version, OpId = Guid.NewGuid() };
+        Assert.Equal(HttpStatusCode.OK, (await ctx.Engineer.PutAsJsonAsync(url, edit)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await ctx.Engineer.PutAsJsonAsync(url, edit)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await ctx.Engineer.PutAsJsonAsync(url, create)).StatusCode);
+        var list = await ctx.Engineer.GetFromJsonAsync<GeoFeatureCollection<CandidateProps>>($"/api/projects/{ctx.ProjectId}/candidates");
+        Assert.Equal("Corner, next to the tap", list!.Features.Single().Properties.Notes);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await ctx.Engineer.DeleteAsync(url)).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await ctx.Engineer.DeleteAsync(url)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await ctx.Engineer.DeleteAsync($"/api/projects/{ctx.ProjectId}/candidates/{Guid.NewGuid()}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Load_change_synced_twice_is_applied_once_and_never_overwrites_unseen_loads()
+    {
+        var ctx = await SetupAsync();
+        var inspector = await InspectorAsync(ctx.Engineer);
+        var url = $"/api/projects/{ctx.ProjectId}/buildings/{ctx.Buildings[0]}/load";
+        var obs = new Dictionary<string, JsonElement> { ["dwelling"] = JsonSerializer.SerializeToElement("rdp") };
+        var save = new LoadRequest("residential", obs, null, null, null, null, OpId: Guid.NewGuid(), CapturedAt: DateTimeOffset.UtcNow.AddHours(-3));
+
+        var first = await (await inspector.PutAsJsonAsync(url, save)).Content.ReadFromJsonAsync<LoadPointDto>();
+        var again = await inspector.PutAsJsonAsync(url, save);
+        Assert.Equal(HttpStatusCode.OK, again.StatusCode);
+        Assert.Equal(first!.Version, (await again.Content.ReadFromJsonAsync<LoadPointDto>())!.Version);
+
+        // Another tablet, which never saw this load, saves one for the same building.
+        var unseen = await inspector.PutAsJsonAsync(url, new LoadRequest("special", null, "school", null, null, null, OpId: Guid.NewGuid()));
+        Assert.Equal(HttpStatusCode.Conflict, unseen.StatusCode);
+        Assert.Equal("residential", (await unseen.Content.ReadFromJsonAsync<LoadPointDto>())!.Kind);
+
+        var stale = await inspector.PutAsJsonAsync(url, new LoadRequest("special", null, "school", null, null, first.Version + 99, OpId: Guid.NewGuid()));
+        Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
+        Assert.Equal(1.5, (await ctx.Engineer.GetFromJsonAsync<List<LoadPointDto>>($"/api/projects/{ctx.ProjectId}/load-points"))!.Single().Kva);
+    }
+
     private async Task<List<AssumptionDto>> OpenAssumptionsAsync(Ctx ctx) =>
         (await ctx.Engineer.GetFromJsonAsync<List<AssumptionDto>>($"/api/projects/{ctx.ProjectId}/assumptions?status=open"))!;
 }

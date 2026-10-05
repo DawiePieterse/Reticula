@@ -10,5 +10,6 @@ nav a.active { color: var(--accent); font-weight: 600; }
 .spacer { flex: 1; }
 .status { font-size: .85rem; padding: .15rem .5rem; border-radius: 999px; background: var(--ok-bg); color: var(--ok); }
 .status.offline { background: var(--danger-bg); color: var(--danger); }
+.status.queue:not(.offline) { background: var(--warn-bg); color: var(--text); }
 .user { color: var(--muted); }
 main { padding: 1rem; max-width: 72rem; margin: 0 auto; }

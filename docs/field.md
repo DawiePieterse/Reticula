@@ -40,9 +40,17 @@ Re-estimating a load reopens its entries. When the engineer confirms a load, its
 
 The **Loads** page lists every building that is present, with its load or "No load recorded". It shows totals after diversity from the calc service. With `eskom/0.2.0` this is Herman-Beta at 90 % confidence over balanced phases, plus special loads. The CSV export carries the rules version and hash, the generation time and the totals. Cell values that would start a spreadsheet formula are prefixed with an apostrophe.
 
-## Ready for offline sync
+## Working offline
 
-Offline capture is the next slice (plan items 1.8 and 1.9). The field data is already shaped for it:
+The field screen works without a connection (ADR 0004).
 
-- Building ids, inspection ids, candidate ids and photo ids are generated on the device. Sending the same record twice stores it once.
-- Every building, candidate and load point carries a version. A stale write returns 409 with the current state, which the app shows instead of overwriting.
+- **Before going out**, open the project's **Field inspection** once while online. The tablet keeps its stands, buildings, candidates, loads, the income and ADMD form and the photo counts. When offline, the **You are offline** screen lists the projects on the tablet with links to their field screens.
+- **Every change is saved on the tablet first** and shows at once: confirmations, corrections, new buildings, candidates, loads and photos. The header chip shows what is waiting ("3 on this tablet", "3 to sync") or "All synced". The app header shows the count across projects.
+- **Loads saved offline** keep the observations, class choice and any override. The kVA is worked out by the calc service when the load syncs, and shows then.
+- **Changes sync on their own** as soon as the server can be reached, in the order they were made. After reconnecting, the project is fetched again so other people's changes show. **Sync now** in the sync panel tries at once.
+- **If someone else changed the same item**, your change is held, never applied over theirs. The building panel says so. **Decide** opens the sync panel, which shows your version next to the server's. **Keep mine** sends yours over theirs. **Keep theirs** drops yours.
+- **If the server refuses a change** (for example a new building outside the project area), the sync panel gives the reason. **Try again** sends it again; **Discard** drops it, together with any later changes to a building or candidate it would have added.
+- **Signing out** keeps unsynced changes on the tablet. They sync the next time the same person signs in. Each person's changes are kept apart.
+- Any request can be sent twice without being applied twice: buildings, inspections, candidates, loads and photos carry ids made on the device.
+
+Not offline yet: the basemap tiles (plan item 1.9), the project list and settings, the **Loads** page and the CSV export. The engineer's confirm and clear actions are online only.

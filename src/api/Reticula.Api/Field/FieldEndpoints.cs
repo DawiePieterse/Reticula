@@ -212,6 +212,13 @@ public static class FieldEndpoints
         var project = await ProjectAsync(db, projectId, ct);
         if (project is null) return TypedResults.NotFound();
 
+        // A change synced twice is applied once.
+        if (req.OpId is { } opId && await db.Inspections.AnyAsync(i => i.Id == opId && i.ProjectId == projectId, ct))
+        {
+            var current = await db.Candidates.AsNoTracking().FirstOrDefaultAsync(c => c.Id == candidateId && c.ProjectId == projectId && c.ArchivedAt == null, ct);
+            return current is null ? TypedResults.NotFound() : TypedResults.Ok(Feature(current));
+        }
+
         var errors = new Dictionary<string, string[]>();
         if (!CandidateKinds.All.Contains(req.Kind)) errors["kind"] = [$"Kind must be one of: {string.Join(", ", CandidateKinds.All)}."];
         if (!req.Geometry.TryToGeometry(out var geometry, out var geomError)) errors["geometry"] = [geomError!];
@@ -236,7 +243,7 @@ public static class FieldEndpoints
             if (req.Version != candidate.Version) return TypedResults.Conflict(Feature(candidate));
             candidate.Update(geometry!, Trim(req.Notes, 2000), now);
         }
-        db.Inspections.Add(new Inspection(Guid.CreateVersion7(), projectId, InspectionActions.Candidate, null, candidateId, req.Kind,
+        db.Inspections.Add(new Inspection(req.OpId ?? Guid.CreateVersion7(), projectId, InspectionActions.Candidate, null, candidateId, req.Kind,
             position, req.Position?.AccuracyM, req.CapturedAt ?? now, null, userId, now));
 
         try
@@ -253,8 +260,10 @@ public static class FieldEndpoints
 
     private static async Task<Results<NoContent, NotFound>> ArchiveCandidate(Guid projectId, Guid candidateId, ReticulaDbContext db, TimeProvider time, CancellationToken ct)
     {
-        var c = await db.Candidates.FirstOrDefaultAsync(x => x.Id == candidateId && x.ProjectId == projectId && x.ArchivedAt == null, ct);
+        var c = await db.Candidates.FirstOrDefaultAsync(x => x.Id == candidateId && x.ProjectId == projectId, ct);
         if (c is null) return TypedResults.NotFound();
+        // Removing twice (a synced change sent again) is not an error.
+        if (c.ArchivedAt is not null) return TypedResults.NoContent();
         c.Archive(time.GetUtcNow());
         await db.SaveChangesAsync(ct);
         return TypedResults.NoContent();
@@ -281,6 +290,13 @@ public static class FieldEndpoints
         var building = await db.Buildings.AsNoTracking().FirstOrDefaultAsync(b => b.Id == buildingId && b.ProjectId == projectId, ct);
         if (project is null || building is null) return TypedResults.NotFound();
 
+        var existing = await db.LoadPoints.AsNoTracking().FirstOrDefaultAsync(l => l.BuildingId == buildingId, ct);
+        // A change synced twice is applied once.
+        if (req.OpId is { } opId && await db.Inspections.AnyAsync(i => i.Id == opId && i.ProjectId == projectId, ct))
+            return existing is null ? TypedResults.NotFound() : TypedResults.Ok(ToDto(existing));
+        // A save made without seeing the current load (none, or another version) must not overwrite it.
+        if (existing is not null && req.Version != existing.Version) return TypedResults.Conflict(ToDto(existing));
+
         var errors = new Dictionary<string, string[]>();
         if (req.Kind is not (LoadKinds.Residential or LoadKinds.Special)) errors["kind"] = ["Kind must be residential or special."];
         if (req.Kind == LoadKinds.Special && string.IsNullOrWhiteSpace(req.SpecialLoad)) errors["specialLoad"] = ["Choose the special load."];
@@ -295,7 +311,7 @@ public static class FieldEndpoints
             var lp = await field.EstimateLoadAsync(project, building,
                 new AdmdEstimateRequest(project.RulesRef, req.Kind, req.Observations ?? [], req.SpecialLoad, req.OverrideKva, Trim(req.OverrideReason, 1000),
                     req.Kind == LoadKinds.Residential && !string.IsNullOrWhiteSpace(req.LoadClass) ? req.LoadClass : null),
-                erf, req.Version, UserId(user), ct);
+                erf, req.Version, req.OpId, req.CapturedAt, UserId(user), ct);
             return TypedResults.Ok(ToDto(lp));
         }
         catch (CalcRejectedException e)

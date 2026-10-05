@@ -1,14 +1,16 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
+import { Component, WritableSignal, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { HttpErrorResponse } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
-import { toApiProblem } from '../../core/api-problem';
-import { AdmdForm, AdmdFormField, FieldApi, LoadPoint } from './field.api';
+import { AdmdForm, AdmdFormField } from './field.api';
+import { FieldSync, stored } from './sync/field-sync.service';
+import { FieldLoad, loadKey } from './sync/outbox';
 
 const SPECIAL_FOR_TYPE: Record<string, string> = { school: 'school', shop: 'shop', other: 'other' };
 
-/** Income and ADMD tool. Every option comes from the rules file; the calc service does the arithmetic. */
+/**
+ * Income and ADMD tool. Every option comes from the rules file; the calc service does the arithmetic, so a load
+ * saved offline shows its kVA once it syncs.
+ */
 @Component({
   selector: 'app-load-tool',
   imports: [FormsModule, DecimalPipe],
@@ -16,14 +18,14 @@ const SPECIAL_FOR_TYPE: Record<string, string> = { school: 'school', shop: 'shop
     <section class="load">
       <h4>Load</h4>
       <div class="seg" role="radiogroup" aria-label="Load kind">
-        <button type="button" [class.on]="kind() === 'residential'" (click)="kind.set('residential')">Dwelling</button>
-        <button type="button" [class.on]="kind() === 'special'" (click)="kind.set('special')">Special load</button>
+        <button type="button" [class.on]="kind() === 'residential'" (click)="edit(kind, 'residential')">Dwelling</button>
+        <button type="button" [class.on]="kind() === 'special'" (click)="edit(kind, 'special')">Special load</button>
       </div>
 
       @if (kind() === 'residential') {
         @if (classes().length) {
           <label>Load class
-            <select [ngModel]="loadClass()" (ngModelChange)="loadClass.set($event)" name="loadClass">
+            <select [ngModel]="loadClass()" (ngModelChange)="edit(loadClass, $event)" name="loadClass">
               <option value="">From the observations below</option>
               @for (c of classes(); track c.code) {
                 <option [value]="c.code" [disabled]="!c.usable">{{ c.description }} · {{ c.admd_kva }} kVA{{ incomeRange(c) }}{{ c.usable ? '' : ' (unverified)' }}</option>
@@ -56,24 +58,36 @@ const SPECIAL_FOR_TYPE: Record<string, string> = { school: 'school', shop: 'shop
         }
       } @else {
         <label>Special load
-          <select [ngModel]="specialLoad()" (ngModelChange)="specialLoad.set($event)" name="special">
+          <select [ngModel]="specialLoad()" (ngModelChange)="edit(specialLoad, $event)" name="special">
             @for (s of specialOptions(); track s.key) { <option [value]="s.key">{{ pretty(s.key) }} ({{ s.kva }} kVA default)</option> }
           </select>
         </label>
       }
 
-      <label class="inline"><input type="checkbox" [ngModel]="overrideOn()" (ngModelChange)="overrideOn.set($event)" name="ovr" /> Override the kVA</label>
+      <label class="inline"><input type="checkbox" [ngModel]="overrideOn()" (ngModelChange)="edit(overrideOn, $event)" name="ovr" /> Override the kVA</label>
       @if (overrideOn()) {
         <div class="override">
-          <label>kVA <input type="number" inputmode="decimal" min="0" step="0.1" [ngModel]="overrideKva()" (ngModelChange)="overrideKva.set($event)" name="kva" /></label>
-          <label>Reason <input [ngModel]="overrideReason()" (ngModelChange)="overrideReason.set($event)" name="reason" placeholder="Why the method does not fit" /></label>
+          <label>kVA <input type="number" inputmode="decimal" min="0" step="0.1" [ngModel]="overrideKva()" (ngModelChange)="edit(overrideKva, $event)" name="kva" /></label>
+          <label>Reason <input [ngModel]="overrideReason()" (ngModelChange)="edit(overrideReason, $event)" name="reason" placeholder="Why the method does not fit" /></label>
         </div>
       }
 
       <button type="button" class="primary" (click)="save()" [disabled]="!canSave() || busy()">{{ busy() ? 'Saving…' : 'Save load' }}</button>
       @if (problem()) { <p class="error" role="alert">{{ problem() }}</p> }
+      @if (issue(); as op) {
+        <p class="error" role="alert">
+          {{ op.state === 'conflict' ? 'This load changed on the server after you saw it. Your change is held until you choose.' : 'The server refused this load: ' + op.error }}
+          <button type="button" (click)="openSync.emit()">Decide</button>
+        </p>
+      }
 
       @if (current(); as lp) {
+        @if (lp.pending) {
+          <div class="result">
+            Saved on this tablet. The kVA is worked out when it syncs.
+            @if (lp.overridden) { <div>Override: {{ lp.kva | number: '1.0-2' }} kVA</div> }
+          </div>
+        } @else {
         <div class="result" [class.confirmed]="lp.status === 'confirmed'">
           <strong>{{ lp.kva | number: '1.0-2' }} kVA</strong>
           @if (lp.kind === 'residential') {
@@ -85,6 +99,7 @@ const SPECIAL_FOR_TYPE: Record<string, string> = { school: 'school', shop: 'shop
           <div class="muted">{{ lp.status === 'confirmed' ? 'Confirmed by the engineer' : 'Estimate: in the assumptions register until confirmed' }}</div>
           @if (lp.missing.length) { <div class="muted">Not recorded, scored as zero: {{ lp.missing.join(', ') }}</div> }
         </div>
+        }
       }
     </section>
   `,
@@ -106,14 +121,14 @@ const SPECIAL_FOR_TYPE: Record<string, string> = { school: 'school', shop: 'shop
   `,
 })
 export class LoadTool {
-  readonly projectId = input.required<string>();
   readonly buildingId = input.required<string>();
   readonly buildingType = input<string>('house');
   readonly form = input<AdmdForm | null>(null);
-  readonly existing = input<LoadPoint | null>(null);
-  readonly saved = output<LoadPoint>();
+  readonly existing = input<FieldLoad | null>(null);
+  /** The person wants to decide on a held change. */
+  readonly openSync = output<void>();
 
-  private readonly api = inject(FieldApi);
+  private readonly sync = inject(FieldSync);
 
   protected readonly kind = signal<'residential' | 'special'>('residential');
   protected readonly loadClass = signal('');
@@ -124,7 +139,8 @@ export class LoadTool {
   protected readonly overrideReason = signal('');
   protected readonly busy = signal(false);
   protected readonly problem = signal<string | null>(null);
-  protected readonly current = signal<LoadPoint | null>(null);
+  protected readonly current = computed(() => this.existing());
+  protected readonly issue = computed(() => this.sync.view()?.issues.get(loadKey(this.buildingId())) ?? null);
 
   protected readonly choiceFields = computed(() => this.form()?.indicators ?? []);
   protected readonly multiFields = computed(() => this.form()?.multi_indicators ?? []);
@@ -133,14 +149,21 @@ export class LoadTool {
   protected readonly specialOptions = computed(() => Object.entries(this.form()?.special_loads ?? {}).map(([key, kva]) => ({ key, kva })));
   protected readonly canSave = computed(() => !this.overrideOn() || ((this.overrideKva() ?? 0) > 0 && this.overrideReason().trim().length > 0));
 
+  /** The person changed the form since it was last filled from the saved load. */
+  private dirty = false;
+  private shownFor: string | null = null;
+
   constructor() {
-    // Reset from the building's saved load whenever the selection changes.
+    // Fill from the building's saved load when the selection changes, or when the load changes (it synced, or a
+    // refresh brought someone else's) and the person is not part-way through editing.
     effect(() => {
       const lp = this.existing();
       const type = this.buildingType();
-      this.buildingId();
+      const id = this.buildingId();
       untracked(() => {
-        this.current.set(lp);
+        if (id === this.shownFor && this.dirty) return;
+        this.shownFor = id;
+        this.dirty = false;
         this.problem.set(null);
         this.kind.set(lp?.kind ?? (type === 'house' ? 'residential' : 'special'));
         this.observations.set({ ...(lp?.observations ?? {}) });
@@ -151,6 +174,11 @@ export class LoadTool {
         this.overrideReason.set(lp?.overrideReason ?? '');
       });
     });
+  }
+
+  protected edit<T>(s: WritableSignal<T>, v: T): void {
+    s.set(v);
+    this.dirty = true;
   }
 
   protected classLabel(code: string | null): string {
@@ -172,6 +200,7 @@ export class LoadTool {
   }
 
   protected setValue(key: string, v: unknown): void {
+    this.dirty = true;
     this.observations.update((o) => {
       const next = { ...o };
       if (v === '' || v === null || v === undefined) delete next[key];
@@ -200,27 +229,18 @@ export class LoadTool {
     const obs = { ...this.observations() };
     if (residential) for (const f of this.multiFields() as AdmdFormField[]) obs[f.key] ??= [];
     try {
-      const lp = await firstValueFrom(
-        this.api.saveLoad(this.projectId(), this.buildingId(), {
-          kind: this.kind(),
-          observations: residential ? obs : undefined,
-          specialLoad: residential ? null : this.specialLoad(),
-          overrideKva: this.overrideOn() ? this.overrideKva() : null,
-          overrideReason: this.overrideOn() ? this.overrideReason().trim() : null,
-          version: this.current()?.version ?? null,
-          loadClass: residential && this.loadClass() ? this.loadClass() : null,
-        }),
-      );
-      this.current.set(lp);
-      this.saved.emit(lp);
+      this.dirty = false;
+      await this.sync.saveLoad(this.buildingId(), {
+        kind: this.kind(),
+        observations: residential ? obs : undefined,
+        specialLoad: residential ? null : this.specialLoad(),
+        overrideKva: this.overrideOn() ? this.overrideKva() : null,
+        overrideReason: this.overrideOn() ? this.overrideReason().trim() : null,
+        loadClass: residential && this.loadClass() ? this.loadClass() : null,
+      });
     } catch (e) {
-      if (e instanceof HttpErrorResponse && e.status === 409) {
-        this.current.set(e.error as LoadPoint);
-        this.problem.set('Someone else changed this load. Their version is shown; your change was not saved.');
-      } else {
-        const p = toApiProblem(e);
-        this.problem.set(Object.values(p.fieldErrors).flat()[0] ?? p.message);
-      }
+      this.dirty = true;
+      this.problem.set(stored(e));
     } finally {
       this.busy.set(false);
     }

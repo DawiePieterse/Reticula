@@ -1,13 +1,12 @@
 import { DecimalPipe, PercentPipe } from '@angular/common';
-import { Component, effect, inject, input, output, signal, untracked } from '@angular/core';
+import { Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { HttpErrorResponse } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
-import { toApiProblem } from '../../core/api-problem';
 import { BUILDING_COLOURS, BuildingProps } from '../projects/layout.api';
-import { AdmdForm, BUILDING_TYPES, BuildingAction, BuildingField, FieldApi, GpsFix, LoadPoint, newId } from './field.api';
+import { AdmdForm, BUILDING_TYPES, BuildingAction, GpsFix } from './field.api';
 import { LoadTool } from './load-tool';
 import { PhotoService } from './photo.service';
+import { FieldSync, stored } from './sync/field-sync.service';
+import { FieldLoad, buildingKey } from './sync/outbox';
 
 export interface SelectedBuilding {
   id: string;
@@ -38,7 +37,18 @@ const STATUS_LABEL: Record<string, string> = {
         </p>
       }
 
-      @if (conflict()) { <div class="banner warn" role="alert">{{ conflict() }}</div> }
+      @if (issue(); as op) {
+        <div class="banner warn" role="alert">
+          @if (op.state === 'conflict') {
+            This building changed on the server after you saw it. Your change is held until you choose which to keep.
+          } @else {
+            The server refused a change to this building: {{ op.error }}
+          }
+          <button type="button" (click)="openSync.emit()">Decide</button>
+        </div>
+      } @else if (unsynced()) {
+        <p class="muted saved">Saved on this tablet; not on the server yet.</p>
+      }
 
       <div class="actions">
         @if (b.props.status !== 'notpresent') {
@@ -65,8 +75,11 @@ const STATUS_LABEL: Record<string, string> = {
           Take photo
           <input type="file" accept="image/*" capture="environment" (change)="photo($event)" hidden />
         </label>
-        <span class="muted">{{ photoCount() }} photo{{ photoCount() === 1 ? '' : 's' }}</span>
-        @if (uploading()) { <span class="muted">Uploading…</span> }
+        <span class="muted">
+          {{ photoCount() }} photo{{ photoCount() === 1 ? '' : 's' }}
+          @if (photosWaiting()) { · {{ photosWaiting() }} waiting to upload }
+        </span>
+        @if (uploading()) { <span class="muted">Preparing…</span> }
         <span class="gps muted">{{ gps() ? 'GPS ±' + (gps()!.accuracyM ?? '?') + ' m' : 'No GPS fix' }}</span>
       </div>
 
@@ -74,12 +87,11 @@ const STATUS_LABEL: Record<string, string> = {
 
       @if (b.props.status !== 'notpresent') {
         <app-load-tool
-          [projectId]="projectId()"
           [buildingId]="b.id"
           [buildingType]="b.props.effectiveType"
           [form]="form()"
           [existing]="load()"
-          (saved)="loadSaved.emit($event)"
+          (openSync)="openSync.emit()"
         />
       }
     }
@@ -103,16 +115,15 @@ const STATUS_LABEL: Record<string, string> = {
   `,
 })
 export class BuildingPanel {
-  readonly projectId = input.required<string>();
   readonly building = input<SelectedBuilding | null>(null);
   readonly gps = input<GpsFix | null>(null);
   readonly form = input<AdmdForm | null>(null);
-  readonly load = input<LoadPoint | null>(null);
+  readonly load = input<FieldLoad | null>(null);
 
-  readonly changed = output<BuildingField>();
-  readonly loadSaved = output<LoadPoint>();
+  /** The person wants to decide on a held change. */
+  readonly openSync = output<void>();
 
-  private readonly api = inject(FieldApi);
+  private readonly sync = inject(FieldSync);
   private readonly photos = inject(PhotoService);
 
   protected readonly types = BUILDING_TYPES;
@@ -121,18 +132,27 @@ export class BuildingPanel {
   protected readonly busy = signal(false);
   protected readonly uploading = signal(false);
   protected readonly problem = signal<string | null>(null);
-  protected readonly conflict = signal<string | null>(null);
-  protected readonly photoCount = signal(0);
+
+  private readonly id = computed(() => this.building()?.id ?? null);
+  protected readonly unsynced = computed(() => {
+    const id = this.id();
+    return !!id && !!this.sync.view()?.unsynced.has(buildingKey(id));
+  });
+  protected readonly issue = computed(() => {
+    const id = this.id();
+    return (id && this.sync.view()?.issues.get(buildingKey(id))) || null;
+  });
+  protected readonly photoCount = computed(() => this.sync.view()?.photoCounts[this.id() ?? ''] ?? 0);
+  protected readonly photosWaiting = computed(
+    () => this.sync.ops().filter((o) => o.state === 'pending' && o.body.kind === 'photo' && o.body.buildingId === this.id()).length,
+  );
 
   constructor() {
     effect(() => {
-      const id = this.building()?.id;
+      this.id();
       untracked(() => {
         this.notes.set('');
         this.problem.set(null);
-        this.conflict.set(null);
-        this.photoCount.set(0);
-        if (id) this.api.photos(this.projectId(), id).subscribe({ next: (p) => this.photoCount.set(p.length), error: () => undefined });
       });
     });
   }
@@ -146,29 +166,11 @@ export class BuildingPanel {
     if (!b) return;
     this.busy.set(true);
     this.problem.set(null);
-    this.conflict.set(null);
     try {
-      const result = await firstValueFrom(
-        this.api.inspect(this.projectId(), b.id, {
-          inspectionId: newId(),
-          action,
-          type,
-          position: this.gps(),
-          capturedAt: new Date().toISOString(),
-          notes: this.notes().trim() || null,
-          version: b.props.version,
-        }),
-      );
+      await this.sync.inspect(b.id, action, type, this.gps(), this.notes().trim() || null);
       this.notes.set('');
-      this.changed.emit(result);
     } catch (e) {
-      if (e instanceof HttpErrorResponse && e.status === 409) {
-        const current = e.error as BuildingField;
-        this.conflict.set(`Someone else updated this building: it is now ${STATUS_LABEL[current.status]?.toLowerCase()} (${current.effectiveType}). Your change was not applied.`);
-        this.changed.emit(current);
-      } else {
-        this.problem.set(toApiProblem(e).message);
-      }
+      this.problem.set(stored(e));
     } finally {
       this.busy.set(false);
     }
@@ -183,11 +185,9 @@ export class BuildingPanel {
     this.uploading.set(true);
     this.problem.set(null);
     try {
-      const blob = await this.photos.prepare(file);
-      await firstValueFrom(this.api.uploadPhoto(this.projectId(), { id: newId(), blob, buildingId: b.id, capturedAt: new Date().toISOString() }));
-      this.photoCount.update((n) => n + 1);
+      await this.sync.addPhoto({ buildingId: b.id }, await this.photos.prepare(file));
     } catch (e) {
-      this.problem.set(toApiProblem(e).message);
+      this.problem.set(stored(e));
     } finally {
       this.uploading.set(false);
     }
