@@ -124,6 +124,68 @@ export interface LvLoads {
   connections: LvConnection[];
 }
 
+export interface TracedValue {
+  value: number;
+  unit: string;
+  formulaId: string;
+  formula: string;
+  clause: string;
+  rulesHash: string;
+  inputs: { name: string; value: number | string | boolean; unit: string; source: string }[];
+}
+
+export interface LvPointResult {
+  /** A network node id, or the load point id at a service connection. */
+  id: string;
+  kind: 'node' | 'connection';
+  feeder: string | null;
+  distanceM: number;
+  dropPct: Record<'R' | 'W' | 'B', number>;
+  worstPct: number;
+  faultA: number;
+  passes: boolean;
+}
+
+export interface LvBranchResult {
+  id: string;
+  feeder: string | null;
+  conductor: string;
+  ratingA: number;
+  currentA: Record<'R' | 'W' | 'B', number>;
+  utilisationPct: number;
+  passes: boolean;
+}
+
+export interface LvFeederResult {
+  feeder: string;
+  maxDropPct: number;
+  maxDropAt: string;
+  maxUtilisationPct: number;
+  maxUtilisationBranch: string;
+  minFaultA: number;
+  minFaultAt: string;
+  passes: boolean;
+}
+
+/** Voltage drop, thermal loading and fault level (plan 2.4). */
+export interface LvAnalysis {
+  rulesRef: string;
+  rulesHash: string;
+  clause: string;
+  limitPct: number;
+  phaseVoltageV: number;
+  confidencePct: number;
+  points: LvPointResult[];
+  branches: LvBranchResult[];
+  feeders: LvFeederResult[];
+  issues: LvIssue[];
+  worstDrop: TracedValue | null;
+  worstCurrent: TracedValue | null;
+  lowestFault: TracedValue | null;
+  /** Inputs that are placeholders, in words. */
+  placeholders: string[];
+}
+
 export interface LvNetwork {
   id: string;
   rulesRef: string;
@@ -140,6 +202,26 @@ export interface LvNetwork {
   branches: LvBranch[];
   /** How loads are connected and phased; null when the rules file has no service settings. */
   loads: LvLoads | null;
+  /** Voltage drop, loading and fault level; null when the rules file has no design settings. */
+  analysis?: LvAnalysis | null;
+}
+
+/**
+ * The links from sources to their routes, which carry every feeder of the source, summed up like a feeder; null when the
+ * network has none.
+ */
+export function sourceLinkResult(a: LvAnalysis): LvFeederResult | null {
+  const pts = a.points.filter((p) => p.feeder === null);
+  const brs = a.branches.filter((b) => b.feeder === null);
+  if (!pts.length && !brs.length) return null;
+  const d = pts.reduce<LvPointResult | null>((m, p) => (!m || p.worstPct > m.worstPct ? p : m), null);
+  const f = pts.reduce<LvPointResult | null>((m, p) => (!m || p.faultA < m.faultA ? p : m), null);
+  const u = brs.reduce<LvBranchResult | null>((m, b) => (!m || b.utilisationPct > m.utilisationPct ? b : m), null);
+  return {
+    feeder: 'Source links', maxDropPct: d?.worstPct ?? 0, maxDropAt: d?.id ?? '', maxUtilisationPct: u?.utilisationPct ?? 0,
+    maxUtilisationBranch: u?.id ?? '', minFaultA: f?.faultA ?? 0, minFaultAt: f?.id ?? '',
+    passes: pts.every((p) => p.passes) && brs.every((b) => b.passes),
+  };
 }
 
 /** Feeder colours, in feeder order; branches nothing feeds are grey. */
@@ -150,8 +232,12 @@ export const UNFED_COLOUR = '#8c959f';
 export const PHASE_COLOURS: Record<LvPhase, string> = { R: '#cf222e', W: '#57606a', B: '#0969da', RWB: '#8250df' };
 export const PHASE_NAMES: Record<'R' | 'W' | 'B', string> = { R: 'Red', W: 'White', B: 'Blue' };
 
-export interface LvBranchProps { kind: LvBranch['kind']; feeder: string | null; colour: string; lengthM: number }
-export interface LvNodeProps { kind: LvNodeKind; label: string | null; feeder: string | null }
+/** Voltage drop against the limit: under 80 % of it, up to it, over it. */
+export type DropBand = 'ok' | 'near' | 'over';
+export const DROP_COLOURS: Record<DropBand, string> = { ok: '#1a7f37', near: '#bf8700', over: '#cf222e' };
+
+export interface LvBranchProps { kind: LvBranch['kind']; feeder: string | null; colour: string; lengthM: number; overloaded: boolean }
+export interface LvNodeProps { kind: LvNodeKind; label: string | null; feeder: string | null; band: DropBand | null; dropColour: string | null }
 export interface LvIssueProps { severity: LvIssue['severity']; code: string; message: string }
 export interface LvServiceProps { phase: LvPhase | null; colour: string; box: string | null; label: string | null }
 
@@ -168,20 +254,29 @@ export interface LvLayers {
 export function lvLayers(net: LvNetwork): LvLayers {
   const order = new Map(net.feeders.map((f, i) => [f.id, i]));
   const connections = net.loads?.connections ?? [];
+  const analysis = net.analysis ?? null;
+  const overloaded = new Set((analysis?.branches ?? []).filter((b) => !b.passes).map((b) => b.id));
+  const nodeDrop = new Map((analysis?.points ?? []).filter((p) => p.kind === 'node').map((p) => [p.id, p.worstPct]));
+  const dropOf = (id: string): { band: DropBand | null; dropColour: string | null } => {
+    const pct = nodeDrop.get(id);
+    if (pct === undefined || !analysis) return { band: null, dropColour: null };
+    const band: DropBand = pct > analysis.limitPct ? 'over' : pct > 0.8 * analysis.limitPct ? 'near' : 'ok';
+    return { band, dropColour: DROP_COLOURS[band] };
+  };
   const colour = (feeder: string | null) => (feeder !== null && order.has(feeder) ? FEEDER_COLOURS[order.get(feeder)! % FEEDER_COLOURS.length] : UNFED_COLOUR);
   return {
     branches: {
       type: 'FeatureCollection',
       features: net.branches.map((b) => ({
         type: 'Feature', id: b.id, geometry: { type: 'LineString', coordinates: b.coordinates },
-        properties: { kind: b.kind, feeder: b.feeder, colour: colour(b.feeder), lengthM: b.lengthM },
+        properties: { kind: b.kind, feeder: b.feeder, colour: colour(b.feeder), lengthM: b.lengthM, overloaded: overloaded.has(b.id) },
       })),
     },
     nodes: {
       type: 'FeatureCollection',
       features: net.nodes.map((n) => ({
         type: 'Feature', id: n.id, geometry: { type: 'Point', coordinates: n.coordinates },
-        properties: { kind: n.kind, label: n.label, feeder: n.feeder },
+        properties: { kind: n.kind, label: n.label, feeder: n.feeder, ...dropOf(n.id) },
       })),
     },
     issues: {

@@ -54,3 +54,23 @@ public sealed record CalcConductor(string Code, string Description, string Kind,
     double? RAcOhmPerKm = null, double? RAcTempC = null);
 
 public sealed record CalcConductorLibrary(string RulesRef, string RulesHash, IReadOnlyList<CalcConductor> Conductors);
+
+/// <summary>A connected load as the LV checks take it (plan 2.4).</summary>
+/// <param name="LoadClass">The Herman-Beta load class of a residential load; null takes it at its ADMD.</param>
+public sealed record LvLoadAt(string LoadId, string Branch, double OffsetM, string? Phase, double Kva, string Kind, string? LoadClass, string? Label);
+
+/// <param name="Id">A network node id, or the load point id at a service connection.</param>
+public sealed record LvPointResult(string Id, string Kind, string? Feeder, double DistanceM, IReadOnlyDictionary<string, double> DropPct,
+    double WorstPct, double FaultA, bool Passes);
+
+public sealed record LvBranchResult(string Id, string? Feeder, string Conductor, double RatingA, IReadOnlyDictionary<string, double> CurrentA,
+    double UtilisationPct, bool Passes);
+
+public sealed record LvFeederResult(string Feeder, double MaxDropPct, string MaxDropAt, double MaxUtilisationPct, string MaxUtilisationBranch,
+    double MinFaultA, string MinFaultAt, bool Passes);
+
+/// <summary>Voltage drop, thermal loading and fault level of the connected LV network (plan 2.4).</summary>
+/// <param name="Placeholders">Inputs that are placeholders, in words; results that use them are not fit to submit.</param>
+public sealed record CalcLvAnalysis(string RulesRef, string RulesHash, string Clause, double LimitPct, double PhaseVoltageV, double ConfidencePct,
+    IReadOnlyList<LvPointResult> Points, IReadOnlyList<LvBranchResult> Branches, IReadOnlyList<LvFeederResult> Feeders, IReadOnlyList<LvIssue> Issues,
+    TracedValue? WorstDrop, TracedValue? WorstCurrent, TracedValue? LowestFault, IReadOnlyList<string> Placeholders);

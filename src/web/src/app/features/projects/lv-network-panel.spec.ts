@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { FEEDER_COLOURS, LvLayers, LvLoads, LvNetwork, PHASE_COLOURS, UNFED_COLOUR, lvLayers } from './lv-network.api';
+import { DROP_COLOURS, FEEDER_COLOURS, LvAnalysis, LvLayers, LvLoads, LvNetwork, PHASE_COLOURS, UNFED_COLOUR, lvLayers } from './lv-network.api';
 import { LvNetworkPanel } from './lv-network-panel';
 
 const URL = '/api/projects/p1/lv-network';
@@ -45,6 +45,30 @@ export function loads(): LvLoads {
     }],
     boxes: [],
     connections: [conn('7001', 'R', 'P1-1'), conn('7002', 'RWB', null), conn('7003', null, 'P4-1')],
+  };
+}
+
+export function analysis(): LvAnalysis {
+  const drop = (R: number, W: number, B: number) => ({ R, W, B });
+  return {
+    rulesRef: 'eskom/0.6.0', rulesHash: '9f1c2b7a00d4e5f6', clause: 'LV design check settings: placeholders', limitPct: 10, phaseVoltageV: 230, confidencePct: 90,
+    points: [
+      { id: 'N2', kind: 'node', feeder: null, distanceM: 20, dropPct: drop(0.4, 0.3, 0.3), worstPct: 0.4, faultA: 2400, passes: true },
+      { id: 'N3', kind: 'node', feeder: 'TX1-F1', distanceM: 620, dropPct: drop(8.6, 7.1, 6.0), worstPct: 8.6, faultA: 610, passes: true },
+      { id: 'N4', kind: 'node', feeder: 'TX1-F2', distanceM: 670, dropPct: drop(11.2, 9.0, 8.1), worstPct: 11.2, faultA: 540, passes: false },
+    ],
+    branches: [
+      { id: 'B1', feeder: 'TX1-F1', conductor: 'ABC-3C-70', ratingA: 191, currentA: drop(60, 52, 41), utilisationPct: 31.4, passes: true },
+      { id: 'B2', feeder: 'TX1-F2', conductor: 'ABC-3C-70', ratingA: 191, currentA: drop(201, 150, 120), utilisationPct: 105.2, passes: false },
+      { id: 'B3', feeder: null, conductor: 'ABC-3C-70', ratingA: 191, currentA: drop(150, 140, 130), utilisationPct: 78.5, passes: true },
+    ],
+    feeders: [
+      { feeder: 'TX1-F1', maxDropPct: 8.6, maxDropAt: 'N3', maxUtilisationPct: 31.4, maxUtilisationBranch: 'B1', minFaultA: 610, minFaultAt: 'N3', passes: true },
+      { feeder: 'TX1-F2', maxDropPct: 11.2, maxDropAt: 'N4', maxUtilisationPct: 105.2, maxUtilisationBranch: 'B2', minFaultA: 540, minFaultAt: 'N4', passes: false },
+    ],
+    issues: [],
+    worstDrop: null, worstCurrent: null, lowestFault: null,
+    placeholders: ['Source transformer: 100 kVA, 4 % impedance'],
   };
 }
 
@@ -143,6 +167,20 @@ describe('LvNetworkPanel loads', () => {
   it('says nothing about loads when the rules have no service settings', async () => {
     const { el } = await setup(true, network());
     expect(el.textContent).not.toContain('Loads and phases');
+    expect(el.textContent).not.toContain('Checks');
+  });
+
+  it('shows the checks per feeder and warns about placeholders', async () => {
+    const { el } = await setup(true, network({ analysis: analysis() }));
+    expect(el.querySelector('[aria-label="Placeholder inputs"]')!.textContent).toContain('Source transformer: 100 kVA, 4 % impedance');
+    const rows = [...el.querySelectorAll('.checks tbody tr')].map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent?.replace(/\s+/g, ' ').trim()));
+    expect(rows).toEqual([
+      ['TX1-F1', '8.60 % at N3', '31 % on B1', '610 A at N3', 'Passes'],
+      ['TX1-F2', '11.20 % at N4', '105 % on B2', '540 A at N4', 'Fails'],
+      ['Source links', '0.40 % at N2', '79 % on B3', '2,400 A at N2', 'Passes'],
+    ]);
+    expect(el.querySelectorAll('.checks tbody tr')[1].querySelector('td:nth-child(2)')!.classList).toContain('warn');
+    expect(el.textContent!.replace(/\s+/g, ' ')).toContain('against a limit of 10 % of 230 V');
   });
 });
 
@@ -159,5 +197,14 @@ describe('lvLayers', () => {
     const l = lvLayers({ ...n, branches: [...n.branches, { ...n.branches[0], id: 'B4', feeder: null }] });
     expect(l.branches.features.map((f) => f.properties.colour)).toEqual([FEEDER_COLOURS[0], FEEDER_COLOURS[1], UNFED_COLOUR, UNFED_COLOUR]);
     expect(l.nodes.features[0]).toMatchObject({ id: 'N1', geometry: { type: 'Point', coordinates: [28.1, -25.52] }, properties: { kind: 'source', label: 'TX1' } });
+  });
+
+  it('marks overloaded branches and bands nodes by voltage drop', () => {
+    const l = lvLayers(network({ analysis: analysis() }));
+    expect(l.branches.features.map((f) => f.properties.overloaded)).toEqual([false, true, false]);
+    expect(l.nodes.features.map((f) => f.properties.band)).toEqual([null, 'ok']);
+    const nodes = network().nodes;
+    const more = lvLayers(network({ analysis: analysis(), nodes: [...nodes, { ...nodes[1], id: 'N3' }, { ...nodes[1], id: 'N4' }] }));
+    expect(more.nodes.features.map((f) => f.properties.dropColour)).toEqual([null, DROP_COLOURS.ok, DROP_COLOURS.near, DROP_COLOURS.over]);
   });
 });

@@ -3,7 +3,7 @@ import { Component, computed, effect, inject, input, output, signal, untracked }
 import { firstValueFrom } from 'rxjs';
 import { toApiProblem } from '../../core/api-problem';
 import { ConductorLibrary } from './conductor-library';
-import { FEEDER_COLOURS, LvLayers, LvNetwork, LvNetworkApi, PHASE_COLOURS, PHASE_NAMES, lvLayers } from './lv-network.api';
+import { FEEDER_COLOURS, LvFeederResult, LvLayers, LvNetwork, LvNetworkApi, PHASE_COLOURS, PHASE_NAMES, lvLayers, sourceLinkResult } from './lv-network.api';
 
 /** The LV network model (plan 2.1): the marked LV routes and sites joined into a network, with its feeders and what to fix. */
 @Component({
@@ -100,15 +100,49 @@ import { FEEDER_COLOURS, LvLayers, LvNetwork, LvNetworkApi, PHASE_COLOURS, PHASE
             </table>
             <p class="muted small">
               Customers and ADMD on each phase. Three-phase loads count on every phase with a third of their kVA. Unbalance is the largest
-              difference from the mean of the three phases. Design currents per section follow with the voltage-drop checks.
+              difference from the mean of the three phases.
             </p>
           }
           <p class="muted small">Connected using {{ l.clause }}.</p>
         }
 
+        @if (n.analysis; as a) {
+          <h4>Checks</h4>
+          @if (a.placeholders.length) {
+            <div class="banner warn" role="note" aria-label="Placeholder inputs">
+              <strong>Not fit to submit:</strong> these checks use placeholder values until the governing standards are held.
+              <ul>
+                @for (p of a.placeholders; track p) { <li>{{ p }}</li> }
+              </ul>
+            </div>
+          }
+          @if (checkRows().length) {
+            <table class="checks">
+              <thead>
+                <tr><th>Feeder</th><th>Voltage drop</th><th>Loading</th><th>Lowest fault current</th><th>Result</th></tr>
+              </thead>
+              <tbody>
+                @for (f of checkRows(); track f.feeder) {
+                  <tr>
+                    <td>{{ f.feeder }}</td>
+                    <td [class.warn]="f.maxDropPct > a.limitPct">{{ f.maxDropPct | number: '1.2-2' }} % <span class="muted">at {{ f.maxDropAt }}</span></td>
+                    <td [class.warn]="f.maxUtilisationPct > 100">{{ f.maxUtilisationPct | number: '1.0-0' }} % <span class="muted">on {{ f.maxUtilisationBranch }}</span></td>
+                    <td>{{ f.minFaultA | number: '1.0-0' }} A <span class="muted">at {{ f.minFaultAt }}</span></td>
+                    <td [class.ok]="f.passes" [class.warn]="!f.passes">{{ f.passes ? 'Passes' : 'Fails' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          }
+          <p class="muted small">
+            Voltage drop is the worst phase at {{ a.confidencePct | number: '1.0-0' }} % confidence (Herman-Beta), against a limit of
+            {{ a.limitPct | number: '1.0-1' }} % of {{ a.phaseVoltageV | number: '1.0-0' }} V. Loading is the design current of each
+            section against its conductor rating. Source links run from a transformer to its route and carry all its feeders. Fault current is phase to neutral at the far point. Checked using {{ a.clause }}.
+          </p>
+        }
+
         <p class="muted small">
           Built {{ n.builtAt | date: 'd MMM y, HH:mm' }} with rules {{ n.rulesRef }} ({{ n.rulesHash }}). Joined using {{ n.clause }}.
-          Conductors and checks follow in later steps.
         </p>
       } @else if (loaded()) {
         <p class="muted">
@@ -125,6 +159,7 @@ import { FEEDER_COLOURS, LvLayers, LvNetwork, LvNetworkApi, PHASE_COLOURS, PHASE
     .chips li { border: 1px solid var(--border); border-radius: 999px; padding: .2rem .7rem; background: var(--surface); }
     .warn { color: var(--danger); }
     .banner.warn { border: 1px solid var(--danger); border-radius: 8px; padding: .5rem .75rem; }
+    .banner ul { margin: .35rem 0 0; padding-left: 1.1rem; }
     .issues { padding-left: 1.1rem; }
     .issues .error { color: var(--danger); }
     .ok { color: var(--ok); }
@@ -146,6 +181,14 @@ export class LvNetworkPanel {
   protected readonly problem = signal<string | null>(null);
   /** Loops and tied sources: the errors that stop feeders being worked out. */
   protected readonly topologyErrors = computed(() => this.network()?.issues.filter((i) => i.code === 'loop' || i.code === 'sources_tied').length ?? 0);
+
+  /** A row per feeder, then the source links. */
+  protected readonly checkRows = computed<LvFeederResult[]>(() => {
+    const a = this.network()?.analysis;
+    if (!a) return [];
+    const links = sourceLinkResult(a);
+    return links ? [...a.feeders, links] : a.feeders;
+  });
 
   constructor() {
     effect(() => {
