@@ -4,7 +4,7 @@ Every check and every rules-file value that comes from a standard points to an e
 
 **Status: draft, 2026-10-05.** No clause number below has been checked against the standards. Each row says *to confirm* until the engineer has read the clause in the current edition and filled in the number. The plan requires this before Phase 2 (open item 5).
 
-**The engineer holds none of the cited documents (answered 2026-10-05).** No row can be confirmed until copies are obtained, so every value that comes from a standard stays *unverified* and is listed in the assumptions register as such. Getting the documents is the first step to closing open item 5.
+**The engineer held none of the cited documents (answered 2026-10-05).** Later that day the engineer supplied Eskom 240-56030637 Rev 2 (LV cable systems); its clauses are located below but not yet confirmed. Every other row waits for its document, so every value that comes from a standard stays *unverified* and is listed in the assumptions register as such. Getting the documents is the first step to closing open item 5.
 
 ## How it is used
 
@@ -53,17 +53,21 @@ Every check and every rules-file value that comes from a standard points to an e
 
 ### Eskom standards (govern Eskom projects)
 
-The engineer designs Eskom projects to Eskom's own standards. Their document numbers and editions are still to be identified, so each row names the subject, not the document.
+The engineer designs Eskom projects to Eskom's own standards. Where a document number is not yet known, the row names the subject. Numbers found in 240-56030637 §2.2.1 are recorded, but only that document is held so far (see **Documents held** below).
 
 | Id | Check or value | Standard | Clause | Edition | Used by | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | ESKOM-PLANNING | Residential electrification planning and design: ADMD, design horizon, phasing; overrides NRS 034-1 where they differ | Eskom distribution standard, number to identify | to confirm | to identify | `eskom/*` rules: `income_admd`, `load_tables` | to identify |
-| ESKOM-VDROP | LV voltage drop allocation and limits for Eskom networks; overrides NRS034-VDROP | Eskom distribution standard, number to identify | to confirm | to identify | `eskom/*` rules: `voltage.lv_max_drop_pct` (index set from eskom/0.3.0) | to identify |
-| ESKOM-CONDUCTOR | Standard LV and MV conductors and cables, with impedances and ratings | Eskom distribution standard, number to identify | to confirm | to identify | `eskom/*` rules: `conductors` (index set from eskom/0.3.0) | to identify |
-| ESKOM-DERATE | Cable current derating for soil, depth and grouping | Eskom distribution standard, number to identify | to confirm | to identify | Phase 2.6 | to identify |
+| ESKOM-VDROP | LV voltage drop allocation and limits for Eskom networks; overrides NRS034-VDROP | Eskom 240-70465489 *Distribution voltage regulation and apportionment limits* (cited by 240-56030637 §3.10.5) | to confirm | to identify | `eskom/*` rules: `voltage.lv_max_drop_pct` (index set from eskom/0.3.0) | number identified 2026-10-05; document not held |
+| ESKOM-CONDUCTOR | Standard LV and MV conductors and cables, with impedances and ratings | Eskom 240-56063805 (LV power and control cable 600/1000 V), per 240-56030637 §3.9.1 a); overhead conductors to identify | to confirm | to identify | `eskom/*` rules: `conductors` (index set from eskom/0.3.0) | number identified 2026-10-05; document not held. Underground cable types are set by 240-56030637 §3.9.1 h)–k): see ESKOM-LVCABLE-RATING |
+| ESKOM-DERATE | Cable current derating: standard installation conditions, grouping, cables in pipes | Eskom 240-56030637 *General information and requirements for LV cable systems* | §3.9.1 o)–p) (standard conditions: 70 °C conductor, 25 °C soil, 30 °C air, 1,2 K·m/W, 0,5 m deep); §3.9.6 i) (pipe rating where over 10 % is in pipe); de-rating annex (grouping, in ground and in ducts) | Rev 2, Aug 2021 | Phase 2.6 | clause located 2026-10-05 in the copy supplied; engineer to confirm; values not yet in a rules file. The standard gives grouping factors only; soil and depth factors come from SANS 10198-4, which it cites |
 | ESKOM-OHL | Overhead line spans, sag and tension, clearances, poles and stays | Eskom distribution standard, number to identify | to confirm | to identify | Phase 2.5 | to identify |
-| ESKOM-MINISUB | Transformer and mini-sub selection and standard sizes | Eskom distribution standard, number to identify | to confirm | to identify | Phases 3.1–3.2 | to identify |
-| ESKOM-SERVICE | Service connections and phasing: longest service, where services connect, when a supply is three-phase | Eskom distribution standard, number to identify | to confirm | to identify | `eskom/*` rules: `lv_loads` (from eskom/0.4.0) | to identify: 2 boxes a pole, 4 loads a box and the second box on another phase are the engineer's stated practice (2026-10-05); 40 m and 15 kVA are placeholders |
+| ESKOM-MINISUB | Transformer and mini-sub selection and standard sizes | Eskom 240-56062752 (MV miniature substations 11–22 kV), per 240-56030637 §2.2.1 | to confirm | to identify | Phases 3.1–3.2 | number identified 2026-10-05; document not held. Feeders per mini-sub: see ESKOM-LVPROT |
+| ESKOM-SERVICE | Service connections and phasing: longest service, where services connect, when a supply is three-phase | Eskom 240-75661043 Part 8 Section 3 (outdoor LV services for SPU and LPU), per 240-56030637 §2.2.1 | to confirm | to identify | `eskom/*` rules: `lv_loads` (from eskom/0.4.0) | number identified 2026-10-05; document not held. 2 boxes a pole, 4 loads a box and the second box on another phase are the engineer's stated practice (2026-10-05); 40 m and 15 kVA are placeholders |
+| ESKOM-LVCABLE-RATING | Continuous current rating of 600/1000 V armoured LV cables, Cu and Al, 16–240 mm², in ground, in pipes and in air; feeder cables four-core, services two- or four-core | Eskom 240-56030637 *General information and requirements for LV cable systems* | §3.9.1 h)–k), n); Tables 6 (Cu) and 7 (Al) | Rev 2, Aug 2021 | Phase 2.3 (underground conductor library) | clause located 2026-10-05 in the copy supplied; engineer to confirm; values not yet in a rules file |
+| ESKOM-LVCABLE-FAULT | Short-circuit withstand of LV cables: I = K·A/√t, K 0,115 (Cu) and 0,076 (Al); phase and earth fault levels | Eskom 240-56030637 *General information and requirements for LV cable systems* | §3.9.1 m); Tables 1–5 | Rev 2, Aug 2021 | Phase 2.4 (fault level) | clause located 2026-10-05 in the copy supplied; engineer to confirm; values not yet in a rules file |
+| ESKOM-LVPROT | LV feeder protection per cable size (MCCB and fuse ratings); at most 5 LV feeders from a Type A mini-sub, 6 from a Type B | Eskom 240-56030637 *General information and requirements for LV cable systems* | §3.6; §3.9.12 a); Table 10 and its note | Rev 2, Aug 2021 | Phases 2.4 and 3.2 | clause located 2026-10-05 in the copy supplied; engineer to confirm; values not yet in a rules file. LV protection philosophy is in 240-57649065 (not held) |
+| ESKOM-KIOSK | Underground supply: LV feeders supply metering kiosks, never customers directly; at each kiosk, MCBs on one phase grouped, at most 4 per phase, and the kiosk balanced across phases | Eskom 240-56030637 *General information and requirements for LV cable systems* | §2.3.1 (LV feeder cable); §3.5.3 d)–f); §3.10 e) | Rev 2, Aug 2021 | Plan 2.2, underground (kiosks not yet modelled; see ADR 0007) | clause located 2026-10-05 in the copy supplied; engineer to confirm; values not yet in a rules file |
 
 ### Later and supporting
 
@@ -90,9 +94,15 @@ These values are Reticula's own and say so in their `clause` text. They are list
 3. **Eskom projects:** designed to Eskom's own standards, which override NRS and SANS where they differ (the Eskom rows above).
 4. **SANS 507-1 class C8:** cannot be checked. It stays excluded from designs.
 
+## Documents held
+
+| Document | Revision | Received | Notes |
+| --- | --- | --- | --- |
+| Eskom 240-56030637 (alt. 34-1176) *General information and requirements for low-voltage cable systems* | Rev 2, August 2021 | 2026-10-05, from the engineer | Underground LV only. Its next review date (August 2026) has passed: confirm Rev 2 is current. Controlled disclosure, Eskom copyright: the PDF is not kept in this repository; rules files carry only the values the calculations use, with clause references. |
+
 ## Still open
 
-- **Eskom document numbers and editions** for the six Eskom rows, and copies of them.
+- **Eskom documents identified but not held:** 240-70465489 (voltage regulation and apportionment), 240-75661043 (LV services), 240-56063805 (LV cable specification), 240-56062752 (mini-substations), 240-57649065 (LV protection philosophy). Still unidentified: the planning standard (ESKOM-PLANNING) and the overhead line standard (ESKOM-OHL).
 - **Copies of NRS 034-1, NRS 048-2, SANS 1507, SANS 1418, SANS 780, SANS 1019, SANS 97 and IEC 60909**, for municipal projects and for values Eskom does not set.
 
 Until these are in hand, Phase 2 can be built and tested against hand-worked cases, but every rules value stays *unverified* and no design is fit to submit.

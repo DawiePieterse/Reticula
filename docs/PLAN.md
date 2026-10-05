@@ -195,7 +195,7 @@ F. **Performance targets.** Field UI usable on mid-range Android tablet; 2,000-s
 - [ ] Check which authorities require DWG rather than DXF.
 - [ ] Choose which authority's rules to encode first (assumed Eskom).
 - [ ] Decide whether any design calculation must also run offline (assumed no).
-- [ ] Confirm current editions of NRS 034-1, NRS 048-2, NRS 097-2-1, SANS 10142-1, SANS 10098, SANS 780, SANS 1019, SANS 1507, SANS 97, IEC 60909, Red Book. (2026-10-05: none held yet. Eskom projects follow Eskom's own standards, numbers to identify. See docs/standards-index.md.)
+- [ ] Confirm current editions of NRS 034-1, NRS 048-2, NRS 097-2-1, SANS 10142-1, SANS 10098, SANS 780, SANS 1019, SANS 1507, SANS 97, IEC 60909, Red Book. (2026-10-05: none held yet. Eskom projects follow Eskom's own standards. Eskom 240-56030637 Rev 2, LV cable systems, now held, with five more Eskom numbers identified from it. See docs/standards-index.md.)
 - [ ] Confirm Google satellite and rooftop-image licence terms.
 - [ ] Confirm .NET + Python split vs Python-only back end (Decision A).
 
