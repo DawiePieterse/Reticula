@@ -91,3 +91,24 @@ def test_endpoints(client):
     g = client.post("/calc/admd/group", json={"rules": "eskom/0.1.0", "loads": [{"id": "a", "kind": "residential", "kva": 1.5}]})
     assert g.status_code == 200 and g.json()["total_kva"]["value"] == pytest.approx(3.75)
     assert client.get("/calc/admd/form/eskom/0.1.0").status_code == 200
+
+
+def test_empirical_diversity_matches_reticmaster_mixed_domestic_example():
+    """ReticMaster 21 test procedure "Mixed Domestic Loads" §1.1: DCF(n) = 1 + 2/n (its AMEU default; our starter rules
+    use k = 1.5, so k = 2 is set here). Its per-phase currents, at 231 V, add up to the group demand Reticula gives."""
+    import dataclasses
+
+    from reticula_calc.calcs.admd import GroupRequest, group
+
+    rs = load_rules("eskom/0.1.0")
+    cfg = rs.data["income_admd"]
+    rs = dataclasses.replace(rs, data={**rs.data, "income_admd": {**cfg, "diversity": {**cfg["diversity"], "k": 2}}})
+
+    def kva(*loads: float) -> float:
+        req = GroupRequest(rules=rs.ref, loads=[{"id": str(i), "kind": "residential", "kva": x} for i, x in enumerate(loads)])
+        return group(req, rs).residential_kva.value
+
+    # DSP3: two LSM 3-4 loads (1.3 kVA), one on phase A and one on B: 11.255 A on each, DCF(2) = 2.
+    assert kva(1.3, 1.3) == pytest.approx(2 * 231 * 11.255 / 1000, rel=1e-4)
+    # LV to LV2, n = 4 (two LSM 3-4, two LSM 5-6 at 2.37 kVA): A 8.441 A, B 23.831 A, C 15.390 A (2.37/231 × 1.5).
+    assert kva(1.3, 1.3, 2.37, 2.37) == pytest.approx(231 * (8.441 + 23.831 + 2.37 / 231 * 1.5 * 1000) / 1000, rel=1e-4)

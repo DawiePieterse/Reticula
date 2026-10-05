@@ -103,7 +103,7 @@ Deliverables: predicted building types, tablet inspection, income/ADMD tool, loa
 - [x] 1.9 Offline map tiles: PMTiles pack per project area, download/refresh. (ADR 0005; docs/field.md, docs/operations.md. Needs a map source configured on the server.)
 - [~] 1.10 Load schedule view and export (CSV/Excel). (Done: view and CSV. To do: Excel with the documents in Phase 6.)
 - [x] 1.11 Assumptions register v1: every estimate and override auto-registered.
-- [~] 1.12 Validation: ADMD hand-worked cases from NRS 034-1 examples in `/test-cases`. (Done: hand-worked ADMD and Herman-Beta cases, and a self-check of every load class against its α, β and c. To do: compare with NRS 034-1 worked examples and ReticMaster results.)
+- [~] 1.12 Validation: ADMD hand-worked cases from NRS 034-1 examples in `/test-cases`. (Done: hand-worked ADMD and Herman-Beta cases, and a self-check of every load class against its α, β and c. Herman-Beta mixing and empirical diversity checked against ReticMaster 21's worked results; see docs/load-data.md. To do: compare with NRS 034-1 worked examples.)
 
 ### Phase 2 – LV design
 
