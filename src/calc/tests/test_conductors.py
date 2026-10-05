@@ -37,7 +37,7 @@ def test_withstand_matches_the_fault_level_tables(rs, code, t, table_ka):
 def test_the_library_is_complete_and_says_what_is_a_placeholder(rs):
     lib = library(rs)
     codes = [c.code for c in lib.conductors]
-    assert len(codes) == len(set(codes)) == 28
+    assert len(codes) == len(set(codes)) == 29
     for c in lib.conductors:
         if c.kind == "underground":
             # Ratings and K come from the standard; impedances do not yet.
@@ -74,6 +74,17 @@ def test_single_phase_abc_is_transcribed_from_the_data_sheet_and_the_sheet_is_co
     assert r90 == pytest.approx(r20 * (1 + 0.00403 * 70), rel=0.004)  # aluminium, 20 °C to 90 °C
 
 
+def test_16_mm2_single_phase_abc_comes_from_the_2006_sheet_with_its_short_circuit_value_a_placeholder(rs):
+    import math
+
+    c = rs.conductor("ABC-1C-16")
+    assert (c.r_ohm_per_km, c.r_ac_ohm_per_km, c.x_ohm_per_km, c.rating_a) == (1.910, 2.372, 0.091, 87)
+    assert c.placeholder == ("fault_k",)
+    assert withstand(rs, c.code, 1).value == pytest.approx(1.4, abs=0.001)
+    assert math.hypot(2.372, 0.091) == pytest.approx(2.374, abs=0.0015) and 2 * 2.374 == pytest.approx(4.75, abs=0.006)
+    assert "(placeholder)" in withstand(rs, c.code, 1).inputs[0].source
+
+
 def test_a_rating_is_traced_and_flags_placeholders(rs):
     r = rating(rs, "CU-4C-70", "pipe")
     assert (r.value, r.unit, r.formula_id) == (171, "A", "lv.cable.rating.v1")
@@ -95,6 +106,6 @@ def test_endpoint(client):
     r = client.get(f"/rules/{RULES}/conductors")
     assert r.status_code == 200
     body = r.json()
-    assert body["rules_ref"] == RULES and len(body["conductors"]) == 28
+    assert body["rules_ref"] == RULES and len(body["conductors"]) == 29
     assert next(c for c in body["conductors"] if c["code"] == "AL-4C-70")["ratings_a"] == {"ground": 158, "pipe": 130, "air": 151}
     assert client.get("/rules/eskom/9.9.9/conductors").status_code == 404
