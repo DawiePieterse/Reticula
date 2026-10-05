@@ -3,12 +3,13 @@ import { Component, computed, effect, inject, input, output, signal, untracked }
 import { firstValueFrom } from 'rxjs';
 import { toApiProblem } from '../../core/api-problem';
 import { ConductorLibrary } from './conductor-library';
+import { LvOverheadSection } from './lv-overhead';
 import { FEEDER_COLOURS, LvFeederResult, LvLayers, LvNetwork, LvNetworkApi, PHASE_COLOURS, PHASE_NAMES, lvLayers, sourceLinkResult } from './lv-network.api';
 
 /** The LV network model (plan 2.1): the marked LV routes and sites joined into a network, with its feeders and what to fix. */
 @Component({
   selector: 'app-lv-network',
-  imports: [DatePipe, DecimalPipe, ConductorLibrary],
+  imports: [DatePipe, DecimalPipe, ConductorLibrary, LvOverheadSection],
   template: `
     <section class="lv">
       <div class="page-head">
@@ -140,6 +141,8 @@ import { FEEDER_COLOURS, LvFeederResult, LvLayers, LvNetwork, LvNetworkApi, PHAS
             section against its conductor rating. Source links run from a transformer to its route and carry all its feeders. Fault current is phase to neutral at the far point. Checked using {{ a.clause }}.
           </p>
         }
+
+        @if (n.overhead; as o) { <app-lv-overhead [overhead]="o" /> }
 
         <p class="muted small">
           Built {{ n.builtAt | date: 'd MMM y, HH:mm' }} with rules {{ n.rulesRef }} ({{ n.rulesHash }}). Joined using {{ n.clause }}.

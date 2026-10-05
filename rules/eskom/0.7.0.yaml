@@ -1,0 +1,63 @@
+# Eskom residential distribution rules: 0.6.0 plus LV overhead line checks (Phase 2.5).
+# Only the keys below differ from the base file. Every value must be checked before use in a design.
+base: eskom/0.6.0
+authority: eskom
+version: 0.7.0
+effective_date: 2026-10-05
+notes: >-
+  As 0.6.0, plus the settings for the LV overhead checks: spans, sag and tension, ground clearance, pole loads and
+  stays. The Eskom overhead line standard is not yet identified (index ESKOM-OHL), so every setting below is a
+  placeholder except the conductors' mass, diameter and pull force, which are M-TEC manufacturer data. Not for design
+  use until checked.
+
+# LV overhead checks (Phase 2.5). Spans run between supports (marked poles and sources); bends and junctions need a
+# pole. A strain section runs between strain supports (terminals, junctions, sources, angles over strain_angle_deg,
+# and where the conductor changes); its ruling span sets the tension in each loading case (parabolic state change).
+lv_overhead:
+  clause: "LV overhead line settings: placeholders until the Eskom overhead line standard is identified"
+  index: ESKOM-OHL
+  max_span_m: 50                     # PLACEHOLDER: longest LV span
+  bend_tolerance_m: 2.0              # PLACEHOLDER: how far a route may stray from the straight line between supports
+  min_ground_clearance_m: 5.5        # PLACEHOLDER: conductor to flat ground at the hottest sag
+  intermediate_max_deg: 10           # PLACEHOLDER: deviation up to which a pole is an intermediate (suspension) pole
+  strain_angle_deg: 30               # PLACEHOLDER: deviation over which an angle pole is a strain pole
+  pole:                              # PLACEHOLDER: one LV pole for every support
+    length_m: 9.0
+    planting_depth_m: 1.5
+    attach_below_top_m: 0.3
+  # Unstayed working capacity at the conductor attachment, lightest first. PLACEHOLDER: wood poles worked from a
+  # groundline section modulus at about 20 MPa; to replace with the Eskom pole schedule.
+  pole_classes:
+    - { code: 9m-140, top_diameter_mm: 140, capacity_kn: 2.7 }
+    - { code: 9m-160, top_diameter_mm: 160, capacity_kn: 3.5 }
+    - { code: 9m-180, top_diameter_mm: 180, capacity_kn: 4.5 }
+  stay:                              # PLACEHOLDER
+    terminals: true                  # every terminal pole is stayed
+    angle_from_ground_deg: 45
+    capacity_kn: 20
+  # Loading cases. A section is strung at tension_pct of the conductor's max_pull_kn at the everyday case, or slacker
+  # where that would take the cold or wind case over max_tension_pct of max_pull_kn.
+  # PLACEHOLDER: temperatures, wind pressure and both percentages.
+  everyday: { temp_c: 15, wind_pa: 0, tension_pct: 45, max_tension_pct: 100 }
+  cases:
+    hot: { temp_c: 80, wind_pa: 0 }       # greatest sag: ground clearance
+    cold: { temp_c: -5, wind_pa: 0 }      # greatest tension without wind
+    wind: { temp_c: 10, wind_pa: 700 }    # greatest tension with wind, on the bundle's diameter
+  materials:                         # PLACEHOLDER: stranded hard-drawn aluminium
+    al: { modulus_gpa: 59, expansion_per_c: 0.000023 }
+  # Mechanical data by conductor code. All cores carry the tension (self-supporting ABC).
+  conductors:
+    ABC-3C-25: { mass_kg_per_m: 0.41, diameter_mm: 23, max_pull_kn: 3.30, index: MTEC-ABC-3C, clause: "M-TEC AS3x data sheet R06: cable mass, cable diameter, maximum pull force on cores combined" }
+    ABC-3C-35: { mass_kg_per_m: 0.56, diameter_mm: 26, max_pull_kn: 4.50, index: MTEC-ABC-3C, clause: "M-TEC AS3x data sheet R06: cable mass, cable diameter, maximum pull force on cores combined" }
+    ABC-3C-50: { mass_kg_per_m: 0.72, diameter_mm: 29, max_pull_kn: 6.20, index: MTEC-ABC-3C, clause: "M-TEC AS3x data sheet R06: cable mass, cable diameter, maximum pull force on cores combined" }
+    ABC-3C-70: { mass_kg_per_m: 1.01, diameter_mm: 34, max_pull_kn: 8.90, index: MTEC-ABC-3C, clause: "M-TEC AS3x data sheet R06: cable mass, cable diameter, maximum pull force on cores combined" }
+    ABC-3C-95: { mass_kg_per_m: 1.33, diameter_mm: 39, max_pull_kn: 12.30, index: MTEC-ABC-3C, clause: "M-TEC AS3x data sheet R06: cable mass, cable diameter, maximum pull force on cores combined" }
+    ABC-3C-120: { mass_kg_per_m: 1.64, diameter_mm: 42, max_pull_kn: 15.60, index: MTEC-ABC-3C, clause: "M-TEC AS3x data sheet R06: cable mass, cable diameter, maximum pull force on cores combined" }
+    ABC-3C-150: { mass_kg_per_m: 1.95, diameter_mm: 45, max_pull_kn: 19.20, index: MTEC-ABC-3C, clause: "M-TEC AS3x data sheet R06: cable mass, cable diameter, maximum pull force on cores combined" }
+    ABC-1C-25: { mass_kg_per_m: 0.20, diameter_mm: 20, max_pull_kn: 2.48, index: MTEC-ABC-1C, clause: "M-TEC AS1x data sheet R06: cable mass, cable diameter, maximum pull force on cores combined" }
+    ABC-1C-35: { mass_kg_per_m: 0.28, diameter_mm: 24, max_pull_kn: 3.38, index: MTEC-ABC-1C, clause: "M-TEC AS1x data sheet R06: cable mass, cable diameter, maximum pull force on cores combined" }
+    ABC-1C-50: { mass_kg_per_m: 0.36, diameter_mm: 26, max_pull_kn: 4.65, index: MTEC-ABC-1C, clause: "M-TEC AS1x data sheet R06: cable mass, cable diameter, maximum pull force on cores combined" }
+    ABC-1C-70: { mass_kg_per_m: 0.59, diameter_mm: 31, max_pull_kn: 6.68, index: MTEC-ABC-1C, clause: "M-TEC AS1x data sheet R06: cable mass, cable diameter, maximum pull force on cores combined (mass looks high against the other sizes; to confirm)" }
+    ABC-1C-95: { mass_kg_per_m: 0.67, diameter_mm: 35, max_pull_kn: 9.23, index: MTEC-ABC-1C, clause: "M-TEC AS1x data sheet R06: cable mass, cable diameter, maximum pull force on cores combined" }
+    ABC-1C-120: { mass_kg_per_m: 0.74, diameter_mm: 38, max_pull_kn: 11.70, index: MTEC-ABC-1C, clause: "M-TEC AS1x data sheet R06: cable mass, cable diameter, maximum pull force on cores combined" }
+    ABC-1C-150: { mass_kg_per_m: 0.97, diameter_mm: 45, max_pull_kn: 14.40, index: MTEC-ABC-1C, clause: "M-TEC AS1x data sheet R06: cable mass, cable diameter, maximum pull force on cores combined" }

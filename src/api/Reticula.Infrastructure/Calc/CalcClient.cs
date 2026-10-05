@@ -122,6 +122,13 @@ public sealed class CalcClient(HttpClient http) : ICalcClient
         return await ReadAsync<CalcLvAnalysis>(r, ct);
     }
 
+    public async Task<CalcLvOverhead> CheckLvOverheadAsync(string rulesRef, CalcLvNetwork network, CancellationToken ct = default)
+    {
+        using var content = JsonContent.Create(new { rules = rulesRef, network }, options: Json);
+        using var r = await SendAsync(() => http.PostAsync("/calc/lv/overhead", content, ct), ct);
+        return await ReadAsync<CalcLvOverhead>(r, ct);
+    }
+
     public async Task<MapExtract> ExtractMapAsync(double minLon, double minLat, double maxLon, double maxLat, CancellationToken ct = default)
     {
         using var content = JsonContent.Create(new { bbox = new[] { minLon, minLat, maxLon, maxLat } }, options: Json);

@@ -50,6 +50,10 @@ public interface ICalcClient
     /// <exception cref="CalcRejectedException">The rules file has no lv_design section.</exception>
     Task<CalcLvAnalysis> AnalyseLvAsync(string rulesRef, CalcLvNetwork network, IReadOnlyList<LvLoadAt> loads, CancellationToken ct = default);
 
+    /// <summary>Overhead line checks of the LV network: spans, sag and tension, ground clearance, pole loads and stays.</summary>
+    /// <exception cref="CalcRejectedException">The rules file has no lv_overhead section.</exception>
+    Task<CalcLvOverhead> CheckLvOverheadAsync(string rulesRef, CalcLvNetwork network, CancellationToken ct = default);
+
     Task<AdmdGroup> GroupAdmdAsync(string rulesRef, IReadOnlyList<AdmdGroupLoad> loads, CancellationToken ct = default);
 }
 

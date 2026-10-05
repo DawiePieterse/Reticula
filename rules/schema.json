@@ -871,6 +871,286 @@
           "description": "Smallest phase-to-neutral fault current allowed anywhere on a feeder; unset: reported only"
         }
       }
+    },
+    "lv_overhead": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "LV overhead checks (Phase 2.5): spans, sag and tension, ground clearance, pole loads and stays.",
+      "required": [
+        "max_span_m",
+        "bend_tolerance_m",
+        "min_ground_clearance_m",
+        "intermediate_max_deg",
+        "strain_angle_deg",
+        "pole",
+        "pole_classes",
+        "stay",
+        "everyday",
+        "cases",
+        "materials",
+        "conductors"
+      ],
+      "properties": {
+        "clause": {
+          "type": "string"
+        },
+        "index": {
+          "type": "string",
+          "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)+$",
+          "description": "Id of the clause in docs/standards-index.md"
+        },
+        "max_span_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "bend_tolerance_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Largest distance of a route from the straight line between its supports"
+        },
+        "min_ground_clearance_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "intermediate_max_deg": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 180,
+          "description": "Deviation up to which a pole is an intermediate pole"
+        },
+        "strain_angle_deg": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 180,
+          "description": "Deviation over which an angle pole is a strain pole"
+        },
+        "pole": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "length_m",
+            "planting_depth_m",
+            "attach_below_top_m"
+          ],
+          "properties": {
+            "length_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "planting_depth_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "attach_below_top_m": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        },
+        "pole_classes": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Unstayed working capacity at the attachment, lightest first",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "code",
+              "capacity_kn"
+            ],
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "top_diameter_mm": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "capacity_kn": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            }
+          }
+        },
+        "stay": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "terminals",
+            "angle_from_ground_deg",
+            "capacity_kn"
+          ],
+          "properties": {
+            "terminals": {
+              "type": "boolean"
+            },
+            "angle_from_ground_deg": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "exclusiveMaximum": 90
+            },
+            "capacity_kn": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "everyday": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "temp_c",
+            "wind_pa",
+            "tension_pct",
+            "max_tension_pct"
+          ],
+          "properties": {
+            "temp_c": {
+              "type": "number"
+            },
+            "wind_pa": {
+              "type": "number",
+              "minimum": 0
+            },
+            "tension_pct": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 100
+            },
+            "max_tension_pct": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 100,
+              "description": "Greatest tension in the cold and wind cases, as a percentage of max_pull_kn"
+            }
+          }
+        },
+        "cases": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "hot",
+            "cold",
+            "wind"
+          ],
+          "properties": {
+            "hot": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "temp_c",
+                "wind_pa"
+              ],
+              "properties": {
+                "temp_c": {
+                  "type": "number"
+                },
+                "wind_pa": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            },
+            "cold": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "temp_c",
+                "wind_pa"
+              ],
+              "properties": {
+                "temp_c": {
+                  "type": "number"
+                },
+                "wind_pa": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            },
+            "wind": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "temp_c",
+                "wind_pa"
+              ],
+              "properties": {
+                "temp_c": {
+                  "type": "number"
+                },
+                "wind_pa": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        },
+        "materials": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "modulus_gpa",
+              "expansion_per_c"
+            ],
+            "properties": {
+              "modulus_gpa": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "expansion_per_c": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            }
+          }
+        },
+        "conductors": {
+          "type": "object",
+          "description": "Mechanical data by conductor code",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "mass_kg_per_m",
+              "diameter_mm",
+              "max_pull_kn"
+            ],
+            "properties": {
+              "mass_kg_per_m": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "diameter_mm": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "max_pull_kn": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "clause": {
+                "type": "string"
+              },
+              "index": {
+                "type": "string",
+                "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)+$",
+                "description": "Id of the clause in docs/standards-index.md"
+              },
+              "placeholder": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

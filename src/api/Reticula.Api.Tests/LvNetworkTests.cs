@@ -166,6 +166,13 @@ public class LvNetworkTests(ReticulaApiFactory factory)
         Assert.Equal(4.2, analysis.WorstDrop!.Value);
         Assert.Contains(net.Issues, i => i.Code == "placeholders");
 
+        // The overhead checks are stored too.
+        var overhead = Assert.IsType<CalcLvOverhead>(net.Overhead);
+        Assert.Equal((1, 40.0, "T1"), (overhead.Summary.Spans, overhead.Summary.LongestSpanM, overhead.Spans[0].Section));
+        Assert.Equal(("9m-140", true), (overhead.Supports[^1].PoleClass, overhead.Supports[^1].Stay));
+        Assert.Equal(6.4, overhead.LowestClearance!.Value);
+        Assert.Contains(net.Issues, i => i.Code == "overhead_placeholders");
+
         // Estimating the bare building's load makes the network out of date.
         (await client.PutAsJsonAsync($"/api/projects/{projectId}/buildings/{bare}/load", new LoadRequest("residential", [], null, null, null, null)))
             .EnsureSuccessStatusCode();
@@ -215,6 +222,27 @@ public class LvNetworkTests(ReticulaApiFactory factory)
         finally
         {
             factory.Calc.OnAnalyseLv = FakeCalc.DefaultLvAnalysis;
+        }
+    }
+
+    [Fact]
+    public async Task Rules_without_overhead_settings_say_the_overhead_checks_were_skipped()
+    {
+        factory.Calc.OnBuildLvNetwork = FakeCalc.DefaultLvNetwork;
+        factory.Calc.OnCheckLvOverhead = (rules, _) => throw new CalcRejectedException($"rules {rules} has no lv_overhead section");
+        try
+        {
+            var (client, projectId) = await NewProjectAsync();
+            await MarkAsync(client, projectId, "lv_route", Line());
+            Assert.Equal(HttpStatusCode.OK, (await client.PostAsync($"/api/projects/{projectId}/lv-network", null)).StatusCode);
+            var net = (await GetAsync(client, projectId))!;
+            Assert.NotNull(net.Analysis);
+            Assert.Null(net.Overhead);
+            Assert.Contains(net.Issues, i => i.Code == "overhead_skipped" && i.Message.Contains("lv_overhead"));
+        }
+        finally
+        {
+            factory.Calc.OnCheckLvOverhead = FakeCalc.DefaultLvOverhead;
         }
     }
 

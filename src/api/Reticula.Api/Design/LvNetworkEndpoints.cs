@@ -24,10 +24,11 @@ public sealed record LvLoadsDto(string Clause, LvLoadSummary Summary, IReadOnlyL
     IReadOnlyList<LvLoadDto> Connections);
 
 /// <param name="Analysis">Voltage drop, thermal loading and fault level; null when the rules file has no design settings.</param>
+/// <param name="Overhead">Spans, sag and tension, clearance, pole loads and stays; null when the rules file has no overhead settings.</param>
 /// <param name="Stale">Why the network no longer matches the marked routes and sites or the project's rules; null when it does.</param>
 public sealed record LvNetworkDto(Guid Id, string RulesRef, string RulesHash, string Clause, DateTimeOffset BuiltAt, string? Stale,
     LvSummary Summary, IReadOnlyList<LvFeeder> Feeders, IReadOnlyList<LvIssue> Issues, IReadOnlyList<LvNodeDto> Nodes, IReadOnlyList<LvBranchDto> Branches,
-    LvLoadsDto? Loads, CalcLvAnalysis? Analysis = null);
+    LvLoadsDto? Loads, CalcLvAnalysis? Analysis = null, CalcLvOverhead? Overhead = null);
 
 /// <param name="Network">The project's LV network, or null before it is first built.</param>
 public sealed record LvNetworkStatus(LvNetworkDto? Network);
@@ -93,7 +94,8 @@ public static class LvNetworkEndpoints
             [.. branches.Select(x => new LvBranchDto(x.Key, x.Kind, x.FromKey, x.ToKey, [.. x.Geometry.Coordinates.Select(c => new[] { c.X, c.Y })],
                 x.LengthM, x.CandidateId, x.Feeder))],
             await LoadsAsync(db, n, ct),
-            n.AnalysisJson is null ? null : JsonSerializer.Deserialize<CalcLvAnalysis>(n.AnalysisJson, json));
+            n.AnalysisJson is null ? null : JsonSerializer.Deserialize<CalcLvAnalysis>(n.AnalysisJson, json),
+            n.OverheadJson is null ? null : JsonSerializer.Deserialize<CalcLvOverhead>(n.OverheadJson, json));
     }
 
     private static async Task<LvLoadsDto?> LoadsAsync(ReticulaDbContext db, LvNetwork n, CancellationToken ct)

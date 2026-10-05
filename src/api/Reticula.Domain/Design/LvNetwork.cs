@@ -13,7 +13,7 @@ public sealed class LvNetwork
 
     public LvNetwork(Guid id, Guid projectId, string rulesRef, string rulesHash, string clause, string summaryJson, string feedersJson,
         string issuesJson, int errorCount, Guid builtBy, DateTimeOffset builtAt, string? loadsClause = null, string? loadsSummaryJson = null,
-        string phasesJson = "[]", string boxesJson = "[]", string? analysisJson = null)
+        string phasesJson = "[]", string boxesJson = "[]", string? analysisJson = null, string? overheadJson = null)
     {
         Id = id;
         ProjectId = projectId;
@@ -31,6 +31,7 @@ public sealed class LvNetwork
         PhasesJson = phasesJson;
         BoxesJson = boxesJson;
         AnalysisJson = analysisJson;
+        OverheadJson = overheadJson;
     }
 
     public Guid Id { get; private set; }
@@ -63,6 +64,9 @@ public sealed class LvNetwork
 
     /// <summary>Voltage drop, thermal loading and fault level (plan 2.4); null when the rules file has no design settings.</summary>
     public string? AnalysisJson { get; private set; }
+
+    /// <summary>Spans, sag and tension, ground clearance, pole loads and stays (plan 2.5); null when the rules file has no overhead settings.</summary>
+    public string? OverheadJson { get; private set; }
 }
 
 /// <summary>

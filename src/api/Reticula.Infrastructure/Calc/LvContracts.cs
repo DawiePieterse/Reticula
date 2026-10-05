@@ -74,3 +74,28 @@ public sealed record LvFeederResult(string Feeder, double MaxDropPct, string Max
 public sealed record CalcLvAnalysis(string RulesRef, string RulesHash, string Clause, double LimitPct, double PhaseVoltageV, double ConfidencePct,
     IReadOnlyList<LvPointResult> Points, IReadOnlyList<LvBranchResult> Branches, IReadOnlyList<LvFeederResult> Feeders, IReadOnlyList<LvIssue> Issues,
     TracedValue? WorstDrop, TracedValue? WorstCurrent, TracedValue? LowestFault, IReadOnlyList<string> Placeholders);
+
+/// <param name="BendM">How far the route strays from the straight line between the supports.</param>
+/// <param name="TensionKn">The strain section's greatest tension, cold or wind; null without mechanical data.</param>
+public sealed record LvSpanResult(string Id, string FromNode, string ToNode, string FromLabel, string ToLabel, IReadOnlyList<string> Branches,
+    string? Feeder, string Conductor, double LengthM, double BendM, string? Section, double? SagM, double? ClearanceM, double? TensionKn, bool Passes,
+    double[][] Coordinates);
+
+/// <param name="Marked">A marked pole or source; false where a pole is needed but not marked.</param>
+/// <param name="Role">terminal, intermediate, angle, strain or junction.</param>
+/// <param name="PoleClass">Null at a source, or where no load could be worked out.</param>
+public sealed record LvSupportResult(string Id, string Label, string Kind, bool Marked, string Role, int Spans, double? DeviationDeg, double? LoadKn,
+    string? GoverningCase, string? PoleClass, bool Stay, double? StayTensionKn, bool Passes, double[] Coordinates);
+
+/// <param name="TensionKn">Horizontal tension in each loading case: everyday, hot, cold, wind.</param>
+/// <param name="Governing">What set the everyday tension: everyday, or max_tension where the cold or wind case would exceed it.</param>
+public sealed record LvSectionResult(string Id, IReadOnlyList<string> Spans, string Conductor, double RulingSpanM,
+    IReadOnlyDictionary<string, double> TensionKn, string Governing, double MaxPullKn, bool Passes);
+
+public sealed record LvOverheadSummary(int Spans, double LongestSpanM, int Sections, int Supports, int PolesNeeded, int Stays,
+    IReadOnlyDictionary<string, int> PoleClasses);
+
+/// <summary>Overhead line checks of the LV network (plan 2.5): spans, sag and tension, ground clearance, pole loads and stays.</summary>
+public sealed record CalcLvOverhead(string RulesRef, string RulesHash, string Clause, LvOverheadSummary Summary, IReadOnlyList<LvSpanResult> Spans,
+    IReadOnlyList<LvSupportResult> Supports, IReadOnlyList<LvSectionResult> Sections, IReadOnlyList<LvIssue> Issues,
+    TracedValue? LowestClearance, TracedValue? HighestPoleLoad, IReadOnlyList<string> Placeholders);

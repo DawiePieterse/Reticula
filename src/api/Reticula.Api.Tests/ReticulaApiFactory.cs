@@ -276,6 +276,31 @@ public sealed class FakeCalc : ICalcClient
             T(4.2, "%"), T(139, "A"), T(812, "A"), ["the LV source transformer"]);
     }
 
+    /// <summary>Set by a test to decide what the overhead checks return. By default every node a support, every branch a 40 m span.</summary>
+    public Func<string, CalcLvNetwork, CalcLvOverhead> OnCheckLvOverhead { get; set; } = DefaultLvOverhead;
+
+    public Task<CalcLvOverhead> CheckLvOverheadAsync(string rulesRef, CalcLvNetwork network, CancellationToken ct = default)
+    {
+        Throw();
+        return Task.FromResult(OnCheckLvOverhead(rulesRef, network));
+    }
+
+    public static CalcLvOverhead DefaultLvOverhead(string rulesRef, CalcLvNetwork network)
+    {
+        var spans = network.Branches.Select((b, i) => new LvSpanResult($"S{i + 1}", b.FromNode, b.ToNode, b.FromNode, b.ToNode, [b.Id], b.Feeder,
+            "ABC-3C-70", 40, 0.1, "T1", 0.8, 6.4, 5.1, true, b.Coordinates)).ToList();
+        var supports = network.Nodes.Select(n => new LvSupportResult(n.Id, n.Label ?? n.Id, n.Kind, true, "terminal", 1, null, 4.6, "cold",
+            n.Kind == "source" ? null : "9m-140", true, 6.5, true, n.Coordinates)).ToList();
+        TracedValue T(double v, string unit) => new(v, unit, "test", "test", "test clause", "0123456789abcdef", JsonDocument.Parse("[]").RootElement.Clone());
+        return new CalcLvOverhead(rulesRef, "0123456789abcdef", "test overhead settings",
+            new LvOverheadSummary(spans.Count, 40, 1, supports.Count, 0, supports.Count, new Dictionary<string, int> { ["9m-140"] = supports.Count }),
+            spans, supports,
+            [new LvSectionResult("T1", [.. spans.Select(s => s.Id)], "ABC-3C-70", 40,
+                new Dictionary<string, double> { ["everyday"] = 4.0, ["hot"] = 1.9, ["cold"] = 5.1, ["wind"] = 5.0 }, "everyday", 8.9, true)],
+            [new LvIssue("warning", "overhead_placeholders", "The overhead checks use placeholder values.", 1, [], [])],
+            T(6.4, "m"), T(4.6, "kN"), ["the Eskom overhead line settings"]);
+    }
+
     public Task<CalcConductorLibrary?> GetConductorsAsync(string rulesRef, CancellationToken ct = default)
     {
         Throw();

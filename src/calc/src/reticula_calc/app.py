@@ -29,6 +29,7 @@ from .lv.analysis import AnalyseRequest, Analysis, analyse
 from .lv.conductors import Library, library
 from .lv.loads import AllocateRequest, LoadAllocation, allocate
 from .lv.network import BuildRequest, LvNetwork, build_network
+from .lv.overhead import Overhead, OverheadRequest, check_overhead
 from .maps.extract import ExtractRequest, MapSourceError, extract_configured
 from .rules import RulesError, list_rules, load_rules
 
@@ -96,6 +97,15 @@ def calc_lv_analyse(req: AnalyseRequest) -> Analysis:
     """Voltage drop (Herman-Beta, per phase), thermal loading and fault level for the connected LV network."""
     try:
         return analyse(req, load_rules(req.rules))
+    except RulesError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+@app.post("/calc/lv/overhead")
+def calc_lv_overhead(req: OverheadRequest) -> Overhead:
+    """Overhead line checks for the LV network: spans, sag and tension, ground clearance, pole loads and stays."""
+    try:
+        return check_overhead(req, load_rules(req.rules))
     except RulesError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 

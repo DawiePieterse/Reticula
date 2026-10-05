@@ -186,6 +186,77 @@ export interface LvAnalysis {
   placeholders: string[];
 }
 
+export interface LvSpanResult {
+  id: string;
+  fromNode: string;
+  toNode: string;
+  fromLabel: string;
+  toLabel: string;
+  branches: string[];
+  feeder: string | null;
+  conductor: string;
+  lengthM: number;
+  /** How far the route strays from the straight line between the supports. */
+  bendM: number;
+  section: string | null;
+  sagM: number | null;
+  clearanceM: number | null;
+  /** The strain section's greatest tension, cold or wind. */
+  tensionKn: number | null;
+  passes: boolean;
+  coordinates: Position[];
+}
+
+export type LvSupportRole = 'terminal' | 'intermediate' | 'angle' | 'strain' | 'junction';
+
+export interface LvSupportResult {
+  id: string;
+  label: string;
+  kind: string;
+  /** A marked pole or source; false where a pole is needed but not marked. */
+  marked: boolean;
+  role: LvSupportRole;
+  spans: number;
+  deviationDeg: number | null;
+  loadKn: number | null;
+  governingCase: string | null;
+  /** Null at a source (the transformer structure is designed with it). */
+  poleClass: string | null;
+  stay: boolean;
+  stayTensionKn: number | null;
+  passes: boolean;
+  coordinates: Position;
+}
+
+export type LoadingCase = 'everyday' | 'hot' | 'cold' | 'wind';
+
+export interface LvSectionResult {
+  id: string;
+  spans: string[];
+  conductor: string;
+  rulingSpanM: number;
+  tensionKn: Record<LoadingCase, number>;
+  /** What set the everyday tension: the everyday limit, or keeping the cold and wind cases within the maximum (strung slack). */
+  governing: 'everyday' | 'max_tension';
+  maxPullKn: number;
+  passes: boolean;
+}
+
+/** Overhead line checks (plan 2.5): spans, sag and tension, ground clearance, pole loads and stays. */
+export interface LvOverhead {
+  rulesRef: string;
+  rulesHash: string;
+  clause: string;
+  summary: { spans: number; longestSpanM: number; sections: number; supports: number; polesNeeded: number; stays: number; poleClasses: Record<string, number> };
+  spans: LvSpanResult[];
+  supports: LvSupportResult[];
+  sections: LvSectionResult[];
+  issues: LvIssue[];
+  lowestClearance: TracedValue | null;
+  highestPoleLoad: TracedValue | null;
+  placeholders: string[];
+}
+
 export interface LvNetwork {
   id: string;
   rulesRef: string;
@@ -204,6 +275,8 @@ export interface LvNetwork {
   loads: LvLoads | null;
   /** Voltage drop, loading and fault level; null when the rules file has no design settings. */
   analysis?: LvAnalysis | null;
+  /** Spans, sag, clearance, pole loads and stays; null when the rules file has no overhead settings. */
+  overhead?: LvOverhead | null;
 }
 
 /**
@@ -237,7 +310,8 @@ export type DropBand = 'ok' | 'near' | 'over';
 export const DROP_COLOURS: Record<DropBand, string> = { ok: '#1a7f37', near: '#bf8700', over: '#cf222e' };
 
 export interface LvBranchProps { kind: LvBranch['kind']; feeder: string | null; colour: string; lengthM: number; overloaded: boolean }
-export interface LvNodeProps { kind: LvNodeKind; label: string | null; feeder: string | null; band: DropBand | null; dropColour: string | null }
+export interface LvNodeProps { kind: LvNodeKind; label: string | null; feeder: string | null; band: DropBand | null; dropColour: string | null; stay: boolean }
+export interface LvSpanProps { label: string; failing: boolean }
 export interface LvIssueProps { severity: LvIssue['severity']; code: string; message: string }
 export interface LvServiceProps { phase: LvPhase | null; colour: string; box: string | null; label: string | null }
 
@@ -249,6 +323,8 @@ export interface LvLayers {
   /** Service connections, coloured by phase, and a dot at each building. */
   services: FeatureCollection<LvServiceProps, GeoJsonLineString>;
   loads: FeatureCollection<LvServiceProps, GeoJsonPoint>;
+  /** Overhead spans, straight from support to support. */
+  spans: FeatureCollection<LvSpanProps, GeoJsonLineString>;
 }
 
 export function lvLayers(net: LvNetwork): LvLayers {
@@ -263,6 +339,7 @@ export function lvLayers(net: LvNetwork): LvLayers {
     const band: DropBand = pct > analysis.limitPct ? 'over' : pct > 0.8 * analysis.limitPct ? 'near' : 'ok';
     return { band, dropColour: DROP_COLOURS[band] };
   };
+  const stayed = new Set((net.overhead?.supports ?? []).filter((p) => p.stay).map((p) => p.id));
   const colour = (feeder: string | null) => (feeder !== null && order.has(feeder) ? FEEDER_COLOURS[order.get(feeder)! % FEEDER_COLOURS.length] : UNFED_COLOUR);
   return {
     branches: {
@@ -276,7 +353,7 @@ export function lvLayers(net: LvNetwork): LvLayers {
       type: 'FeatureCollection',
       features: net.nodes.map((n) => ({
         type: 'Feature', id: n.id, geometry: { type: 'Point', coordinates: n.coordinates },
-        properties: { kind: n.kind, label: n.label, feeder: n.feeder, ...dropOf(n.id) },
+        properties: { kind: n.kind, label: n.label, feeder: n.feeder, ...dropOf(n.id), stay: stayed.has(n.id) },
       })),
     },
     issues: {
@@ -296,6 +373,13 @@ export function lvLayers(net: LvNetwork): LvLayers {
       type: 'FeatureCollection',
       features: connections.map((c) => ({
         type: 'Feature', id: c.loadPointId, geometry: { type: 'Point', coordinates: c.service[0] }, properties: serviceProps(c),
+      })),
+    },
+    spans: {
+      type: 'FeatureCollection',
+      features: (net.overhead?.spans ?? []).map((s) => ({
+        type: 'Feature', id: s.id, geometry: { type: 'LineString', coordinates: s.coordinates },
+        properties: { label: `${s.fromLabel}–${s.toLabel}`, failing: !s.passes },
       })),
     },
   };

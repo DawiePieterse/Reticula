@@ -50,6 +50,7 @@ const LV_NODES = 'lv-nodes';
 const LV_ISSUES = 'lv-issues';
 const LV_SERVICES = 'lv-services';
 const LV_LOADS = 'lv-loads';
+const LV_SPANS = 'lv-spans';
 
 export type AnyCollection = FeatureCollection<unknown, AnyGeometry> | null;
 
@@ -143,7 +144,7 @@ export class AreaMap implements OnDestroy {
       map.addControl(new NavigationControl(), 'top-right');
       // Not 'load': that waits for the basemap tiles, so a slow or blocked tile server would hide the project's own layers.
       map.on('style.load', () => {
-        for (const id of [CONTOURS, ROADS, STANDS, BUILDINGS, NETWORK, LV_SERVICES, LV_LOADS, LV_BRANCHES, LV_NODES, LV_ISSUES, PREVIEW]) map.addSource(id, { type: 'geojson', data: emptyCollection(), promoteId: 'id' });
+        for (const id of [CONTOURS, ROADS, STANDS, BUILDINGS, NETWORK, LV_SERVICES, LV_LOADS, LV_BRANCHES, LV_SPANS, LV_NODES, LV_ISSUES, PREVIEW]) map.addSource(id, { type: 'geojson', data: emptyCollection(), promoteId: 'id' });
         map.addLayer({ id: 'contours-line', type: 'line', source: CONTOURS, paint: { 'line-color': '#bc8f5a', 'line-width': 0.8, 'line-opacity': 0.8 } });
         map.addLayer({ id: 'contours-label', type: 'symbol', source: CONTOURS, minzoom: 15,
           layout: { 'symbol-placement': 'line', 'text-field': ['to-string', ['get', 'elevationM']], 'text-size': 10 },
@@ -177,6 +178,9 @@ export class AreaMap implements OnDestroy {
           layout: { 'line-cap': 'round' }, paint: { 'line-color': ['get', 'colour'] as never, 'line-width': 3.5 } });
         map.addLayer({ id: 'lv-link', type: 'line', source: LV_BRANCHES, filter: ['==', ['get', 'kind'], 'link'],
           paint: { 'line-color': ['get', 'colour'] as never, 'line-width': 2.5, 'line-dasharray': [1.5, 1] } });
+        // Overhead spans that fail a check, drawn straight from support to support.
+        map.addLayer({ id: 'lv-span-fail', type: 'line', source: LV_SPANS, filter: ['==', ['get', 'failing'], true],
+          paint: { 'line-color': '#cf222e', 'line-width': 2, 'line-dasharray': [2, 1.5] } });
         map.addLayer({ id: 'lv-node', type: 'circle', source: LV_NODES, filter: ['!', ['in', ['get', 'kind'], ['literal', ['source', 'pole']]]] as never,
           minzoom: 15, paint: { 'circle-radius': 2.5, 'circle-color': '#ffffff', 'circle-stroke-color': '#24292f', 'circle-stroke-width': 1 } });
         map.addLayer({ id: 'lv-pole', type: 'circle', source: LV_NODES, filter: ['==', ['get', 'kind'], 'pole'],
@@ -184,6 +188,8 @@ export class AreaMap implements OnDestroy {
         // Voltage drop band as a ring around each node, so it shows over the pole markers.
         map.addLayer({ id: 'lv-drop', type: 'circle', source: LV_NODES, filter: ['to-boolean', ['get', 'dropColour']] as never,
           paint: { 'circle-radius': 6, 'circle-opacity': 0, 'circle-stroke-color': ['get', 'dropColour'] as never, 'circle-stroke-width': 2.5 } });
+        map.addLayer({ id: 'lv-stay', type: 'circle', source: LV_NODES, filter: ['==', ['get', 'stay'], true],
+          paint: { 'circle-radius': 9, 'circle-opacity': 0, 'circle-stroke-color': '#24292f', 'circle-stroke-width': 1.5 } });
         map.addLayer({ id: 'lv-source', type: 'circle', source: LV_NODES, filter: ['==', ['get', 'kind'], 'source'],
           paint: { 'circle-radius': 7, 'circle-color': '#24292f', 'circle-stroke-color': '#ffd33d', 'circle-stroke-width': 2.5 } });
         map.addLayer({ id: 'lv-issue', type: 'circle', source: LV_ISSUES,
@@ -277,6 +283,7 @@ export class AreaMap implements OnDestroy {
     this.setData(LV_ISSUES, lv?.issues ?? null);
     this.setData(LV_SERVICES, lv?.services ?? null);
     this.setData(LV_LOADS, lv?.loads ?? null);
+    this.setData(LV_SPANS, lv?.spans ?? null);
   }
 
   private setData(source: string, data: AnyCollection): void {

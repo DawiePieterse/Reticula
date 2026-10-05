@@ -13,7 +13,8 @@ namespace Reticula.Infrastructure.Design;
 
 /// <summary>
 /// Builds a project's LV network model in the calc service from the marked routes and sites (plan 2.1), connects each building's
-/// load to it and gives it a phase (plan 2.2), and stores the result.
+/// load to it and gives it a phase (plan 2.2), checks voltage drop, loading and fault level (plan 2.4) and the overhead line
+/// (plan 2.5), and stores the result.
 /// </summary>
 public sealed class LvNetworkService(ReticulaDbContext db, ICalcClient calc, TimeProvider time)
 {
@@ -61,12 +62,24 @@ public sealed class LvNetworkService(ReticulaDbContext db, ICalcClient calc, Tim
                 issues.Add(new LvIssue("warning", "checks_skipped", $"Voltage drop, loading and fault level were not checked: {e.Message}.", 1, [], []));
             }
         }
+        CalcLvOverhead? overhead = null;
+        try
+        {
+            overhead = await calc.CheckLvOverheadAsync(project.RulesRef, result, ct);
+            issues.AddRange(overhead.Issues);
+        }
+        catch (CalcRejectedException e)
+        {
+            // Rules from before plan 2.5 have no overhead line settings.
+            issues.Add(new LvIssue("warning", "overhead_skipped", $"Spans, sag, clearance and pole loads were not checked: {e.Message}.", 1, [], []));
+        }
 
         var network = new LvNetwork(Guid.CreateVersion7(), project.Id, result.RulesRef, result.RulesHash, result.Clause,
             JsonSerializer.Serialize(result.Summary, Json), JsonSerializer.Serialize(result.Feeders, Json), JsonSerializer.Serialize(issues, Json),
             issues.Count(i => i.Severity == "error"), userId, time.GetUtcNow(),
             loads?.Clause, loads is null ? null : JsonSerializer.Serialize(loads.Summary, Json), JsonSerializer.Serialize(loads?.Feeders ?? [], Json),
-            JsonSerializer.Serialize(loads?.Boxes ?? [], Json), analysis is null ? null : JsonSerializer.Serialize(analysis, Json));
+            JsonSerializer.Serialize(loads?.Boxes ?? [], Json), analysis is null ? null : JsonSerializer.Serialize(analysis, Json),
+            overhead is null ? null : JsonSerializer.Serialize(overhead, Json));
         var known = candidates.Select(c => c.Id).ToHashSet();
         Guid? Candidate(string? id) => Guid.TryParse(id, out var g) && known.Contains(g) ? g : null;
 

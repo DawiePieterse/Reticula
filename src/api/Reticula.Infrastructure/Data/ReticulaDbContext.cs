@@ -280,6 +280,7 @@ public sealed class ReticulaDbContext(DbContextOptions<ReticulaDbContext> option
             e.Property(x => x.PhasesJson).HasColumnType("jsonb").IsRequired();
             e.Property(x => x.BoxesJson).HasColumnType("jsonb").IsRequired();
             e.Property(x => x.AnalysisJson).HasColumnType("jsonb");
+            e.Property(x => x.OverheadJson).HasColumnType("jsonb");
             e.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.BuiltBy).OnDelete(DeleteBehavior.Restrict);
         });
