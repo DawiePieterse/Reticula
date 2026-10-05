@@ -211,4 +211,16 @@ public class LvNetworkTests(ReticulaApiFactory factory)
         Assert.Equal(HttpStatusCode.Forbidden, (await inspector.PostAsync($"/api/projects/{projectId}/lv-network", null)).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/projects/{Guid.NewGuid()}/lv-network")).StatusCode);
     }
+
+    [Fact]
+    public async Task Serves_the_conductor_library_of_the_projects_rules()
+    {
+        var (client, projectId) = await NewProjectAsync();
+        var library = (await client.GetFromJsonAsync<CalcConductorLibrary>($"/api/projects/{projectId}/conductors"))!;
+        Assert.Equal("eskom/0.1.0", library.RulesRef);
+        var c = Assert.Single(library.Conductors);
+        Assert.Equal(("CU-4C-70", 171.0, 8.05), (c.Code, c.RatingsA["pipe"], c.OneSecondKa));
+        Assert.Equal(["r_ohm_per_km", "x_ohm_per_km"], c.Placeholder);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/projects/{Guid.NewGuid()}/conductors")).StatusCode);
+    }
 }

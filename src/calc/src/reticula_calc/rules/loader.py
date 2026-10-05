@@ -42,6 +42,16 @@ class Conductor:
     rating_a: float
     clause: str
     description: str = ""
+    material: str | None = None
+    size_mm2: float | None = None
+    cores: int | None = None
+    uses: tuple[str, ...] = ()
+    ratings_a: tuple[tuple[str, float], ...] = ()
+    """Rating by installation (ground, pipe, air), as pairs so the dataclass stays hashable."""
+    fault_k: float | None = None
+    placeholder: tuple[str, ...] = ()
+    rating_clause: str = ""
+    index: str = ""
 
 
 @dataclass(frozen=True)
@@ -59,16 +69,32 @@ class RuleSet:
     def conductor(self, code: str) -> Conductor:
         for c in self.data["conductors"]:
             if c["code"] == code:
-                return Conductor(
-                    code=c["code"],
-                    kind=c["kind"],
-                    r_ohm_per_km=float(c["r_ohm_per_km"]),
-                    x_ohm_per_km=float(c["x_ohm_per_km"]),
-                    rating_a=float(c["rating_a"]),
-                    clause=c.get("clause", ""),
-                    description=c.get("description", ""),
-                )
+                return _conductor(c)
         raise RulesError(f"conductor {code!r} not in rules {self.ref}")
+
+    def conductors(self) -> list[Conductor]:
+        return [_conductor(c) for c in self.data["conductors"]]
+
+
+def _conductor(c: dict[str, Any]) -> Conductor:
+    return Conductor(
+        code=c["code"],
+        kind=c["kind"],
+        r_ohm_per_km=float(c["r_ohm_per_km"]),
+        x_ohm_per_km=float(c["x_ohm_per_km"]),
+        rating_a=float(c["rating_a"]),
+        clause=c.get("clause", ""),
+        description=c.get("description", ""),
+        material=c.get("material"),
+        size_mm2=float(c["size_mm2"]) if "size_mm2" in c else None,
+        cores=c.get("cores"),
+        uses=tuple(c.get("uses", ())),
+        ratings_a=tuple((k, float(v)) for k, v in c.get("ratings_a", {}).items()),
+        fault_k=float(c["fault_k"]) if "fault_k" in c else None,
+        placeholder=tuple(c.get("placeholder", ())),
+        rating_clause=c.get("rating_clause", ""),
+        index=c.get("index", ""),
+    )
 
 
 def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:

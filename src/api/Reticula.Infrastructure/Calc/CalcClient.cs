@@ -106,6 +106,15 @@ public sealed class CalcClient(HttpClient http) : ICalcClient
         return await ReadAsync<CalcLvLoads>(r, ct);
     }
 
+    public async Task<CalcConductorLibrary?> GetConductorsAsync(string rulesRef, CancellationToken ct = default)
+    {
+        var parts = rulesRef.Split('/');
+        if (parts.Length != 2) return null;
+        using var r = await SendAsync($"/rules/{Uri.EscapeDataString(parts[0])}/{Uri.EscapeDataString(parts[1])}/conductors", ct);
+        if (r.StatusCode == HttpStatusCode.NotFound) return null;
+        return await ReadAsync<CalcConductorLibrary>(r, ct);
+    }
+
     public async Task<MapExtract> ExtractMapAsync(double minLon, double minLat, double maxLon, double maxLat, CancellationToken ct = default)
     {
         using var content = JsonContent.Create(new { bbox = new[] { minLon, minLat, maxLon, maxLat } }, options: Json);

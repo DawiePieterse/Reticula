@@ -42,3 +42,12 @@ public sealed record LvLoadSummary(int Loads, int Allocated, int Unallocated, in
 /// <param name="Attach">pole_boxes or nearest_point, from the rules file.</param>
 public sealed record CalcLvLoads(string RulesRef, string RulesHash, string Clause, string Attach, IReadOnlyList<CalcLvAllocation> Allocations,
     IReadOnlyList<LvBox> Boxes, IReadOnlyList<LvFeederPhases> Feeders, IReadOnlyList<LvIssue> Issues, LvLoadSummary Summary);
+
+/// <param name="RatingsA">Continuous rating by installation: ground, pipe, air.</param>
+/// <param name="OneSecondKa">Short-circuit withstand for 1 s, from FaultK.</param>
+/// <param name="Placeholder">Fields whose values are placeholders, not yet from the governing standard.</param>
+public sealed record CalcConductor(string Code, string Description, string Kind, string? Material, double? SizeMm2, int? Cores,
+    IReadOnlyList<string> Uses, double ROhmPerKm, double XOhmPerKm, double RatingA, IReadOnlyDictionary<string, double> RatingsA,
+    double? FaultK, double? OneSecondKa, IReadOnlyList<string> Placeholder, string Clause, string RatingClause, string Index);
+
+public sealed record CalcConductorLibrary(string RulesRef, string RulesHash, IReadOnlyList<CalcConductor> Conductors);

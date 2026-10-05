@@ -39,7 +39,17 @@ public static class LvNetworkEndpoints
         var g = app.MapGroup("/api/projects/{projectId:guid}/lv-network").WithTags("Design").RequireAuthorization(Policies.FieldUser);
         g.MapGet("/", Get);
         g.MapPost("/", Build).RequireAuthorization(Policies.Engineer);
+        app.MapGet("/api/projects/{projectId:guid}/conductors", Conductors).WithTags("Design").RequireAuthorization(Policies.FieldUser);
         return app;
+    }
+
+    /// <summary>The conductor library of the project's rules file (plan 2.3), with each conductor's placeholder values marked.</summary>
+    private static async Task<Results<Ok<CalcConductorLibrary>, NotFound>> Conductors(Guid projectId, ReticulaDbContext db, ICalcClient calc, CancellationToken ct)
+    {
+        var project = await db.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.Id == projectId && p.ArchivedAt == null, ct);
+        if (project is null) return TypedResults.NotFound();
+        var library = await calc.GetConductorsAsync(project.RulesRef, ct);
+        return library is null ? TypedResults.NotFound() : TypedResults.Ok(library);
     }
 
     private static async Task<Results<Ok<LvNetworkStatus>, NotFound>> Get(Guid projectId, ReticulaDbContext db, LvNetworkService service, CancellationToken ct)

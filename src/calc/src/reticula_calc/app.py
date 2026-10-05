@@ -25,6 +25,7 @@ from .geo.importers import ImportResult, Kind, UnreadableFileError, import_file
 from .geo.osm import OsmError, OsmKind, fetch_osm
 from .geo.predict import PredictRequest, PredictResponse, predict
 from .logging_setup import configure_logging, log_requests
+from .lv.conductors import Library, library
 from .lv.loads import AllocateRequest, LoadAllocation, allocate
 from .lv.network import BuildRequest, LvNetwork, build_network
 from .maps.extract import ExtractRequest, MapSourceError, extract_configured
@@ -52,6 +53,15 @@ def rules_info(authority: str, version: str) -> dict[str, str]:
     except RulesError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     return {"ref": rs.ref, "hash": rs.hash, "effective_date": rs.effective_date}
+
+
+@app.get("/rules/{authority}/{version}/conductors")
+def rules_conductors(authority: str, version: str) -> Library:
+    """The conductor library: ratings by installation, short-circuit constant, and which values are still placeholders."""
+    try:
+        return library(load_rules(f"{authority}/{version}"))
+    except RulesError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
 
 
 @app.post("/calc/lv/voltage-drop")

@@ -1,0 +1,357 @@
+# Eskom residential distribution rules: 0.4.0 plus the LV conductor library (Phase 2.3).
+# Only the keys below differ from the base file. Every value must be checked before use in a design.
+base: eskom/0.4.0
+authority: eskom
+version: 0.5.0
+effective_date: 2026-10-05
+notes: >-
+  As 0.4.0, with the conductor library replaced. Underground cable current ratings and short-circuit constants are
+  transcribed from Eskom 240-56030637 Rev 2 (LV cable systems), Tables 6 and 7 and §3.9.1 m); the engineer confirmed
+  Rev 2 is current. Resistances and reactances are placeholders until the Eskom cable specification 240-56063805 is
+  held, and the overhead ABC entry stays a placeholder until the ABC specification 240-84758170 is held. Each
+  conductor lists its placeholder fields under `placeholder`.
+
+standards:
+  NRS034-1: "2024"      # TODO confirm edition
+  NRS048-2: "2024"      # TODO confirm edition
+  SANS1507: "2024"      # TODO confirm edition
+  IEC60909: "2016"      # TODO confirm edition
+  ESKOM240-56030637: "Rev 2 (2021)"
+
+# Conductors and cables. rating_a is the rating as normally installed: in ground for underground cables (standard
+# conditions of 240-56030637 §3.9.1 o): 70 °C conductor, 25 °C soil, 30 °C air, 1,2 K·m/W, 0,5 m deep, load factor 1,
+# thermally independent). ratings_a gives the rating in ground, in pipes and in air. fault_k is K in I = K·A/√t, kA.
+# Feeder cables are four-core; services two-core (single phase) or four-core (three phase) (§3.9.1 i)–j)).
+conductors:
+  - code: ABC-70
+    description: 70 mm² ABC (placeholder impedance and rating)
+    kind: overhead
+    material: al
+    size_mm2: 70
+    uses: [feeder]
+    r_ohm_per_km: 0.443
+    x_ohm_per_km: 0.085
+    rating_a: 200
+    placeholder: [r_ohm_per_km, x_ohm_per_km, rating_a]
+    clause: "SANS1418 / Eskom 240-84758170 §TBD (placeholders until the ABC specification is held)"
+    index: ESKOM-CONDUCTOR
+  - code: CU-2C-16
+    description: 16 mm² Cu 2-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: cu
+    size_mm2: 16
+    cores: 2
+    uses: [service]
+    r_ohm_per_km: 1.15
+    x_ohm_per_km: 0.08
+    rating_a: 107
+    ratings_a: { ground: 107, pipe: 88, air: 96 }
+    fault_k: 0.115
+    placeholder: [r_ohm_per_km, x_ohm_per_km]
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 6, 2-core; fault K §3.9.1 m)"
+    clause: "R: IEC 60228 class 2 DC at 20 °C, X: typical (placeholders until Eskom 240-56063805)"
+    index: ESKOM-LVCABLE-RATING
+  - code: CU-4C-16
+    description: 16 mm² Cu 4-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: cu
+    size_mm2: 16
+    cores: 4
+    uses: [feeder, service]
+    r_ohm_per_km: 1.15
+    x_ohm_per_km: 0.08
+    rating_a: 91
+    ratings_a: { ground: 91, pipe: 75, air: 82 }
+    fault_k: 0.115
+    placeholder: [r_ohm_per_km, x_ohm_per_km]
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 6, 3- or 4-core; fault K §3.9.1 m)"
+    clause: "R: IEC 60228 class 2 DC at 20 °C, X: typical (placeholders until Eskom 240-56063805)"
+    index: ESKOM-LVCABLE-RATING
+  - code: CU-2C-25
+    description: 25 mm² Cu 2-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: cu
+    size_mm2: 25
+    cores: 2
+    uses: [service]
+    r_ohm_per_km: 0.727
+    x_ohm_per_km: 0.08
+    rating_a: 142
+    ratings_a: { ground: 142, pipe: 116, air: 128 }
+    fault_k: 0.115
+    placeholder: [r_ohm_per_km, x_ohm_per_km]
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 6, 2-core; fault K §3.9.1 m)"
+    clause: "R: IEC 60228 class 2 DC at 20 °C, X: typical (placeholders until Eskom 240-56063805)"
+    index: ESKOM-LVCABLE-RATING
+  - code: CU-4C-25
+    description: 25 mm² Cu 4-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: cu
+    size_mm2: 25
+    cores: 4
+    uses: [feeder, service]
+    r_ohm_per_km: 0.727
+    x_ohm_per_km: 0.08
+    rating_a: 119
+    ratings_a: { ground: 119, pipe: 96, air: 109 }
+    fault_k: 0.115
+    placeholder: [r_ohm_per_km, x_ohm_per_km]
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 6, 3- or 4-core; fault K §3.9.1 m)"
+    clause: "R: IEC 60228 class 2 DC at 20 °C, X: typical (placeholders until Eskom 240-56063805)"
+    index: ESKOM-LVCABLE-RATING
+  - code: CU-2C-35
+    description: 35 mm² Cu 2-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: cu
+    size_mm2: 35
+    cores: 2
+    uses: [service]
+    r_ohm_per_km: 0.524
+    x_ohm_per_km: 0.08
+    rating_a: 171
+    ratings_a: { ground: 171, pipe: 139, air: 156 }
+    fault_k: 0.115
+    placeholder: [r_ohm_per_km, x_ohm_per_km]
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 6, 2-core; fault K §3.9.1 m)"
+    clause: "R: IEC 60228 class 2 DC at 20 °C, X: typical (placeholders until Eskom 240-56063805)"
+    index: ESKOM-LVCABLE-RATING
+  - code: CU-4C-35
+    description: 35 mm² Cu 4-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: cu
+    size_mm2: 35
+    cores: 4
+    uses: [feeder, service]
+    r_ohm_per_km: 0.524
+    x_ohm_per_km: 0.08
+    rating_a: 143
+    ratings_a: { ground: 143, pipe: 116, air: 133 }
+    fault_k: 0.115
+    placeholder: [r_ohm_per_km, x_ohm_per_km]
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 6, 3- or 4-core; fault K §3.9.1 m)"
+    clause: "R: IEC 60228 class 2 DC at 20 °C, X: typical (placeholders until Eskom 240-56063805)"
+    index: ESKOM-LVCABLE-RATING
+  - code: CU-4C-70
+    description: 70 mm² Cu 4-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: cu
+    size_mm2: 70
+    cores: 4
+    uses: [feeder]
+    r_ohm_per_km: 0.268
+    x_ohm_per_km: 0.08
+    rating_a: 210
+    ratings_a: { ground: 210, pipe: 171, air: 205 }
+    fault_k: 0.115
+    placeholder: [r_ohm_per_km, x_ohm_per_km]
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 6, 3- or 4-core; fault K §3.9.1 m)"
+    clause: "R: IEC 60228 class 2 DC at 20 °C, X: typical (placeholders until Eskom 240-56063805)"
+    index: ESKOM-LVCABLE-RATING
+  - code: CU-4C-120
+    description: 120 mm² Cu 4-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: cu
+    size_mm2: 120
+    cores: 4
+    uses: [feeder]
+    r_ohm_per_km: 0.153
+    x_ohm_per_km: 0.08
+    rating_a: 285
+    ratings_a: { ground: 285, pipe: 234, air: 291 }
+    fault_k: 0.115
+    placeholder: [r_ohm_per_km, x_ohm_per_km]
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 6, 3- or 4-core; fault K §3.9.1 m)"
+    clause: "R: IEC 60228 class 2 DC at 20 °C, X: typical (placeholders until Eskom 240-56063805)"
+    index: ESKOM-LVCABLE-RATING
+  - code: CU-4C-150
+    description: 150 mm² Cu 4-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: cu
+    size_mm2: 150
+    cores: 4
+    uses: [feeder]
+    r_ohm_per_km: 0.124
+    x_ohm_per_km: 0.08
+    rating_a: 320
+    ratings_a: { ground: 320, pipe: 263, air: 334 }
+    fault_k: 0.115
+    placeholder: [r_ohm_per_km, x_ohm_per_km]
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 6, 3- or 4-core; fault K §3.9.1 m)"
+    clause: "R: IEC 60228 class 2 DC at 20 °C, X: typical (placeholders until Eskom 240-56063805)"
+    index: ESKOM-LVCABLE-RATING
+  - code: CU-4C-185
+    description: 185 mm² Cu 4-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: cu
+    size_mm2: 185
+    cores: 4
+    uses: [feeder]
+    r_ohm_per_km: 0.0991
+    x_ohm_per_km: 0.08
+    rating_a: 361
+    ratings_a: { ground: 361, pipe: 298, air: 383 }
+    fault_k: 0.115
+    placeholder: [r_ohm_per_km, x_ohm_per_km]
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 6, 3- or 4-core; fault K §3.9.1 m)"
+    clause: "R: IEC 60228 class 2 DC at 20 °C, X: typical (placeholders until Eskom 240-56063805)"
+    index: ESKOM-LVCABLE-RATING
+  - code: CU-4C-240
+    description: 240 mm² Cu 4-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: cu
+    size_mm2: 240
+    cores: 4
+    uses: [feeder]
+    r_ohm_per_km: 0.0754
+    x_ohm_per_km: 0.08
+    rating_a: 416
+    ratings_a: { ground: 416, pipe: 344, air: 451 }
+    fault_k: 0.115
+    placeholder: [r_ohm_per_km, x_ohm_per_km]
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 6, 3- or 4-core; fault K §3.9.1 m)"
+    clause: "R: IEC 60228 class 2 DC at 20 °C, X: typical (placeholders until Eskom 240-56063805)"
+    index: ESKOM-LVCABLE-RATING
+  - code: AL-2C-25
+    description: 25 mm² Al 2-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: al
+    size_mm2: 25
+    cores: 2
+    uses: [service]
+    r_ohm_per_km: 1.2
+    x_ohm_per_km: 0.08
+    rating_a: 106
+    ratings_a: { ground: 106, pipe: 86, air: 92 }
+    fault_k: 0.076
+    placeholder: [r_ohm_per_km, x_ohm_per_km]
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 7, 2-core; fault K §3.9.1 m)"
+    clause: "R: IEC 60228 class 2 DC at 20 °C, X: typical (placeholders until Eskom 240-56063805)"
+    index: ESKOM-LVCABLE-RATING
+  - code: AL-4C-25
+    description: 25 mm² Al 4-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: al
+    size_mm2: 25
+    cores: 4
+    uses: [feeder, service]
+    r_ohm_per_km: 1.2
+    x_ohm_per_km: 0.08
+    rating_a: 90
+    ratings_a: { ground: 90, pipe: 73, air: 80 }
+    fault_k: 0.076
+    placeholder: [r_ohm_per_km, x_ohm_per_km]
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 7, 3- or 4-core; fault K §3.9.1 m)"
+    clause: "R: IEC 60228 class 2 DC at 20 °C, X: typical (placeholders until Eskom 240-56063805)"
+    index: ESKOM-LVCABLE-RATING
+  - code: AL-2C-35
+    description: 35 mm² Al 2-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: al
+    size_mm2: 35
+    cores: 2
+    uses: [service]
+    r_ohm_per_km: 0.868
+    x_ohm_per_km: 0.08
+    rating_a: 128
+    ratings_a: { ground: 128, pipe: 104, air: 113 }
+    fault_k: 0.076
+    placeholder: [r_ohm_per_km, x_ohm_per_km]
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 7, 2-core; fault K §3.9.1 m)"
+    clause: "R: IEC 60228 class 2 DC at 20 °C, X: typical (placeholders until Eskom 240-56063805)"
+    index: ESKOM-LVCABLE-RATING
+  - code: AL-4C-35
+    description: 35 mm² Al 4-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: al
+    size_mm2: 35
+    cores: 4
+    uses: [feeder, service]
+    r_ohm_per_km: 0.868
+    x_ohm_per_km: 0.08
+    rating_a: 108
+    ratings_a: { ground: 108, pipe: 87, air: 99 }
+    fault_k: 0.076
+    placeholder: [r_ohm_per_km, x_ohm_per_km]
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 7, 3- or 4-core; fault K §3.9.1 m)"
+    clause: "R: IEC 60228 class 2 DC at 20 °C, X: typical (placeholders until Eskom 240-56063805)"
+    index: ESKOM-LVCABLE-RATING
+  - code: AL-4C-70
+    description: 70 mm² Al 4-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: al
+    size_mm2: 70
+    cores: 4
+    uses: [feeder]
+    r_ohm_per_km: 0.443
+    x_ohm_per_km: 0.08
+    rating_a: 158
+    ratings_a: { ground: 158, pipe: 130, air: 151 }
+    fault_k: 0.076
+    placeholder: [r_ohm_per_km, x_ohm_per_km]
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 7, 3- or 4-core; fault K §3.9.1 m)"
+    clause: "R: IEC 60228 class 2 DC at 20 °C, X: typical (placeholders until Eskom 240-56063805)"
+    index: ESKOM-LVCABLE-RATING
+  - code: AL-4C-120
+    description: 120 mm² Al 4-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: al
+    size_mm2: 120
+    cores: 4
+    uses: [feeder]
+    r_ohm_per_km: 0.253
+    x_ohm_per_km: 0.08
+    rating_a: 219
+    ratings_a: { ground: 219, pipe: 179, air: 216 }
+    fault_k: 0.076
+    placeholder: [r_ohm_per_km, x_ohm_per_km]
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 7, 3- or 4-core; fault K §3.9.1 m)"
+    clause: "R: IEC 60228 class 2 DC at 20 °C, X: typical (placeholders until Eskom 240-56063805)"
+    index: ESKOM-LVCABLE-RATING
+  - code: AL-4C-150
+    description: 150 mm² Al 4-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: al
+    size_mm2: 150
+    cores: 4
+    uses: [feeder]
+    r_ohm_per_km: 0.206
+    x_ohm_per_km: 0.08
+    rating_a: 245
+    ratings_a: { ground: 245, pipe: 201, air: 250 }
+    fault_k: 0.076
+    placeholder: [r_ohm_per_km, x_ohm_per_km]
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 7, 3- or 4-core; fault K §3.9.1 m)"
+    clause: "R: IEC 60228 class 2 DC at 20 °C, X: typical (placeholders until Eskom 240-56063805)"
+    index: ESKOM-LVCABLE-RATING
+  - code: AL-4C-185
+    description: 185 mm² Al 4-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: al
+    size_mm2: 185
+    cores: 4
+    uses: [feeder]
+    r_ohm_per_km: 0.164
+    x_ohm_per_km: 0.08
+    rating_a: 278
+    ratings_a: { ground: 278, pipe: 229, air: 287 }
+    fault_k: 0.076
+    placeholder: [r_ohm_per_km, x_ohm_per_km]
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 7, 3- or 4-core; fault K §3.9.1 m)"
+    clause: "R: IEC 60228 class 2 DC at 20 °C, X: typical (placeholders until Eskom 240-56063805)"
+    index: ESKOM-LVCABLE-RATING
+  - code: AL-4C-240
+    description: 240 mm² Al 4-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: al
+    size_mm2: 240
+    cores: 4
+    uses: [feeder]
+    r_ohm_per_km: 0.125
+    x_ohm_per_km: 0.08
+    rating_a: 324
+    ratings_a: { ground: 324, pipe: 268, air: 342 }
+    fault_k: 0.076
+    placeholder: [r_ohm_per_km, x_ohm_per_km]
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 7, 3- or 4-core; fault K §3.9.1 m)"
+    clause: "R: IEC 60228 class 2 DC at 20 °C, X: typical (placeholders until Eskom 240-56063805)"
+    index: ESKOM-LVCABLE-RATING

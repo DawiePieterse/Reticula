@@ -210,12 +210,46 @@ function serviceProps(c: LvConnection): LvServiceProps {
   return { phase: c.phase, colour: c.phase ? PHASE_COLOURS[c.phase] : UNFED_COLOUR, box: c.box, label: c.label };
 }
 
+/** A conductor or cable from the project's rules file (plan 2.3). */
+export interface Conductor {
+  code: string;
+  description: string;
+  kind: 'overhead' | 'underground';
+  material: 'cu' | 'al' | null;
+  sizeMm2: number | null;
+  cores: number | null;
+  uses: ('feeder' | 'service')[];
+  rOhmPerKm: number;
+  xOhmPerKm: number;
+  ratingA: number;
+  /** Rating by installation: ground, pipe, air. */
+  ratingsA: Partial<Record<'ground' | 'pipe' | 'air', number>>;
+  faultK: number | null;
+  /** Short-circuit withstand for 1 s. */
+  oneSecondKa: number | null;
+  /** Fields whose values are placeholders, not yet from the governing standard. */
+  placeholder: string[];
+  clause: string;
+  ratingClause: string;
+  index: string;
+}
+
+export interface ConductorLibrary {
+  rulesRef: string;
+  rulesHash: string;
+  conductors: Conductor[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class LvNetworkApi {
   private readonly http = inject(HttpClient);
 
   get(projectId: string): Observable<LvNetwork | null> {
     return this.http.get<{ network: LvNetwork | null }>(`/api/projects/${projectId}/lv-network`).pipe(map((r) => r.network));
+  }
+
+  conductors(projectId: string): Observable<ConductorLibrary> {
+    return this.http.get<ConductorLibrary>(`/api/projects/${projectId}/conductors`);
   }
 
   /** Builds the network again from the LV routes and sites marked now. */

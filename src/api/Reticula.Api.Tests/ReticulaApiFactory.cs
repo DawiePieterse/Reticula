@@ -250,6 +250,18 @@ public sealed class FakeCalc : ICalcClient
             issues, new LvLoadSummary(loads.Count, allocations.Count, 0, unestimated.Count, allocations.Count, 0, allocations.Count == 0 ? 0 : 1, kva, 12.5));
     }
 
+    public Task<CalcConductorLibrary?> GetConductorsAsync(string rulesRef, CancellationToken ct = default)
+    {
+        Throw();
+        if (!Rules.Contains(rulesRef)) return Task.FromResult<CalcConductorLibrary?>(null);
+        return Task.FromResult<CalcConductorLibrary?>(new CalcConductorLibrary(rulesRef, "0123456789abcdef",
+        [
+            new CalcConductor("CU-4C-70", "70 mm² Cu 4-core", "underground", "cu", 70, 4, ["feeder"], 0.268, 0.08, 210,
+                new Dictionary<string, double> { ["ground"] = 210, ["pipe"] = 171, ["air"] = 205 }, 0.115, 8.05, ["r_ohm_per_km", "x_ohm_per_km"],
+                "R placeholder", "Eskom 240-56030637 Rev 2 Table 6", "ESKOM-LVCABLE-RATING"),
+        ]));
+    }
+
     private void Throw()
     {
         if (Unreachable) throw new CalcUnavailableException("Calc service unreachable.");
