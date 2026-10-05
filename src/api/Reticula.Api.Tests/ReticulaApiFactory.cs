@@ -182,6 +182,44 @@ public sealed class FakeCalc : ICalcClient
         return Task.FromResult(OnExtract(LastExtractBox));
     }
 
+    /// <summary>Set by a test to decide what the LV network build returns. By default each LV route is one branch and each source one node.</summary>
+    public Func<string, IReadOnlyList<LvCandidate>, CalcLvNetwork> OnBuildLvNetwork { get; set; } = DefaultLvNetwork;
+
+    public IReadOnlyList<LvCandidate> LastLvCandidates { get; private set; } = [];
+
+    public Task<CalcLvNetwork> BuildLvNetworkAsync(string rulesRef, IReadOnlyList<LvCandidate> candidates, CancellationToken ct = default)
+    {
+        Throw();
+        LastLvCandidates = candidates;
+        return Task.FromResult(OnBuildLvNetwork(rulesRef, candidates));
+    }
+
+    public static CalcLvNetwork DefaultLvNetwork(string rulesRef, IReadOnlyList<LvCandidate> candidates)
+    {
+        var nodes = new List<CalcLvNode>();
+        var branches = new List<CalcLvBranch>();
+        foreach (var c in candidates)
+        {
+            var coords = c.Geometry.GetProperty("coordinates");
+            if (c.Kind == "lv_route")
+            {
+                var line = coords.Deserialize<double[][]>()!;
+                nodes.Add(new CalcLvNode($"N{nodes.Count + 1}", "end", line[0], null, null, null, null));
+                nodes.Add(new CalcLvNode($"N{nodes.Count + 1}", "end", line[^1], null, null, null, null));
+                branches.Add(new CalcLvBranch($"B{branches.Count + 1}", "route", nodes[^2].Id, nodes[^1].Id, line, 100, c.Id, null));
+            }
+            else if (c.Kind is "transformer" or "minisub")
+            {
+                nodes.Add(new CalcLvNode($"N{nodes.Count + 1}", "source", coords.Deserialize<double[]>()!, "TX1", c.Id, null, 0));
+            }
+        }
+        var routes = branches.Count;
+        return new CalcLvNetwork(rulesRef, "0123456789abcdef", "test tolerances", nodes, branches,
+            [new LvFeeder("TX1-F1", "N1", routes, 100.0 * routes, routes, 100)],
+            [new LvIssue("warning", "near_miss", "Route ends stop short.", 1, [], [[28.1, -25.5]])],
+            new LvSummary(routes, 1, 1, 0, 0, 1, nodes.Count, routes, 100.0 * routes, 0));
+    }
+
     private void Throw()
     {
         if (Unreachable) throw new CalcUnavailableException("Calc service unreachable.");

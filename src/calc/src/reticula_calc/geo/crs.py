@@ -81,3 +81,9 @@ def detect(xs: list[float], ys: list[float], area_lon: float | None) -> Detectio
     if 100_000 <= xmin and xmax <= 900_000 and 6_000_000 <= ymin and ymax <= 7_700_000:
         return Detection(None, "coordinates look like UTM; choose the zone (34S, 35S or 36S)")
     return Detection(None, f"unrecognised coordinate range x {xmin:.0f}..{xmax:.0f}, y {ymin:.0f}..{ymax:.0f}")
+
+
+@lru_cache(maxsize=32)
+def from_wgs84(spec: str) -> Transformer:
+    """WGS84 lon/lat to the given system; with a Lo zone this gives metres for geometry work."""
+    return Transformer.from_crs("EPSG:4326", _proj_for(spec), always_xy=True)
