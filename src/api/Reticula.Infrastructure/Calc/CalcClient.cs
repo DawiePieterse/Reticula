@@ -92,6 +92,13 @@ public sealed class CalcClient(HttpClient http) : ICalcClient
         return await ReadAsync<AdmdGroup>(r, ct);
     }
 
+    public async Task<CalcLvNetwork> BuildLvNetworkAsync(string rulesRef, IReadOnlyList<LvCandidate> candidates, CancellationToken ct = default)
+    {
+        using var content = JsonContent.Create(new { rules = rulesRef, candidates }, options: Json);
+        using var r = await SendAsync(() => http.PostAsync("/calc/lv/network", content, ct), ct);
+        return await ReadAsync<CalcLvNetwork>(r, ct);
+    }
+
     public async Task<MapExtract> ExtractMapAsync(double minLon, double minLat, double maxLon, double maxLat, CancellationToken ct = default)
     {
         using var content = JsonContent.Create(new { bbox = new[] { minLon, minLat, maxLon, maxLat } }, options: Json);

@@ -14,6 +14,12 @@ The field screen opens from a project with **Field inspection**. It is built for
 
 The tools add possible transformer, mini-sub and pole sites as points, and MV and LV routes as lines. A site can be placed at the GPS position. A route is tapped out point by point and then finished. Candidates must lie in or near the project area.
 
+The engineer builds the LV network from these marks on the project screen (ADR 0006), so draw LV routes the way the cables would run:
+
+- **End a route on the route it joins.** Ends within 2 m of a route are joined to it. Ends that stop 2 to 6 m short are flagged, and any further away are left apart.
+- **Mark the transformer or mini-sub within 30 m of its route**, and poles within 5 m.
+- **Keep LV routes radial.** A loop, or a route that joins two transformers, is reported for the engineer to decide where the open point goes.
+
 ## Loads: the income and ADMD tool
 
 - For a dwelling, the inspector records what can be seen: dwelling type, roof, walls, vehicles, appliances, stand size and occupants. The calc service scores these, picks the income band and category, and returns the ADMD.

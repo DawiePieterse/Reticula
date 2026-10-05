@@ -5,13 +5,15 @@ import { firstValueFrom } from 'rxjs';
 import { ApiProblem, toApiProblem } from '../../core/api-problem';
 import { AuthService } from '../../core/auth/auth.service';
 import { AreaMap } from './area-map';
+import { LvLayers } from './lv-network.api';
+import { LvNetworkPanel } from './lv-network-panel';
 import { LayoutLayers, ProjectLayout } from './project-layout';
 import { GeoJsonPolygon } from './geo';
 import { ProjectsApi } from './projects.api';
 
 @Component({
   selector: 'app-project-edit',
-  imports: [ReactiveFormsModule, RouterLink, AreaMap, ProjectLayout],
+  imports: [ReactiveFormsModule, RouterLink, AreaMap, ProjectLayout, LvNetworkPanel],
   template: `
     <div class="page-head">
       <h2>{{ isNew() ? 'New project' : form.controls.name.value || 'Project' }}</h2>
@@ -62,6 +64,7 @@ import { ProjectsApi } from './projects.api';
           [roads]="layers().roads"
           [contours]="layers().contours"
           [network]="layers().network"
+          [lv]="lv()"
           [focusId]="focusId()"
           (featureClick)="focusId.set($event)"
         />
@@ -84,6 +87,7 @@ import { ProjectsApi } from './projects.api';
         (layersChange)="layers.set($event)"
         (focus)="focusId.set($event)"
       />
+      <app-lv-network [projectId]="projectId" [canEdit]="canEdit()" (layersChange)="lv.set($event)" />
     }
   `,
 })
@@ -107,6 +111,7 @@ export class ProjectEdit {
   protected readonly isNew = computed(() => !this.id());
   protected readonly layers = signal<LayoutLayers>({ stands: null, buildings: null, preview: null, roads: null, contours: null, network: null });
   protected readonly focusId = signal<string | null>(null);
+  protected readonly lv = signal<LvLayers | null>(null);
   private version: number | undefined;
 
   constructor() {

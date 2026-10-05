@@ -14,6 +14,7 @@ import type { Feature as GjFeature, FeatureCollection as GjCollection } from 'ge
 import type { GeoJSONSource, Map as MlMap, MapMouseEvent, StyleSpecification } from 'maplibre-gl';
 import { GeoJsonPolygon, Position, bounds } from './geo';
 import { AnyGeometry, BUILDING_COLOURS, FeatureCollection, NETWORK_COLOURS, flagIncomplete } from './layout.api';
+import { LvLayers } from './lv-network.api';
 import { PolygonDraw } from './polygon-draw';
 
 const OSM_STYLE: StyleSpecification = {
@@ -44,6 +45,9 @@ const PREVIEW = 'preview';
 const ROADS = 'roads';
 const CONTOURS = 'contours';
 const NETWORK = 'network';
+const LV_BRANCHES = 'lv-branches';
+const LV_NODES = 'lv-nodes';
+const LV_ISSUES = 'lv-issues';
 
 export type AnyCollection = FeatureCollection<unknown, AnyGeometry> | null;
 
@@ -89,6 +93,8 @@ export class AreaMap implements OnDestroy {
   readonly roads = input<AnyCollection>(null);
   readonly contours = input<AnyCollection>(null);
   readonly network = input<AnyCollection>(null);
+  /** The LV network model: branches coloured by feeder, nodes, and where its issues are. */
+  readonly lv = input<LvLayers | null>(null);
   /** Building to zoom to and highlight. */
   readonly focusId = input<string | null>(null);
   readonly featureClick = output<string>();
@@ -115,6 +121,7 @@ export class AreaMap implements OnDestroy {
     effect(() => this.setData(ROADS, this.roads()));
     effect(() => this.setData(CONTOURS, this.contours()));
     effect(() => this.setData(NETWORK, flagIncomplete(this.network())));
+    effect(() => this.setLv(this.lv()));
     effect(() => {
       const p = this.preview();
       untracked(() => {
@@ -133,7 +140,7 @@ export class AreaMap implements OnDestroy {
       const map = new Map({ container: this.mapEl().nativeElement, style: OSM_STYLE, center: SOUTH_AFRICA_CENTRE, zoom: 5 });
       map.addControl(new NavigationControl(), 'top-right');
       map.on('load', () => {
-        for (const id of [CONTOURS, ROADS, STANDS, BUILDINGS, NETWORK, PREVIEW]) map.addSource(id, { type: 'geojson', data: emptyCollection(), promoteId: 'id' });
+        for (const id of [CONTOURS, ROADS, STANDS, BUILDINGS, NETWORK, LV_BRANCHES, LV_NODES, LV_ISSUES, PREVIEW]) map.addSource(id, { type: 'geojson', data: emptyCollection(), promoteId: 'id' });
         map.addLayer({ id: 'contours-line', type: 'line', source: CONTOURS, paint: { 'line-color': '#bc8f5a', 'line-width': 0.8, 'line-opacity': 0.8 } });
         map.addLayer({ id: 'contours-label', type: 'symbol', source: CONTOURS, minzoom: 15,
           layout: { 'symbol-placement': 'line', 'text-field': ['to-string', ['get', 'elevationM']], 'text-size': 10 },
@@ -158,6 +165,19 @@ export class AreaMap implements OnDestroy {
         map.addLayer({ id: 'network-point', type: 'circle', source: NETWORK, filter: ['==', ['geometry-type'], 'Point'],
           paint: { 'circle-color': assetColour, 'circle-radius': ['match', ['get', 'assetType'], 'pole', 3, 6] as never,
             'circle-stroke-color': ['case', ['get', 'incomplete'], '#fb8500', '#ffffff'] as never, 'circle-stroke-width': 2 } });
+        map.addLayer({ id: 'lv-route', type: 'line', source: LV_BRANCHES, filter: ['==', ['get', 'kind'], 'route'],
+          layout: { 'line-cap': 'round' }, paint: { 'line-color': ['get', 'colour'] as never, 'line-width': 3.5 } });
+        map.addLayer({ id: 'lv-link', type: 'line', source: LV_BRANCHES, filter: ['==', ['get', 'kind'], 'link'],
+          paint: { 'line-color': ['get', 'colour'] as never, 'line-width': 2.5, 'line-dasharray': [1.5, 1] } });
+        map.addLayer({ id: 'lv-node', type: 'circle', source: LV_NODES, filter: ['!', ['in', ['get', 'kind'], ['literal', ['source', 'pole']]]] as never,
+          minzoom: 15, paint: { 'circle-radius': 2.5, 'circle-color': '#ffffff', 'circle-stroke-color': '#24292f', 'circle-stroke-width': 1 } });
+        map.addLayer({ id: 'lv-pole', type: 'circle', source: LV_NODES, filter: ['==', ['get', 'kind'], 'pole'],
+          paint: { 'circle-radius': 3.5, 'circle-color': '#57606a', 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1 } });
+        map.addLayer({ id: 'lv-source', type: 'circle', source: LV_NODES, filter: ['==', ['get', 'kind'], 'source'],
+          paint: { 'circle-radius': 7, 'circle-color': '#24292f', 'circle-stroke-color': '#ffd33d', 'circle-stroke-width': 2.5 } });
+        map.addLayer({ id: 'lv-issue', type: 'circle', source: LV_ISSUES,
+          paint: { 'circle-radius': 11, 'circle-opacity': 0, 'circle-stroke-width': 2.5,
+            'circle-stroke-color': ['match', ['get', 'severity'], 'error', '#cf222e', '#fb8500'] as never } });
         map.addLayer({ id: 'preview-line', type: 'line', source: PREVIEW, filter: ['!=', ['geometry-type'], 'Point'], paint: { 'line-color': '#fb8500', 'line-width': 2, 'line-dasharray': [2, 1] } });
         map.addLayer({ id: 'preview-point', type: 'circle', source: PREVIEW, filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-color': '#fb8500', 'circle-radius': 5 } });
         map.on('click', 'buildings-fill', (e) => {
@@ -176,6 +196,7 @@ export class AreaMap implements OnDestroy {
         this.setData(ROADS, this.roads());
         this.setData(CONTOURS, this.contours());
         this.setData(NETWORK, flagIncomplete(this.network()));
+        this.setLv(this.lv());
       });
       map.on('click', (e: MapMouseEvent) => {
         if (!this.drawing()) return;
@@ -237,6 +258,12 @@ export class AreaMap implements OnDestroy {
       features.push({ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[...pts, pts[0]]] } });
     }
     source.setData({ type: 'FeatureCollection', features });
+  }
+
+  private setLv(lv: LvLayers | null): void {
+    this.setData(LV_BRANCHES, lv?.branches ?? null);
+    this.setData(LV_NODES, lv?.nodes ?? null);
+    this.setData(LV_ISSUES, lv?.issues ?? null);
   }
 
   private setData(source: string, data: AnyCollection): void {

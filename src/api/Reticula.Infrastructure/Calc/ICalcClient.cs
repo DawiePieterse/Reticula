@@ -35,6 +35,10 @@ public interface ICalcClient
     /// <exception cref="CalcRejectedException">No map source is configured, it cannot be read, or the box is too large.</exception>
     Task<MapExtract> ExtractMapAsync(double minLon, double minLat, double maxLon, double maxLat, CancellationToken ct = default);
 
+    /// <summary>Joins the LV routes and sites marked in the field into a node-branch network and checks it is radial.</summary>
+    /// <exception cref="CalcRejectedException">The rules file has no lv_network section.</exception>
+    Task<CalcLvNetwork> BuildLvNetworkAsync(string rulesRef, IReadOnlyList<LvCandidate> candidates, CancellationToken ct = default);
+
     Task<AdmdGroup> GroupAdmdAsync(string rulesRef, IReadOnlyList<AdmdGroupLoad> loads, CancellationToken ct = default);
 }
 

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Reticula.Domain.Design;
 using Reticula.Domain.Field;
 using Reticula.Domain.Jobs;
 using Reticula.Domain.Layout;
@@ -27,6 +28,9 @@ public sealed class ReticulaDbContext(DbContextOptions<ReticulaDbContext> option
     public DbSet<Road> Roads => Set<Road>();
     public DbSet<Contour> Contours => Set<Contour>();
     public DbSet<NetworkAsset> NetworkAssets => Set<NetworkAsset>();
+    public DbSet<LvNetwork> LvNetworks => Set<LvNetwork>();
+    public DbSet<LvNode> LvNodes => Set<LvNode>();
+    public DbSet<LvBranch> LvBranches => Set<LvBranch>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -257,6 +261,52 @@ public sealed class ReticulaDbContext(DbContextOptions<ReticulaDbContext> option
             e.Property(x => x.Source).HasMaxLength(300).IsRequired();
             e.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.BuiltBy).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<LvNetwork>(e =>
+        {
+            e.ToTable("lv_networks");
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.ProjectId).IsUnique();
+            e.Property(x => x.RulesRef).HasMaxLength(100).IsRequired();
+            e.Property(x => x.RulesHash).HasMaxLength(64).IsRequired();
+            e.Property(x => x.Clause).HasMaxLength(500).IsRequired();
+            e.Property(x => x.SummaryJson).HasColumnType("jsonb").IsRequired();
+            e.Property(x => x.FeedersJson).HasColumnType("jsonb").IsRequired();
+            e.Property(x => x.IssuesJson).HasColumnType("jsonb").IsRequired();
+            e.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.BuiltBy).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<LvNode>(e =>
+        {
+            e.ToTable("lv_nodes");
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.NetworkId, x.Key }).IsUnique();
+            e.Property(x => x.Key).HasMaxLength(20).IsRequired();
+            e.Property(x => x.Kind).HasMaxLength(20).IsRequired();
+            e.Property(x => x.Label).HasMaxLength(20);
+            e.Property(x => x.Feeder).HasMaxLength(40);
+            e.Property(x => x.Geometry).HasColumnType($"geometry(Point,{ProjectRules.Srid})").IsRequired();
+            e.HasIndex(x => x.Geometry).HasMethod("gist");
+            e.HasOne<LvNetwork>().WithMany().HasForeignKey(x => x.NetworkId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<Candidate>().WithMany().HasForeignKey(x => x.CandidateId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        b.Entity<LvBranch>(e =>
+        {
+            e.ToTable("lv_branches");
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.NetworkId, x.Key }).IsUnique();
+            e.Property(x => x.Key).HasMaxLength(20).IsRequired();
+            e.Property(x => x.Kind).HasMaxLength(20).IsRequired();
+            e.Property(x => x.FromKey).HasMaxLength(20).IsRequired();
+            e.Property(x => x.ToKey).HasMaxLength(20).IsRequired();
+            e.Property(x => x.Feeder).HasMaxLength(40);
+            e.Property(x => x.Geometry).HasColumnType($"geometry(LineString,{ProjectRules.Srid})").IsRequired();
+            e.HasIndex(x => x.Geometry).HasMethod("gist");
+            e.HasOne<LvNetwork>().WithMany().HasForeignKey(x => x.NetworkId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<Candidate>().WithMany().HasForeignKey(x => x.CandidateId).OnDelete(DeleteBehavior.SetNull);
         });
 
         b.Entity<Assumption>(e =>

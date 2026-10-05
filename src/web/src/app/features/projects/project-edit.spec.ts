@@ -8,6 +8,7 @@ import { AUTH_STORAGE_KEY } from '../../core/auth/auth.service';
 import { AreaMap } from './area-map';
 import { GeoJsonPolygon } from './geo';
 import { ProjectEdit } from './project-edit';
+import { LvNetworkPanel } from './lv-network-panel';
 import { ProjectLayout } from './project-layout';
 
 @Component({ selector: 'app-area-map', template: '' })
@@ -21,6 +22,7 @@ class AreaMapStub {
   readonly roads = input<unknown>(null);
   readonly contours = input<unknown>(null);
   readonly network = input<unknown>(null);
+  readonly lv = input<unknown>(null);
   readonly focusId = input<string | null>(null);
   readonly featureClick = output<string>();
 }
@@ -31,6 +33,13 @@ class ProjectLayoutStub {
   readonly canEdit = input(false);
   readonly layersChange = output<unknown>();
   readonly focus = output<string>();
+}
+
+@Component({ selector: 'app-lv-network', template: '' })
+class LvNetworkStub {
+  readonly projectId = input<string>();
+  readonly canEdit = input(false);
+  readonly layersChange = output<unknown>();
 }
 
 const AREA: GeoJsonPolygon = {
@@ -51,7 +60,7 @@ async function setup(id?: string) {
   TestBed.configureTestingModule({
     imports: [ProjectEdit],
     providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
-  }).overrideComponent(ProjectEdit, { remove: { imports: [AreaMap, ProjectLayout] }, add: { imports: [AreaMapStub, ProjectLayoutStub] } });
+  }).overrideComponent(ProjectEdit, { remove: { imports: [AreaMap, ProjectLayout, LvNetworkPanel] }, add: { imports: [AreaMapStub, ProjectLayoutStub, LvNetworkStub] } });
 
   const fixture = TestBed.createComponent(ProjectEdit);
   if (id) fixture.componentRef.setInput('id', id);
@@ -118,5 +127,15 @@ describe('ProjectEdit', () => {
     await fixture.whenStable();
     expect(el.querySelector<HTMLInputElement>('input[formcontrolname="name"]')!.value).toBe('Their edit');
     expect(el.textContent).not.toContain('changed elsewhere');
+  });
+
+  it('shows the LV network on the map', async () => {
+    const { fixture } = await setup('p1');
+    const panel = fixture.debugElement.query((d) => d.name === 'app-lv-network').componentInstance as LvNetworkStub;
+    expect(panel.projectId()).toBe('p1');
+    const layers = { branches: { type: 'FeatureCollection', features: [] } };
+    panel.layersChange.emit(layers);
+    await fixture.whenStable();
+    expect((fixture.debugElement.query((d) => d.name === 'app-area-map').componentInstance as AreaMapStub).lv()).toBe(layers);
   });
 });

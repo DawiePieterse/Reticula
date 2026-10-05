@@ -9,8 +9,8 @@ Every check and every rules-file value that comes from a standard points to an e
 ## How it is used
 
 - **Ids** have the form `STANDARD-TOPIC`, for example `NRS034-ADMD`. They never change once a design has used them. A withdrawn entry stays, marked *withdrawn*.
-- **Rules files** carry the id in an `index` field beside each `clause` (from rules version 0.3.0; `rules/schema.json` accepts it). The calc tests check that every `index` in a rules file exists here, and that every standard a rules file lists under `standards:` has at least one entry here.
-- **Editions** are set per rules file under `standards:`. The edition column here is what the current rules file (`eskom/0.2.0`) claims; it is unconfirmed until the status says otherwise.
+- **Rules files** carry the id in an `index` field beside each `clause` (from rules version 0.3.0, which sets it on the voltage, conductor and LV network sections; `rules/schema.json` accepts it). The calc tests check that every `index` in a rules file exists here, and that every standard a rules file lists under `standards:` has at least one entry here.
+- **Editions** are set per rules file under `standards:`. The edition column here is what the current rules file (`eskom/0.3.0`) claims; it is unconfirmed until the status says otherwise.
 - **Eskom projects follow Eskom's own standards.** Where an Eskom standard and an NRS or SANS document differ, the Eskom standard governs, and the `eskom/*` rules files point at the Eskom row. The NRS and SANS rows stay for municipal projects and for values Eskom does not set.
 - **To confirm a row:** read the clause in the edition you hold, write the clause number and edition, set the status to *confirmed* with your initials and the date, and raise the rules file version if a value changes.
 
@@ -58,8 +58,8 @@ The engineer designs Eskom projects to Eskom's own standards. Their document num
 | Id | Check or value | Standard | Clause | Edition | Used by | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | ESKOM-PLANNING | Residential electrification planning and design: ADMD, design horizon, phasing; overrides NRS 034-1 where they differ | Eskom distribution standard, number to identify | to confirm | to identify | `eskom/*` rules: `income_admd`, `load_tables` | to identify |
-| ESKOM-VDROP | LV voltage drop allocation and limits for Eskom networks; overrides NRS034-VDROP | Eskom distribution standard, number to identify | to confirm | to identify | `eskom/*` rules: `voltage.lv_max_drop_pct` | to identify |
-| ESKOM-CONDUCTOR | Standard LV and MV conductors and cables, with impedances and ratings | Eskom distribution standard, number to identify | to confirm | to identify | `eskom/*` rules: `conductors` | to identify |
+| ESKOM-VDROP | LV voltage drop allocation and limits for Eskom networks; overrides NRS034-VDROP | Eskom distribution standard, number to identify | to confirm | to identify | `eskom/*` rules: `voltage.lv_max_drop_pct` (index set from eskom/0.3.0) | to identify |
+| ESKOM-CONDUCTOR | Standard LV and MV conductors and cables, with impedances and ratings | Eskom distribution standard, number to identify | to confirm | to identify | `eskom/*` rules: `conductors` (index set from eskom/0.3.0) | to identify |
 | ESKOM-DERATE | Cable current derating for soil, depth and grouping | Eskom distribution standard, number to identify | to confirm | to identify | Phase 2.6 | to identify |
 | ESKOM-OHL | Overhead line spans, sag and tension, clearances, poles and stays | Eskom distribution standard, number to identify | to confirm | to identify | Phase 2.5 | to identify |
 | ESKOM-MINISUB | Transformer and mini-sub selection and standard sizes | Eskom distribution standard, number to identify | to confirm | to identify | Phases 3.1–3.2 | to identify |
@@ -80,6 +80,7 @@ These values are Reticula's own and say so in their `clause` text. They are list
 | --- | --- | --- | --- | --- |
 | RETICULA-PREDICT | Building-type prediction from OSM tags, zoning and footprint | Reticula heuristic v1 | `building_prediction` | heuristic: tune per authority |
 | RETICULA-SCORE | Income indicator scoring and thresholds | Reticula heuristic v1 | `income_admd` indicator points and bands | heuristic: needs calibrating (docs/load-data.md) |
+| RETICULA-LVMODEL | Drawing tolerances for joining marked LV routes and sites into a network: join, near-miss, source and pole reach | Reticula LV network tolerances v1 | `lv_network` (from eskom/0.3.0); plan 2.1 | own values: tune to how routes are drawn in the field |
 
 ## Answers from the engineer (2026-10-05)
 

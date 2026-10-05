@@ -587,6 +587,61 @@
           }
         }
       }
+    },
+    "lv_network": {
+      "type": "object",
+      "description": "How LV routes and sites marked in the field are joined into a network (Phase 2.1). Distances in metres.",
+      "additionalProperties": false,
+      "required": [
+        "join_m",
+        "near_miss_m",
+        "source_reach_m",
+        "pole_reach_m",
+        "sources"
+      ],
+      "properties": {
+        "clause": {
+          "type": "string"
+        },
+        "index": {
+          "type": "string",
+          "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)+$",
+          "description": "Id of the clause in docs/standards-index.md"
+        },
+        "join_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "A route end this close to another route is joined to it"
+        },
+        "near_miss_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "A route end closer than this to another route, but not joined, is flagged"
+        },
+        "source_reach_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "A source site this close to a route feeds it"
+        },
+        "pole_reach_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "A pole site this close to a route is placed on it"
+        },
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "transformer",
+              "minisub"
+            ]
+          },
+          "description": "Candidate site kinds that feed the LV network"
+        }
+      }
     }
   }
 }

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.HttpLogging;
 using Reticula.Api;
 using Reticula.Api.Auth;
+using Reticula.Api.Design;
 using Reticula.Api.Field;
 using Reticula.Api.Infrastructure;
 using Reticula.Api.Jobs;
@@ -9,6 +10,7 @@ using Reticula.Api.Maps;
 using Reticula.Api.Projects;
 using Reticula.Infrastructure.Calc;
 using Reticula.Infrastructure.Data;
+using Reticula.Infrastructure.Design;
 using Reticula.Infrastructure.Field;
 using Reticula.Infrastructure.Files;
 using Reticula.Infrastructure.Jobs;
@@ -51,6 +53,7 @@ builder.Services.AddJobHandler<DiagnosticsJob>();
 builder.Services.AddJobHandler<MapPackJob>();
 builder.Services.AddScoped<LayoutService>();
 builder.Services.AddScoped<FieldService>();
+builder.Services.AddScoped<LvNetworkService>();
 builder.Services.AddSingleton<IFileStore, FileSystemFileStore>();
 builder.Services.AddCors(o => o.AddDefaultPolicy(p => p.AllowAnyHeader().AllowAnyMethod().AllowAnyOrigin()));
 
@@ -77,6 +80,7 @@ app.MapJobEndpoints();
 app.MapLayoutEndpoints();
 app.MapFieldEndpoints();
 app.MapMapPackEndpoints();
+app.MapLvNetworkEndpoints();
 
 await app.InitialiseDatabaseAsync();
 

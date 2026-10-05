@@ -25,6 +25,7 @@ from .geo.importers import ImportResult, Kind, UnreadableFileError, import_file
 from .geo.osm import OsmError, OsmKind, fetch_osm
 from .geo.predict import PredictRequest, PredictResponse, predict
 from .logging_setup import configure_logging, log_requests
+from .lv.network import BuildRequest, LvNetwork, build_network
 from .maps.extract import ExtractRequest, MapSourceError, extract_configured
 from .rules import RulesError, list_rules, load_rules
 
@@ -56,6 +57,15 @@ def rules_info(authority: str, version: str) -> dict[str, str]:
 def calc_voltage_drop(req: VoltageDropRequest) -> VoltageDropResult:
     try:
         return voltage_drop(req, load_rules(req.rules))
+    except RulesError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+@app.post("/calc/lv/network")
+def calc_lv_network(req: BuildRequest) -> LvNetwork:
+    """Joins the LV routes and sites marked in the field into a node-branch network and checks that it is radial."""
+    try:
+        return build_network(req, load_rules(req.rules))
     except RulesError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
