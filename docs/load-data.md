@@ -49,6 +49,11 @@ For residential loads, the calc service:
 
 The per-consumer demand falls towards the ADMD as groups grow; a test checks this. A hand-worked case of 30 township-area consumers is in `test-cases/hb_group/case-1`: 136.72 A per phase and 94.34 kVA. It is checked independently with a Cornish-Fisher estimate.
 
+**Checked against ReticMaster 21.** Its test procedure "Mixed Domestic Loads" (15 August 2021, supplied by the engineer) gives two worked mixes of load classes:
+
+- **Herman-Beta:** ReticMaster pools mixed consumers into one class. LSM 3-4 with LSM 5-6 gives α 1.066, β 6.95, c 60 (`hb_group/case-2`). LSM 3-4 with LSM 7 gives α 1.077, β 5.007 (`hb_group/case-3`). Pooling keeps the sum's mean and variance, which is what Reticula adds up directly. The design currents agree to 0.02 %, the rounding of ReticMaster's α and β.
+- **Empirical:** ReticMaster's default correction factor is DCF(n) = 1 + 2/n (k = 2). Its per-phase currents at 231 V for two and four mixed consumers add up to the group demand Reticula gives with k = 2 (`tests/test_admd.py`). Reticula's starter rules use k = 1.5.
+
 Voltage drop along feeders by Herman-Beta follows in Phase 2 (LV design). It will reuse these class parameters.
 
 ## Rules versions

@@ -43,6 +43,9 @@ public interface ICalcClient
     /// <exception cref="CalcRejectedException">The rules file has no lv_loads section.</exception>
     Task<CalcLvLoads> AllocateLvLoadsAsync(string rulesRef, CalcLvNetwork network, IReadOnlyList<LvLoadIn> loads, CancellationToken ct = default);
 
+    /// <summary>The rules file's conductor library; null when the rules file does not exist.</summary>
+    Task<CalcConductorLibrary?> GetConductorsAsync(string rulesRef, CancellationToken ct = default);
+
     Task<AdmdGroup> GroupAdmdAsync(string rulesRef, IReadOnlyList<AdmdGroupLoad> loads, CancellationToken ct = default);
 }
 

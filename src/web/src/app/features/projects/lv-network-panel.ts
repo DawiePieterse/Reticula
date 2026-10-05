@@ -2,12 +2,13 @@ import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { toApiProblem } from '../../core/api-problem';
+import { ConductorLibrary } from './conductor-library';
 import { FEEDER_COLOURS, LvLayers, LvNetwork, LvNetworkApi, PHASE_COLOURS, PHASE_NAMES, lvLayers } from './lv-network.api';
 
 /** The LV network model (plan 2.1): the marked LV routes and sites joined into a network, with its feeders and what to fix. */
 @Component({
   selector: 'app-lv-network',
-  imports: [DatePipe, DecimalPipe],
+  imports: [DatePipe, DecimalPipe, ConductorLibrary],
   template: `
     <section class="lv">
       <div class="page-head">
@@ -114,6 +115,8 @@ import { FEEDER_COLOURS, LvLayers, LvNetwork, LvNetworkApi, PHASE_COLOURS, PHASE
           Not built yet. Mark LV routes and transformer or mini-sub sites in the field{{ canEdit() ? ', then build the network' : '' }}.
         </p>
       }
+
+      <app-conductor-library [projectId]="projectId()" />
     </section>
   `,
   styles: `

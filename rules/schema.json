@@ -115,6 +115,88 @@
             "type": "string",
             "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)+$",
             "description": "Id of the clause in docs/standards-index.md"
+          },
+          "material": {
+            "type": "string",
+            "enum": [
+              "cu",
+              "al"
+            ]
+          },
+          "size_mm2": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Nominal phase conductor size"
+          },
+          "cores": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "uses": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": [
+                "feeder",
+                "service"
+              ]
+            },
+            "description": "feeder: LV distribution; service: from a pole box or kiosk to a customer"
+          },
+          "ratings_a": {
+            "type": "object",
+            "additionalProperties": false,
+            "minProperties": 1,
+            "properties": {
+              "ground": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "pipe": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "air": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            },
+            "description": "Continuous current rating by installation, A, at the standard conditions of the rating clause"
+          },
+          "fault_k": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "K in I = K·A/√t, giving kA with A in mm² and t in s"
+          },
+          "placeholder": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": [
+                "r_ohm_per_km",
+                "x_ohm_per_km",
+                "rating_a",
+                "ratings_a",
+                "fault_k",
+                "r_ac_ohm_per_km"
+              ]
+            },
+            "description": "Fields whose values are placeholders, not yet from the governing standard"
+          },
+          "rating_clause": {
+            "type": "string",
+            "description": "Where the ratings and fault constant come from, when that differs from clause"
+          },
+          "r_ac_ohm_per_km": {
+            "type": "number",
+            "minimum": 0,
+            "description": "AC resistance at r_ac_temp_c, ohm/km"
+          },
+          "r_ac_temp_c": {
+            "type": "number",
+            "description": "Conductor temperature for r_ac_ohm_per_km, °C"
           }
         }
       }

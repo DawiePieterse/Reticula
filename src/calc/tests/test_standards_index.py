@@ -53,7 +53,8 @@ def test_every_standard_a_rules_file_names_is_indexed():
     prefixes = {i.split("-")[0] for i in index_ids()}
     for ref, doc in rules_docs():
         for standard in doc.get("standards", {}):
-            stem = re.match(r"[A-Z]+\d+", standard.replace(" ", "")).group()
+            # Eskom documents are numbered (ESKOM240-56030637); their rows share the ESKOM prefix.
+            stem = "ESKOM" if standard.startswith("ESKOM") else re.match(r"[A-Z]+\d+", standard.replace(" ", "")).group()
             assert stem in prefixes, f"{ref} names {standard}, which has no entry in docs/standards-index.md"
 
 
