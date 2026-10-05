@@ -1,4 +1,4 @@
-"""Predict each building's type from OSM tags, municipal zoning and footprint size.
+"""Predict each building's type from OSM tags, municipal zoning, footprint size and, where given, the rooftop signal.
 
 Every value comes from the rules file's `building_prediction` section. Each prediction lists all the
 signals that fed it, so the inspector sees why, and low-confidence buildings can be visited first.
@@ -15,22 +15,24 @@ from ..rules import RulesError, RuleSet
 BUILDING_TYPES = ("house", "shop", "school", "other")
 
 
+class Signal(BaseModel):
+    source: str
+    type: str
+    confidence: float
+
+
 class BuildingInput(BaseModel):
     id: str
     area_m2: float | None = Field(default=None, ge=0)
     tags: dict[str, str] = {}
     zoning: str | None = None
+    #: Signals worked out elsewhere, e.g. the rooftop classifier (plan 1.3).
+    extra_signals: list[Signal] | None = None
 
 
 class PredictRequest(BaseModel):
     rules: str
     buildings: list[BuildingInput]
-
-
-class Signal(BaseModel):
-    source: str
-    type: str
-    confidence: float
 
 
 class Prediction(BaseModel):
@@ -95,6 +97,7 @@ def predict(req: PredictRequest, rules: RuleSet) -> PredictResponse:
     out: list[Prediction] = []
     for b in req.buildings:
         signals = [s for s in (_tag_signal(b.tags, cfg), _zoning_signal(b.zoning, cfg), _footprint_signal(b.area_m2, cfg)) if s]
+        signals += [s for s in b.extra_signals or [] if s.type in BUILDING_TYPES]
         if not signals:
             out.append(Prediction(id=b.id, type="other", confidence=0.0, source="none", low_confidence=True, signals=[]))
             continue

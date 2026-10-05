@@ -39,6 +39,7 @@ public sealed class ReticulaDbContext(DbContextOptions<ReticulaDbContext> option
     public DbSet<Revision> Revisions => Set<Revision>();
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
     public DbSet<ProjectExport> ProjectExports => Set<ProjectExport>();
+    public DbSet<ProjectImagery> ProjectImagery => Set<ProjectImagery>();
     public DbSet<AssistantConversation> AssistantConversations => Set<AssistantConversation>();
     public DbSet<AssistantDraft> AssistantDrafts => Set<AssistantDraft>();
     public DbSet<ReportSection> ReportSections => Set<ReportSection>();
@@ -308,6 +309,22 @@ public sealed class ReticulaDbContext(DbContextOptions<ReticulaDbContext> option
             e.HasIndex(x => new { x.ProjectId, x.Number }).IsUnique();
             e.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne<DocumentSet>().WithMany().HasForeignKey(x => x.DocumentSetId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<ProjectImagery>(e =>
+        {
+            e.ToTable("project_imagery");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Source).HasMaxLength(20).IsRequired();
+            e.Property(x => x.Format).HasMaxLength(10).IsRequired();
+            e.Property(x => x.Label).HasMaxLength(80).IsRequired();
+            e.Property(x => x.Licence).HasMaxLength(500).IsRequired();
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.StorageKey).HasMaxLength(300);
+            e.Property(x => x.Sha256).HasMaxLength(64);
+            e.Property(x => x.Error).HasMaxLength(2000);
+            e.Property(x => x.ModelJson).HasColumnType("jsonb");
+            e.HasIndex(x => x.ProjectId);
+            e.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Cascade);
         });
         b.Entity<ProjectExport>(e =>
         {

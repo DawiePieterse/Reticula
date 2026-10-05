@@ -78,6 +78,10 @@ builder.Services.AddScoped<ReviewReadiness>();
 builder.Services.AddJobHandler<RevisionIssueJob>();
 builder.Services.AddJobHandler<RevisionReproduceJob>();
 builder.Services.AddJobHandler<ProjectExportJob>();
+builder.Services.AddSingleton(GoogleImageryOptions.From(builder.Configuration));
+builder.Services.AddHttpClient<GoogleTilesClient>(c => c.Timeout = TimeSpan.FromSeconds(60));
+builder.Services.AddJobHandler<GoogleImageryJob>();
+builder.Services.AddJobHandler<RooftopClassifyJob>();
 builder.Services.AddSingleton(AssistantOptions.From(builder.Configuration));
 builder.Services.AddHttpClient<IAssistantModel, AnthropicModel>(c => c.Timeout = TimeSpan.FromSeconds(120));
 builder.Services.AddScoped<AssistantTools>();
@@ -121,6 +125,7 @@ app.MapRateListEndpoints();
 app.MapDocumentEndpoints();
 app.MapReviewEndpoints();
 app.MapAssistantEndpoints();
+app.MapImageryEndpoints();
 
 await app.InitialiseDatabaseAsync();
 

@@ -25,6 +25,7 @@ from .docs.package import RenderRequest, RenderResult
 from .geo import crs as crs_mod
 from .geo.importers import ImportResult, UnreadableFileError, import_file
 from .geo.predict import PredictRequest, PredictResponse, predict
+from .geo.rooftop import ImageryError, RooftopRequest, RooftopResponse, classify
 from .logging_setup import configure_logging, log_requests
 from .lv.costs import load_rates, rates_dir
 from .lv.design import LvDesignRequest, LvDesignResult, design_lv
@@ -87,6 +88,25 @@ async def geo_import(
         return import_file(file.filename or "upload", data, kind, source_crs or None, layer or None, area_geojson,  # type: ignore[arg-type]
                            contour_interval)
     except (UnreadableFileError, crs_mod.CrsError, ValueError) as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+
+MAX_IMAGERY_BYTES = 600 * 1024 * 1024
+
+
+@app.post("/predict/rooftop")
+async def predict_rooftop(imagery: Annotated[UploadFile, File()], request: Annotated[str, Form(description="RooftopRequest as JSON")]) -> RooftopResponse:
+    """Rooftop-imagery signal (plan 1.3): train on the project's confirmed buildings, signal the rest."""
+    try:
+        req = RooftopRequest.model_validate_json(request)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=f"request: {e}") from e
+    data = await imagery.read(MAX_IMAGERY_BYTES + 1)
+    if len(data) > MAX_IMAGERY_BYTES:
+        raise HTTPException(status_code=413, detail="Imagery is larger than 600 MB; crop it to the project")
+    try:
+        return classify(req, data, load_rules(req.rules))
+    except (RulesError, ImageryError) as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
 

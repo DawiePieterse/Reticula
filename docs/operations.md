@@ -78,3 +78,10 @@ deployment, persist the key ring (`AddDataProtection().PersistKeysTo…`) so a l
 Off by default. To enable, set `Assistant__Enabled=true` and the secret `Assistant__ApiKey` (Anthropic) on the API;
 optionally `Assistant__Model`. The API calls `https://api.anthropic.com` (allow it in the network policy). See
 docs/assistant.md for what the assistant can and cannot do.
+
+## Google satellite for the rooftop classifier
+
+Off by default. Google's standard Maps Platform terms do not allow deriving data from its imagery, so enable it only
+with an agreement that does: set `Imagery__Google__Enabled=true`, the secret `Imagery__Google__ApiKey` (Map Tiles API)
+and `Imagery__Google__LicenceReference` (the agreement). Optional: `Imagery__Google__Zoom` (19), `Imagery__Google__MaxTiles`
+(4000). The API calls `https://tile.googleapis.com`. See docs/rooftop.md.

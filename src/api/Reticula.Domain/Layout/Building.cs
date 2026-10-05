@@ -120,6 +120,11 @@ public sealed class Building
         UpdatedAt = now;
     }
 
+    /// <summary>The rooftop classifier's signal (plan 1.3), fed into the prediction with the other signals; null when none.</summary>
+    public string? RooftopSignalJson { get; private set; }
+
+    public void SetRooftopSignal(string? signalJson) => RooftopSignalJson = signalJson;
+
     public void SetPrediction(string type, double confidence, string source, bool lowConfidence, string signalsJson, string rulesHash, DateTimeOffset now)
     {
         PredictedType = type;

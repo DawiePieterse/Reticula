@@ -94,7 +94,7 @@ Deliverables: predicted building types, tablet inspection, income/ADMD tool, loa
 
 - [x] 1.1 Importers: CAD (DXF) and KML stand layouts; contours (DXF/SHP/GeoTIFF); OSM building/road extract for area; authority network data (CSV/SHP/GeoJSON with required fields). (docs/imports.md: stands, buildings, roads, contours and existing network from KML/KMZ/GeoJSON/DXF/zipped shapefile/CSV/GeoTIFF; live Overpass fetch for buildings and roads.)
 - [x] 1.2 Import validation: CRS detection, duplicate stands, missing erf numbers flagged early.
-- [~] 1.3 Building-type predictor: rules on OSM tags, zoning, footprint area; rooftop-image classifier behind licence flag; output type + confidence + source. (Done: tags, zoning, footprint from the rules file. To do: rooftop images, pending licence.)
+- [x] 1.3 Building-type predictor: rules on OSM tags, zoning, footprint area; rooftop-image classifier behind licence flag; output type + confidence + source. (Rooftop classifier on licensed orthophotos or Google tiles under an agreement allowing derived use, trained per project on confirmed buildings; docs/rooftop.md.)
 - [x] 1.4 Inspection UI (tablet): map-first, one-tap confirm, type picker (house/shop/school/other/not present/new), photo capture, notes, GPS, timestamp. (docs/field.md)
 - [x] 1.5 Candidate marking: transformer, mini-sub, MV route, pole site, LV route.
 - [x] 1.6 Progress panel: confirmed / outstanding / low-confidence-first list.
@@ -196,7 +196,7 @@ F. **Performance targets.** Field UI usable on mid-range Android tablet; 2,000-s
 - [ ] Choose which authority's rules to encode first (assumed Eskom).
 - [ ] Decide whether any design calculation must also run offline (assumed no).
 - [ ] Confirm current editions of NRS 034-1, NRS 048-2, NRS 097-2-1, SANS 10142-1, SANS 10098, SANS 780, SANS 1019, SANS 1507, SANS 97, IEC 60909, Red Book.
-- [ ] Confirm Google satellite and rooftop-image licence terms.
+- [ ] Confirm Google satellite and rooftop-image licence terms. (Google stays off until an agreement allowing derived use is configured; orthophotos record their licence per upload.)
 - [ ] Confirm .NET + Python split vs Python-only back end (Decision A).
 
 ---

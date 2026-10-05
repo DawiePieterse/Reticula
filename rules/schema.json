@@ -299,6 +299,53 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1
+        },
+        "rooftop": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "min_confirmed",
+            "min_per_type",
+            "min_accuracy",
+            "max_confidence"
+          ],
+          "properties": {
+            "clause": {
+              "type": "string"
+            },
+            "min_confirmed": {
+              "type": "integer",
+              "minimum": 2
+            },
+            "min_per_type": {
+              "type": "integer",
+              "minimum": 2
+            },
+            "min_accuracy": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "max_confidence": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "folds": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 20
+            },
+            "min_coverage": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1
+            },
+            "max_pixels": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
         }
       }
     },

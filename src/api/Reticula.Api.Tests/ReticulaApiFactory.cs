@@ -35,6 +35,9 @@ public sealed class ReticulaApiFactory : WebApplicationFactory<Program>, IAsyncL
     public FakeTileServer Tiles { get; } = new();
     public FakeOverpass Overpass { get; } = new();
     public FakeAssistantModel Assistant { get; } = new();
+    public FakeGoogleTiles GoogleTiles { get; } = new();
+    /// <summary>Off by default; imagery tests switch it on and back off.</summary>
+    public Reticula.Infrastructure.Layout.GoogleImageryOptions GoogleOptions { get; } = new() { Zoom = 19, MaxTiles = 400 };
     /// <summary>Off by default (plan 8.5); assistant tests switch it on and back off.</summary>
     public Reticula.Infrastructure.Assistant.AssistantOptions AssistantOptions { get; } = new() { Model = "test-model" };
 
@@ -60,6 +63,8 @@ public sealed class ReticulaApiFactory : WebApplicationFactory<Program>, IAsyncL
             s.AddHttpClient(TilePackJob.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => Tiles);
             s.AddHttpClient<Reticula.Infrastructure.Layout.OverpassClient>().ConfigurePrimaryHttpMessageHandler(() => Overpass);
             s.Replace(ServiceDescriptor.Singleton(AssistantOptions));
+            s.Replace(ServiceDescriptor.Singleton(GoogleOptions));
+            s.AddHttpClient<Reticula.Infrastructure.Layout.GoogleTilesClient>().ConfigurePrimaryHttpMessageHandler(() => GoogleTiles);
             s.Replace(ServiceDescriptor.Transient<Reticula.Infrastructure.Assistant.IAssistantModel>(_ => Assistant));
         });
     }
@@ -136,7 +141,8 @@ public sealed class FakeCalc : ICalcClient
         Throw();
         LastPredictionInputs = buildings;
         var predictions = buildings.Select(b =>
-            b.Tags.GetValueOrDefault("building") == "house" ? new BuildingPrediction(b.Id, "house", 0.9, "osm:building=house", false, [])
+            b.ExtraSignals is { Count: > 0 } extra ? new BuildingPrediction(b.Id, extra[0].Type, extra[0].Confidence, extra[0].Source, extra[0].Confidence < 0.6, [.. extra])
+            : b.Tags.GetValueOrDefault("building") == "house" ? new BuildingPrediction(b.Id, "house", 0.9, "osm:building=house", false, [])
             : b.Zoning?.Contains("Residential", StringComparison.OrdinalIgnoreCase) == true ? new BuildingPrediction(b.Id, "house", 0.6, $"zoning:{b.Zoning}", false, [])
             : new BuildingPrediction(b.Id, "other", 0.3, "footprint", true, [])).ToList();
         return Task.FromResult(new PredictionResult("0123456789abcdef", "test", predictions));
@@ -189,6 +195,32 @@ public sealed class FakeCalc : ICalcClient
             "{\"files\":[{\"kind\":\"report\",\"name\":\"p-d1-report.pdf\",\"title\":\"Design report\",\"content_type\":\"application/pdf\",\"size\":13,\"sha256\":\"" + new string('a', 64) + "\",\"data_b64\":\"" + b64 + "\"}," +
             "{\"kind\":\"loads_xlsx\",\"name\":\"p-d1-load-schedule.xlsx\",\"title\":\"Load schedule (Excel)\",\"content_type\":\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\",\"size\":13,\"sha256\":\"" + new string('b', 64) + "\",\"data_b64\":\"" + b64 + "\"}]," +
             "\"checklist\":[{\"id\":\"C01\",\"text\":\"Connection point\",\"status\":\"not met\",\"detail\":\"\"}],\"warnings\":[\"unverified\"]}").RootElement.Clone());
+    }
+
+    public JsonElement? LastRooftop { get; private set; }
+    public long LastRooftopBytes { get; private set; }
+    public bool RooftopModelUsed { get; set; } = true;
+
+    /// <summary>Signals every unconfirmed building as a shop when the model is "used".</summary>
+    public async Task<JsonElement> ClassifyRooftopsAsync(object request, Stream imagery, string fileName, CancellationToken ct = default)
+    {
+        Throw();
+        LastRooftop = JsonSerializer.SerializeToElement(request, new JsonSerializerOptions(JsonSerializerDefaults.Web) { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower });
+        using var ms = new MemoryStream();
+        await imagery.CopyToAsync(ms, ct);
+        LastRooftopBytes = ms.Length;
+        var label = LastRooftop.Value.GetProperty("imagery_label").GetString();
+        var signals = RooftopModelUsed
+            ? LastRooftop.Value.GetProperty("buildings").EnumerateArray().Where(b => b.GetProperty("confirmed_type").ValueKind == JsonValueKind.Null)
+                .Select(b => new { id = b.GetProperty("id").GetString(), signal = new { source = $"rooftop:{label}", type = "shop", confidence = 0.8 } }).ToArray()
+            : [];
+        return JsonSerializer.SerializeToElement(new
+        {
+            rules_hash = "6666666666666666", imagery_label = label, width = 100, height = 100, gsd_m = 0.3, outside_imagery = 0, method = "test",
+            model = new { used = RooftopModelUsed, reason = RooftopModelUsed ? "cross-validated accuracy 90%" : "1 confirmed buildings inside the imagery; at least 30 are needed",
+                trained_on = 1, types = new { house = 1 }, left_out_types = Array.Empty<string>(), accuracy = RooftopModelUsed ? 0.9 : (double?)null, min_accuracy = 0.75 },
+            signals,
+        });
     }
 
     public JsonElement? LastOptionSearch { get; private set; }
@@ -364,4 +396,22 @@ public sealed class FakeAssistantModel : Reticula.Infrastructure.Assistant.IAssi
     /// <summary>The tool results the model was given in its last request.</summary>
     public static IEnumerable<System.Text.Json.Nodes.JsonObject> LastToolResults(Reticula.Infrastructure.Assistant.ModelRequest r) =>
         (r.Messages.Last()!["content"] as System.Text.Json.Nodes.JsonArray ?? []).OfType<System.Text.Json.Nodes.JsonObject>().Where(b => b["type"]?.GetValue<string>() == "tool_result");
+}
+
+
+/// <summary>Stands in for Google's Map Tiles API: a session, then PNG tiles.</summary>
+public sealed class FakeGoogleTiles : HttpMessageHandler
+{
+    public List<Uri> Requests { get; } = [];
+
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+    {
+        lock (Requests) Requests.Add(request.RequestUri!);
+        if (request.RequestUri!.AbsolutePath.EndsWith("/createSession", StringComparison.Ordinal))
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new StringContent("{\"session\":\"sess-1\"}", System.Text.Encoding.UTF8, "application/json") });
+        byte[] png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+        return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new ByteArrayContent(png) });
+    }
+
+    protected override void Dispose(bool disposing) { }
 }

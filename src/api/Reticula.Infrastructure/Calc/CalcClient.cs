@@ -63,6 +63,17 @@ public sealed class CalcClient(HttpClient http) : ICalcClient
         return await ReadAsync<PredictionResult>(r, ct);
     }
 
+    public async Task<JsonElement> ClassifyRooftopsAsync(object request, Stream imagery, string fileName, CancellationToken ct = default)
+    {
+        using var form = new MultipartFormDataContent
+        {
+            { new StreamContent(imagery), "imagery", fileName },
+            { new StringContent(JsonSerializer.Serialize(request, Json)), "request" },
+        };
+        using var r = await SendAsync(() => http.PostAsync("/predict/rooftop", form, ct), ct);
+        return await ReadAsync<JsonElement>(r, ct);
+    }
+
     public async Task<JsonElement> DesignLvAsync(object request, CancellationToken ct = default)
     {
         using var content = JsonContent.Create(request, options: Json);

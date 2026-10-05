@@ -100,7 +100,8 @@ public sealed class LayoutService(ReticulaDbContext db, ICalcClient calc, TimePr
         if (buildings.Count == 0) return;
 
         var inputs = buildings.Select(b => new BuildingPredictionInput(
-            b.Id.ToString(), b.AreaM2, JsonSerializer.Deserialize<Dictionary<string, string>>(b.TagsJson, Json) ?? [], b.Zoning)).ToList();
+            b.Id.ToString(), b.AreaM2, JsonSerializer.Deserialize<Dictionary<string, string>>(b.TagsJson, Json) ?? [], b.Zoning,
+            b.RooftopSignalJson is null ? null : [JsonSerializer.Deserialize<PredictionSignal>(b.RooftopSignalJson, Json)!])).ToList();
         var result = await calc.PredictBuildingTypesAsync(project.RulesRef, inputs, ct);
 
         var byId = result.Predictions.ToDictionary(p => p.Id);

@@ -21,6 +21,10 @@ public interface ICalcClient
     /// <exception cref="CalcRejectedException">The rules file has no prediction section.</exception>
     Task<PredictionResult> PredictBuildingTypesAsync(string rulesRef, IReadOnlyList<BuildingPredictionInput> buildings, CancellationToken ct = default);
 
+    /// <summary>Rooftop-imagery signals (plan 1.3): trains on the confirmed buildings and signals the rest.</summary>
+    /// <exception cref="CalcRejectedException">Unreadable imagery or rules without the rooftop section.</exception>
+    Task<JsonElement> ClassifyRooftopsAsync(object request, Stream imagery, string fileName, CancellationToken ct = default);
+
     /// <summary>The observation form for the income and ADMD tool, from the rules file.</summary>
     Task<JsonElement> GetAdmdFormAsync(string rulesRef, CancellationToken ct = default);
 

@@ -5,6 +5,7 @@ import { firstValueFrom } from 'rxjs';
 import { ApiProblem, toApiProblem } from '../../core/api-problem';
 import { AuthService } from '../../core/auth/auth.service';
 import { ProjectRateList } from '../costs/project-rate-list';
+import { RooftopImagery } from './rooftop-imagery';
 import { AssistantApi } from '../assistant/assistant.api';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { AreaMap } from './area-map';
@@ -14,7 +15,7 @@ import { ProjectsApi } from './projects.api';
 
 @Component({
   selector: 'app-project-edit',
-  imports: [ReactiveFormsModule, RouterLink, AreaMap, ProjectLayout, ProjectRateList],
+  imports: [ReactiveFormsModule, RouterLink, AreaMap, ProjectLayout, ProjectRateList, RooftopImagery],
   template: `
     <div class="page-head">
       <h2>{{ isNew() ? 'New project' : form.controls.name.value || 'Project' }}</h2>
@@ -93,6 +94,7 @@ import { ProjectsApi } from './projects.api';
         (layersChange)="layers.set($event)"
         (focus)="focusId.set($event)"
       />
+      <app-rooftop-imagery [projectId]="projectId" [canEdit]="canEdit()" />
     }
   `,
 })

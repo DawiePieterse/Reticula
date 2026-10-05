@@ -41,7 +41,7 @@ public sealed class AuditInterceptor(AuditActor actor, TimeProvider time) : Save
     {
         [typeof(Project)] = true, [typeof(Candidate)] = true, [typeof(LoadPoint)] = true, [typeof(Building)] = false, [typeof(Inspection)] = true,
         [typeof(Assumption)] = true, [typeof(ConnectionPoint)] = true, [typeof(RateList)] = true, [typeof(DesignRun)] = true, [typeof(ImportBatch)] = true,
-        [typeof(DocumentSet)] = true, [typeof(Revision)] = true, [typeof(AssistantDraft)] = true, [typeof(ReportSection)] = true,
+        [typeof(DocumentSet)] = true, [typeof(Revision)] = true, [typeof(AssistantDraft)] = true, [typeof(ReportSection)] = true, [typeof(ProjectImagery)] = true,
     };
 
     private static readonly HashSet<string> Skipped =

@@ -1,0 +1,20 @@
+# Eskom residential distribution rules – rooftop imagery signal (plan 1.3). STARTER VALUES.
+# Inherits everything from eskom/0.5.0.
+base: eskom/0.5.0
+authority: eskom
+version: 0.6.0
+effective_date: 2026-10-05
+notes: >-
+  Adds the rooftop-imagery signal to the building-type predictor: a classifier trained per project on buildings
+  confirmed in the field, used only once it reaches the stated accuracy on buildings it was not trained on.
+
+building_prediction:
+  rooftop:
+    clause: "Reticula rooftop classifier v1 (project-trained; not a standard)"
+    min_confirmed: 30          # confirmed buildings with a footprint inside the imagery before a model is trained
+    min_per_type: 5            # a type with fewer confirmed examples is left out of the model
+    min_accuracy: 0.75         # cross-validated accuracy needed before its predictions are used
+    max_confidence: 0.85       # its signal never claims more than this
+    folds: 5                   # cross-validation folds
+    min_coverage: 0.8          # share of a footprint that must be inside the imagery
+    max_pixels: 120000000      # orthophoto size limit (crop larger images to the project)

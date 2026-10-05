@@ -22,7 +22,7 @@ public sealed record CalcImportResult(
     public bool HasErrors => Issues.Any(i => i.Severity == "error");
 }
 
-public sealed record BuildingPredictionInput(string Id, double? AreaM2, Dictionary<string, string> Tags, string? Zoning);
+public sealed record BuildingPredictionInput(string Id, double? AreaM2, Dictionary<string, string> Tags, string? Zoning, IReadOnlyList<PredictionSignal>? ExtraSignals = null);
 
 public sealed record PredictionSignal(string Source, string Type, double Confidence);
 
