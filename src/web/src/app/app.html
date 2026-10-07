@@ -3,22 +3,35 @@
   @if (auth.isAuthenticated()) {
     <nav>
       <a routerLink="/projects" routerLinkActive="active">Projects</a>
+      @if (auth.isEngineer()) {
+        <a routerLink="/rates" routerLinkActive="active">Rates</a>
+        <a routerLink="/users" routerLinkActive="active">Users</a>
+      }
       <a routerLink="/system" routerLinkActive="active">System</a>
     </nav>
   }
   <span class="spacer"></span>
-  <span class="status" [class.offline]="!connectivity.online()">{{ connectivity.online() ? 'Online' : 'Offline' }}</span>
+  <span class="status" [class.offline]="!connectivity.online()">{{
+    connectivity.online() ? 'Online' : 'Offline'
+  }}</span>
   @if (sync.queued() || sync.needsDecision()) {
-    <span class="status queue" [class.offline]="sync.needsDecision() > 0" title="Field changes on this tablet not yet on the server">
-      {{ sync.queued() }} to sync@if (sync.needsDecision()) {, {{ sync.needsDecision() }} to decide}
+    <span
+      class="status queue"
+      [class.offline]="sync.needsDecision() > 0"
+      title="Field changes on this tablet not yet on the server"
+    >
+      {{ sync.queued() }} to sync
+      @if (sync.needsDecision()) {
+        , {{ sync.needsDecision() }} to decide
+      }
     </span>
   }
   @if (pwa.canInstall()) {
-    <button type="button" (click)="pwa.install()">Install app</button>
+    <button type="button" class="quiet" (click)="pwa.install()">Install app</button>
   }
   @if (auth.user(); as u) {
     <span class="user">{{ u.displayName }}</span>
-    <button type="button" (click)="signOut()">Sign out</button>
+    <button type="button" class="quiet" (click)="signOut()">Sign out</button>
   }
 </header>
 <main>

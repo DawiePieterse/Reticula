@@ -1,0 +1,24 @@
+# Eskom residential distribution rules: 0.8.0 plus a load class by zoning for buildings not yet inspected.
+# Only the keys below differ from the base file. Every value must be checked before use in a design.
+base: eskom/0.8.0
+authority: eskom
+version: 0.8.1
+effective_date: 2026-10-06
+notes: >-
+  As 0.8.0, plus a load class for each building the field has not inspected, from its stand's zoning (plans 1.3 and
+  2.0), so the pre-design placement can size an area before the inspection. The zoning-to-class table is Reticula's
+  starting point, not a standard: the engineer sets it per area.
+
+# Load class by zoning (plans 1.3, 2.0). Matched within the stand's zoning text, case-insensitively, the longest
+# match winning. Only predicted houses get a class; shops, schools and other buildings are special loads.
+load_classes:
+  clause: "Reticula default load class by stand zoning, to be set by the engineer for each area (not a standard)"
+  index: RETICULA-LOADCLASS
+  residential_types: [house]
+  default: township_area                                       # PLACEHOLDER
+  by_zone:
+    - { zone: "residential 1", load_class: urban_residential_1 }   # PLACEHOLDER
+    - { zone: "residential 2", load_class: township_area }         # PLACEHOLDER
+    - { zone: "residential 3", load_class: urban_township_complex } # PLACEHOLDER
+    - { zone: "informal", load_class: rural_village }              # PLACEHOLDER
+    - { zone: "agricultural", load_class: rural_settlement }       # PLACEHOLDER

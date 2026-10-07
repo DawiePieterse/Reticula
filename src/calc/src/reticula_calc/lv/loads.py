@@ -33,8 +33,9 @@ from shapely.geometry import LineString, Point
 from shapely.ops import transform
 
 from ..geo import crs as crs_mod
+from ..issues import Issue, issue
 from ..rules import RulesError, RuleSet
-from .network import GEOD, MAX_SAMPLES, Branch, Issue, LvNetwork, Node
+from .network import EPS_M, GEOD, Branch, LvNetwork, Node
 
 PHASES: tuple[str, ...] = ("R", "W", "B")
 """Red, white and blue."""
@@ -80,6 +81,8 @@ class Allocation(BaseModel):
     distance_m: float | None = None
     """Along the network from the source to the connection, on a feeder."""
     phase: Phase | None = None
+    location: tuple[float, float] | None = None
+    """The building, lon/lat: the service runs from here to `at`."""
 
 
 class Box(BaseModel):
@@ -168,23 +171,28 @@ class _Unit:
         return sum(a.kva for a in self.loads)
 
 
-def _name(load: LoadIn) -> str:
+def _name(load: LoadIn | Allocation) -> str:
     return load.label or load.building_id[:8]
 
 
 def _issue(severity: Literal["error", "warning"], code: str, message: str, loads: list[LoadIn]) -> Issue:
-    return Issue(severity=severity, code=code, message=message, count=len(loads),
-                 samples=[_name(x) for x in loads[:MAX_SAMPLES]], at=[x.coordinates for x in loads[:MAX_SAMPLES]])
+    return issue(severity, code, message, [_name(x) for x in loads], [x.coordinates for x in loads])
 
 
 class _Geo:
     """The network's route branches and poles in metres, for nearest-neighbour queries."""
 
-    def __init__(self, net: LvNetwork, p: Params):
+    def __init__(self, net: LvNetwork, routes: list[Branch], p: Params):
         lons = [n.coordinates[0] for n in net.nodes]
         self.fwd = crs_mod.from_wgs84(crs_mod.nearest_lo(sum(lons) / len(lons)))
-        self.routes = [b for b in net.branches if b.kind == "route"]
-        self.lines = [self.metres(LineString(b.coordinates)) for b in self.routes]
+        self.routes = routes
+        self.lines = [self.metres(LineString(b.coordinates)) for b in routes]
+        # The route into each node and the first route out of it, for placing a connection at a pole.
+        self.into: dict[str, Branch] = {}
+        self.out_of: dict[str, Branch] = {}
+        for b in routes:
+            self.into.setdefault(b.to_node, b)
+            self.out_of.setdefault(b.from_node, b)
         self.tree = STRtree(self.lines)
         self.poles = [n for n in net.nodes if n.kind == "pole"] if p.attach == "pole_boxes" else []
         self.pole_pts = [self.metres(Point(n.coordinates)) for n in self.poles]
@@ -204,8 +212,9 @@ class _Geo:
         return min(idx.tolist(), key=lambda i: (self.lines[i].distance(pt), i)) if len(idx) else None
 
 
-def allocate(req: AllocateRequest, rules: RuleSet) -> LoadAllocation:
-    p = params(rules)
+def allocate(req: AllocateRequest, rules: RuleSet, p: Params | None = None) -> LoadAllocation:
+    """Connects loads to the network. `p` overrides the rules file's service settings (kiosks on underground routes)."""
+    p = p or params(rules)
     net = req.network
     estimated = [x for x in req.loads if x.kva is not None]
     unestimated = [x for x in req.loads if x.kva is None]
@@ -217,25 +226,24 @@ def allocate(req: AllocateRequest, rules: RuleSet) -> LoadAllocation:
     no_pole: list[LoadIn] = []
     full: list[LoadIn] = []
     if routes and estimated:
-        geo = _Geo(net, p)
+        geo = _Geo(net, routes, p)
         pts = {x.id: geo.metres(Point(x.coordinates)) for x in estimated}
-        three = [x for x in estimated if (x.kva or 0) > p.single_phase_max_kva]
-        single = [x for x in estimated if (x.kva or 0) <= p.single_phase_max_kva]
+        near_poles = {x.id: geo.poles_within(pts[x.id], p.max_service_m) for x in estimated}
 
         # Every load needs the network within reach; with pole boxes, a pole too.
         reachable: list[LoadIn] = []
         for x in estimated:
-            if geo.route_within(pts[x.id], p.max_service_m) is None and not geo.poles_within(pts[x.id], p.max_service_m):
+            if geo.route_within(pts[x.id], p.max_service_m) is None and not near_poles[x.id]:
                 far.append(x)
             else:
                 reachable.append(x)
-        three = [x for x in three if x in reachable]
-        single = [x for x in single if x in reachable]
+        three = [x for x in reachable if x.kva > p.single_phase_max_kva]
+        single = [x for x in reachable if x.kva <= p.single_phase_max_kva]
 
         for x in three:
             if p.attach == "pole_boxes":
-                near = geo.poles_within(pts[x.id], p.max_service_m)
-                a = _at_pole(x, geo.poles[near[0][1]], geo.routes) if near else None
+                near = near_poles[x.id]
+                a = _at_pole(x, geo.poles[near[0][1]], geo) if near else None
             else:
                 a = _on_route(x, pts[x.id], geo, p.max_service_m)
             if a is None:
@@ -246,7 +254,7 @@ def allocate(req: AllocateRequest, rules: RuleSet) -> LoadAllocation:
 
         if p.attach == "pole_boxes":
             capacity = p.box_loads * p.boxes_per_pole
-            pairs = sorted((d, i, x.id) for x in single for d, i in geo.poles_within(pts[x.id], p.max_service_m))
+            pairs = sorted((d, i, x.id) for x in single for d, i in near_poles[x.id])
             by_id = {x.id: x for x in single}
             on_pole: dict[int, list[LoadIn]] = {}
             placed: set[str] = set()
@@ -256,12 +264,12 @@ def allocate(req: AllocateRequest, rules: RuleSet) -> LoadAllocation:
                     placed.add(lid)
             for x in single:
                 if x.id not in placed:
-                    (full if geo.poles_within(pts[x.id], p.max_service_m) else no_pole).append(x)
+                    (full if near_poles[x.id] else no_pole).append(x)
             for i in sorted(on_pole):
                 pole = geo.poles[i]
                 for k, group in enumerate(_boxes(pole, on_pole[i], p.box_loads), start=1):
                     box_id = f"{pole.label or pole.id}-{k}"
-                    loads = [_at_pole(x, pole, geo.routes) for x in group]
+                    loads = [_at_pole(x, pole, geo) for x in group]
                     for a in loads:
                         a.box = box_id
                     allocations += loads
@@ -294,11 +302,10 @@ def allocate(req: AllocateRequest, rules: RuleSet) -> LoadAllocation:
                              f"of {p.box_loads} loads each). Mark another pole near them.", full))
     off = [x for x in allocations if x.feeder is None]
     if off:
-        issues.append(Issue(severity="warning", code="loads_unfed",
-                            message="Loads connect to routes that are not on a feeder (nothing feeds them, or they are in a loop "
-                                    "or between two sources). They get no phase until that is fixed.",
-                            count=len(off), samples=[x.label or x.building_id[:8] for x in off[:MAX_SAMPLES]],
-                            at=[x.at for x in off[:MAX_SAMPLES]]))
+        issues.append(issue("warning", "loads_unfed",
+                            "Loads connect to routes that are not on a feeder (nothing feeds them, or they are in a loop "
+                            "or between two sources). They get no phase until that is fixed.",
+                            [_name(x) for x in off], [x.at for x in off]))
     if unestimated:
         issues.append(_issue("warning", "no_load", "Buildings have no load estimate yet, so they are not connected. "
                              "Estimate their loads in the field.", unestimated))
@@ -338,13 +345,13 @@ def _boxes(pole: Node, loads: list[LoadIn], size: int) -> list[list[LoadIn]]:
     return [ordered[i:i + size] for i in range(0, len(ordered), size)]
 
 
-def _at_pole(load: LoadIn, pole: Node, routes: list[Branch]) -> Allocation:
+def _at_pole(load: LoadIn, pole: Node, geo: _Geo) -> Allocation:
     # Place the connection at the pole's end of the branch that feeds it, or at the start of one leaving it.
-    into = next((b for b in routes if b.to_node == pole.id), None)
-    branch, offset = (into, into.length_m) if into else next((b, 0.0) for b in routes if b.from_node == pole.id)
+    into = geo.into.get(pole.id)
+    branch, offset = (into, into.length_m) if into else (geo.out_of[pole.id], 0.0)
     return Allocation(load_id=load.id, building_id=load.building_id, label=load.label, kind=load.kind, kva=load.kva or 0.0,
                       branch=branch.id, node=pole.id, offset_m=round(offset, 2), at=pole.coordinates,
-                      service_m=_service_m(load.coordinates, pole.coordinates), feeder=branch.feeder)
+                      service_m=_service_m(load.coordinates, pole.coordinates), feeder=branch.feeder, location=load.coordinates)
 
 
 def _on_route(load: LoadIn, pt: Point, geo: _Geo, reach: float) -> Allocation | None:
@@ -357,10 +364,10 @@ def _on_route(load: LoadIn, pt: Point, geo: _Geo, reach: float) -> Allocation | 
     # The connection point in lon/lat, along the stored geometry in the same proportion.
     at = LineString(branch.coordinates).interpolate(s / line.length if line.length else 0.0, normalized=True)
     at_ll = (round(at.x, 7), round(at.y, 7))
-    node = branch.from_node if offset < 0.05 else branch.to_node if branch.length_m - offset < 0.05 else None
+    node = branch.from_node if offset < EPS_M else branch.to_node if branch.length_m - offset < EPS_M else None
     return Allocation(load_id=load.id, building_id=load.building_id, label=load.label, kind=load.kind, kva=load.kva or 0.0,
                       branch=branch.id, node=node, offset_m=round(offset, 2), at=at_ll,
-                      service_m=_service_m(load.coordinates, at_ll), feeder=branch.feeder)
+                      service_m=_service_m(load.coordinates, at_ll), feeder=branch.feeder, location=load.coordinates)
 
 
 def _phase(allocations: list[Allocation], units: list[_Unit], net: LvNetwork, p: Params) -> list[FeederPhases]:

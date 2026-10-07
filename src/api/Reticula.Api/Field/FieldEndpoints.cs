@@ -1,12 +1,14 @@
 using System.Globalization;
 using System.Security.Claims;
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
+using System.Text;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
+using Reticula.Api.Infrastructure;
+using Reticula.Api.Layout;
 using Reticula.Domain.Auth;
 using Reticula.Domain.Field;
 using Reticula.Domain.Layout;
@@ -16,7 +18,6 @@ using Reticula.Infrastructure.Data;
 using Reticula.Infrastructure.Field;
 using Reticula.Infrastructure.Files;
 using Reticula.Infrastructure.Geo;
-using Reticula.Api.Layout;
 
 namespace Reticula.Api.Field;
 
@@ -93,7 +94,7 @@ public static class FieldEndpoints
 
         if (req.Version != building.Version) return TypedResults.Conflict(await DtoAsync(db, building, ct));
 
-        var userId = UserId(user);
+        var userId = user.UserId();
         var now = time.GetUtcNow();
         if (req.Action == InspectionActions.NotPresent) building.MarkNotPresent(userId, now);
         else building.Confirm(type!, userId, now);
@@ -116,7 +117,7 @@ public static class FieldEndpoints
     private static async Task<Results<Created<BuildingFieldDto>, Ok<BuildingFieldDto>, NotFound, ValidationProblem>> AddBuilding(
         Guid projectId, NewBuildingRequest req, ReticulaDbContext db, TimeProvider time, ClaimsPrincipal user, CancellationToken ct)
     {
-        var project = await ProjectAsync(db, projectId, ct);
+        var project = await db.Projects.ActiveAsync(projectId, ct);
         if (project is null) return TypedResults.NotFound();
 
         var existing = await db.Buildings.FirstOrDefaultAsync(b => b.Id == req.Id, ct);
@@ -129,7 +130,7 @@ public static class FieldEndpoints
         if (position is not null && !InArea(project, position)) errors["position"] = ["The position is outside the project area."];
         if (errors.Count > 0) return TypedResults.ValidationProblem(errors);
 
-        var userId = UserId(user);
+        var userId = user.UserId();
         var now = time.GetUtcNow();
         var building = Building.CreateNew(req.Id, projectId, position!, req.Type, userId, now);
         db.Buildings.Add(building);
@@ -153,7 +154,7 @@ public static class FieldEndpoints
         [FromForm] Guid? inspectionId, [FromForm] DateTimeOffset capturedAt,
         ReticulaDbContext db, IFileStore store, TimeProvider time, ClaimsPrincipal user, CancellationToken ct)
     {
-        if (await ProjectAsync(db, projectId, ct) is null) return TypedResults.NotFound();
+        if (await db.Projects.ActiveAsync(projectId, ct) is null) return TypedResults.NotFound();
         var existing = await db.Photos.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id, ct);
         if (existing is not null) return TypedResults.Ok(ToDto(existing));
 
@@ -175,7 +176,7 @@ public static class FieldEndpoints
         await store.SaveAsync(key, ms, ct);
 
         var photo = new Photo(id, projectId, buildingId, candidateId, inspectionId, file.ContentType, file.Length, sha, key,
-            capturedAt, UserId(user), time.GetUtcNow());
+            capturedAt, user.UserId(), time.GetUtcNow());
         db.Photos.Add(photo);
         await db.SaveChangesAsync(ct);
         return TypedResults.Created($"/api/projects/{projectId}/photos/{id}", ToDto(photo));
@@ -202,14 +203,13 @@ public static class FieldEndpoints
     private static async Task<Ok<GeoFeatureCollection<CandidateProps>>> ListCandidates(Guid projectId, ReticulaDbContext db, CancellationToken ct)
     {
         var rows = await db.Candidates.AsNoTracking().Where(c => c.ProjectId == projectId && c.ArchivedAt == null).OrderBy(c => c.CreatedAt).ToListAsync(ct);
-        return TypedResults.Ok(GeoFeatureCollection<CandidateProps>.Of(rows.Select(c =>
-            new GeoFeature<CandidateProps>("Feature", c.Id.ToString(), GeometryInput.ToDto(c.Geometry), new CandidateProps(c.Kind, c.Notes, c.CreatedAt, c.Version)))));
+        return TypedResults.Ok(GeoFeatureCollection<CandidateProps>.Of(rows.Select(Feature)));
     }
 
     private static async Task<Results<Created<GeoFeature<CandidateProps>>, Ok<GeoFeature<CandidateProps>>, NotFound, ValidationProblem, Conflict<GeoFeature<CandidateProps>>>> SaveCandidate(
         Guid projectId, Guid candidateId, CandidateRequest req, ReticulaDbContext db, TimeProvider time, ClaimsPrincipal user, CancellationToken ct)
     {
-        var project = await ProjectAsync(db, projectId, ct);
+        var project = await db.Projects.ActiveAsync(projectId, ct);
         if (project is null) return TypedResults.NotFound();
 
         // A change synced twice is applied once.
@@ -228,7 +228,7 @@ public static class FieldEndpoints
         var position = ToPoint(req.Position, errors);
         if (errors.Count > 0) return TypedResults.ValidationProblem(errors);
 
-        var userId = UserId(user);
+        var userId = user.UserId();
         var now = time.GetUtcNow();
         var candidate = await db.Candidates.FirstOrDefaultAsync(c => c.Id == candidateId, ct);
         var created = candidate is null;
@@ -273,7 +273,7 @@ public static class FieldEndpoints
 
     private static async Task<Results<Ok<JsonElement>, NotFound>> AdmdForm(Guid projectId, ReticulaDbContext db, ICalcClient calc, CancellationToken ct)
     {
-        var project = await ProjectAsync(db, projectId, ct);
+        var project = await db.Projects.ActiveAsync(projectId, ct);
         return project is null ? TypedResults.NotFound() : TypedResults.Ok(await calc.GetAdmdFormAsync(project.RulesRef, ct));
     }
 
@@ -286,7 +286,7 @@ public static class FieldEndpoints
     private static async Task<Results<Ok<LoadPointDto>, NotFound, ValidationProblem, Conflict<LoadPointDto>>> SaveLoad(
         Guid projectId, Guid buildingId, LoadRequest req, ReticulaDbContext db, FieldService field, ClaimsPrincipal user, CancellationToken ct)
     {
-        var project = await ProjectAsync(db, projectId, ct);
+        var project = await db.Projects.ActiveAsync(projectId, ct);
         var building = await db.Buildings.AsNoTracking().FirstOrDefaultAsync(b => b.Id == buildingId && b.ProjectId == projectId, ct);
         if (project is null || building is null) return TypedResults.NotFound();
 
@@ -311,7 +311,7 @@ public static class FieldEndpoints
             var lp = await field.EstimateLoadAsync(project, building,
                 new AdmdEstimateRequest(project.RulesRef, req.Kind, req.Observations ?? [], req.SpecialLoad, req.OverrideKva, Trim(req.OverrideReason, 1000),
                     req.Kind == LoadKinds.Residential && !string.IsNullOrWhiteSpace(req.LoadClass) ? req.LoadClass : null),
-                erf, req.Version, req.OpId, req.CapturedAt, UserId(user), ct);
+                erf, req.Version, req.OpId, req.CapturedAt, user.UserId(), ct);
             return TypedResults.Ok(ToDto(lp));
         }
         catch (CalcRejectedException e)
@@ -329,7 +329,7 @@ public static class FieldEndpoints
     {
         var lp = await db.LoadPoints.FirstOrDefaultAsync(l => l.Id == loadPointId && l.ProjectId == projectId, ct);
         if (lp is null) return TypedResults.NotFound();
-        await field.ConfirmLoadAsync(lp, UserId(user), ct);
+        await field.ConfirmLoadAsync(lp, user.UserId(), ct);
         return TypedResults.Ok(ToDto(lp));
     }
 
@@ -349,7 +349,7 @@ public static class FieldEndpoints
     {
         var a = await db.Assumptions.FirstOrDefaultAsync(x => x.Id == assumptionId && x.ProjectId == projectId, ct);
         if (a is null) return TypedResults.NotFound();
-        a.Clear(UserId(user), Trim(req.Note, 1000), time.GetUtcNow());
+        a.Clear(user.UserId(), Trim(req.Note, 1000), time.GetUtcNow());
         await db.SaveChangesAsync(ct);
         return TypedResults.NoContent();
     }
@@ -358,35 +358,42 @@ public static class FieldEndpoints
 
     private static async Task<Results<Ok<FieldProgress>, NotFound>> Progress(Guid projectId, ReticulaDbContext db, CancellationToken ct)
     {
-        if (await ProjectAsync(db, projectId, ct) is null) return TypedResults.NotFound();
-        var b = db.Buildings.Where(x => x.ProjectId == projectId);
-        var present = b.Where(x => x.Status != BuildingStatus.NotPresent);
+        if (await db.Projects.ActiveAsync(projectId, ct) is null) return TypedResults.NotFound();
         var withLoad = db.LoadPoints.Where(l => l.ProjectId == projectId).Select(l => l.BuildingId);
+        // One pass over each table: the counts are conditional aggregates of a single group.
+        var b = await db.Buildings.Where(x => x.ProjectId == projectId).GroupBy(_ => 1).Select(g => new
+        {
+            Total = g.Count(),
+            Confirmed = g.Count(x => x.Status == BuildingStatus.Confirmed),
+            NotPresent = g.Count(x => x.Status == BuildingStatus.NotPresent),
+            Added = g.Count(x => x.Status == BuildingStatus.New),
+            Outstanding = g.Count(x => x.Status == BuildingStatus.Predicted),
+            OutstandingLowConfidence = g.Count(x => x.Status == BuildingStatus.Predicted && x.LowConfidence),
+            WithoutLoad = g.Count(x => x.Status != BuildingStatus.NotPresent && !withLoad.Contains(x.Id)),
+        }).FirstOrDefaultAsync(ct);
+        var loads = await db.LoadPoints.Where(l => l.ProjectId == projectId).GroupBy(_ => 1).Select(g => new
+        {
+            Estimated = g.Count(l => l.Status == LoadPointStatus.Estimated),
+            Confirmed = g.Count(l => l.Status == LoadPointStatus.Confirmed),
+        }).FirstOrDefaultAsync(ct);
         var candidates = await db.Candidates.Where(c => c.ProjectId == projectId && c.ArchivedAt == null)
             .GroupBy(c => c.Kind).Select(g => new { g.Key, Count = g.Count() }).ToDictionaryAsync(x => x.Key, x => x.Count, ct);
         return TypedResults.Ok(new FieldProgress(
-            await b.CountAsync(ct),
-            await b.CountAsync(x => x.Status == BuildingStatus.Confirmed, ct),
-            await b.CountAsync(x => x.Status == BuildingStatus.NotPresent, ct),
-            await b.CountAsync(x => x.Status == BuildingStatus.New, ct),
-            await b.CountAsync(x => x.Status == BuildingStatus.Predicted, ct),
-            await b.CountAsync(x => x.Status == BuildingStatus.Predicted && x.LowConfidence, ct),
-            await db.LoadPoints.CountAsync(l => l.ProjectId == projectId && l.Status == LoadPointStatus.Estimated, ct),
-            await db.LoadPoints.CountAsync(l => l.ProjectId == projectId && l.Status == LoadPointStatus.Confirmed, ct),
-            await present.CountAsync(x => !withLoad.Contains(x.Id), ct),
+            b?.Total ?? 0, b?.Confirmed ?? 0, b?.NotPresent ?? 0, b?.Added ?? 0, b?.Outstanding ?? 0, b?.OutstandingLowConfidence ?? 0,
+            loads?.Estimated ?? 0, loads?.Confirmed ?? 0, b?.WithoutLoad ?? 0,
             await db.Assumptions.CountAsync(a => a.ProjectId == projectId && a.Status == AssumptionStatus.Open, ct),
             candidates));
     }
 
     private static async Task<Results<Ok<LoadSchedule>, NotFound>> Schedule(Guid projectId, ReticulaDbContext db, ICalcClient calc, TimeProvider time, CancellationToken ct)
     {
-        var schedule = await BuildScheduleAsync(projectId, db, calc, time, ct);
+        var schedule = await LoadSchedules.BuildAsync(db, calc, time, projectId, ct);
         return schedule is null ? TypedResults.NotFound() : TypedResults.Ok(schedule);
     }
 
     private static async Task<Results<FileContentHttpResult, NotFound>> ScheduleCsv(Guid projectId, ReticulaDbContext db, ICalcClient calc, TimeProvider time, CancellationToken ct)
     {
-        var s = await BuildScheduleAsync(projectId, db, calc, time, ct);
+        var s = await LoadSchedules.BuildAsync(db, calc, time, projectId, ct);
         if (s is null) return TypedResults.NotFound();
 
         var sb = new StringBuilder();
@@ -408,46 +415,7 @@ public static class FieldEndpoints
         return TypedResults.File(bytes, "text/csv", $"load-schedule-{projectId:N}.csv");
     }
 
-    private static async Task<LoadSchedule?> BuildScheduleAsync(Guid projectId, ReticulaDbContext db, ICalcClient calc, TimeProvider time, CancellationToken ct)
-    {
-        var project = await ProjectAsync(db, projectId, ct);
-        if (project is null) return null;
-
-        var rows = await (
-            from b in db.Buildings.AsNoTracking()
-            where b.ProjectId == projectId && b.Status != BuildingStatus.NotPresent
-            join s in db.Stands.AsNoTracking() on b.StandId equals s.Id into ss
-            from s in ss.DefaultIfEmpty()
-            join l in db.LoadPoints.AsNoTracking() on b.Id equals l.BuildingId into ls
-            from l in ls.DefaultIfEmpty()
-            orderby s.ErfNumber, b.Id
-            select new { b, Erf = s == null ? null : s.ErfNumber, l }).ToListAsync(ct);
-
-        var scheduleRows = rows.Select(x => new LoadScheduleRow(
-            x.Erf, x.b.Id, x.b.ConfirmedType ?? x.b.PredictedType, x.b.Status.ToString().ToLowerInvariant(),
-            x.l?.Kind, x.l?.Category, x.l?.IncomeBand, x.l?.Kva, x.l?.EstimatedKva, x.l?.Overridden ?? false, x.l?.OverrideReason,
-            x.l?.Status.ToString().ToLowerInvariant())).ToList();
-
-        var loads = rows.Where(x => x.l is not null)
-            .Select(x => new AdmdGroupLoad(x.l!.Id.ToString(), x.l.Kind, x.l.Kva, x.l.Kind == LoadKinds.Residential ? x.l.Category : null)).ToList();
-        LoadScheduleTotals? totals = null;
-        var rulesHash = rows.FirstOrDefault(x => x.l is not null)?.l!.RulesHash ?? "";
-        if (loads.Count > 0)
-        {
-            var g = await calc.GroupAdmdAsync(project.RulesRef, loads, ct);
-            rulesHash = g.RulesHash;
-            totals = new LoadScheduleTotals(g.ResidentialCount, g.SpecialCount, g.DiversityFactor?.Value, g.ResidentialKva.Value,
-                g.SpecialKva, g.TotalKva.Value, g.TotalKva.Formula, g.TotalKva.Clause, g.Method, g.Phases, g.ConfidencePct, g.DesignCurrentA?.Value);
-        }
-        return new LoadSchedule(project.Name, project.RulesRef, rulesHash, time.GetUtcNow(), scheduleRows, totals);
-    }
-
     // ---------- helpers ----------
-
-    private static Task<Project?> ProjectAsync(ReticulaDbContext db, Guid projectId, CancellationToken ct) =>
-        db.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.Id == projectId && p.ArchivedAt == null, ct);
-
-    private static Guid UserId(ClaimsPrincipal user) => Guid.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
     private static bool InArea(Project project, Geometry g)
     {
@@ -479,7 +447,7 @@ public static class FieldEndpoints
     }
 
     private static GeoFeature<CandidateProps> Feature(Candidate c) =>
-        new("Feature", c.Id.ToString(), GeometryInput.ToDto(c.Geometry), new CandidateProps(c.Kind, c.Notes, c.CreatedAt, c.Version));
+        new("Feature", c.Id.ToString(), GeometryInput.ToDto(c.Geometry), new CandidateProps(c.Kind, c.Notes, c.CreatedAt, c.Version, c.Source));
 
     private static LoadPointDto ToDto(LoadPoint l) => new(
         l.Id, l.BuildingId, l.Kind, l.SpecialLoad, JsonDocument.Parse(l.ObservationsJson).RootElement.Clone(), l.ClassOverride, l.IncomeBand, l.Category,

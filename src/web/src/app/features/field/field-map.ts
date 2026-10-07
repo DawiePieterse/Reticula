@@ -1,9 +1,11 @@
 import { Component, ElementRef, OnDestroy, afterNextRender, computed, effect, input, output, signal, untracked, viewChild } from '@angular/core';
 import type { FeatureCollection as GjCollection } from 'geojson';
 import type { GeoJSONSource, Map as MlMap, MapMouseEvent } from 'maplibre-gl';
-import { Position, bounds } from '../projects/geo';
-import { AnyGeometry, BUILDING_COLOURS, FeatureCollection, NETWORK_COLOURS, flagIncomplete } from '../projects/layout.api';
-import { CANDIDATE_COLOURS, GpsFix } from './field.api';
+import { Position, bounds, emptyCollection, positionsOf, withIdProperty } from '../projects/geo';
+import { MapLegend } from '../../shared/map-legend';
+import { CANDIDATE_ICON, FIELD_LEGEND, NETWORK_ICON, lineColour, lineDash, registerSymbols } from '../../shared/symbols';
+import { AnyGeometry, BUILDING_COLOURS, FeatureCollection, flagIncomplete } from '../projects/layout.api';
+import { GpsFix } from './field.api';
 import { basemapStyle } from './map/basemap';
 import { LocalMapPack } from './map/map-pack.store';
 
@@ -16,8 +18,10 @@ type Coll = FeatureCollection<unknown, AnyGeometry> | null;
 /** Field map: tap a building or candidate to select it, tap to place, or tap out a route. */
 @Component({
   selector: 'app-field-map',
+  imports: [MapLegend],
   template: `
     <div class="map" #mapEl [class.placing]="mode() !== 'select'"></div>
+    <app-map-legend [items]="legend" [proposed]="true" />
     @if (mode() === 'route') {
       <div class="route-tools">
         <span>{{ draft().length }} points</span>
@@ -32,7 +36,7 @@ type Coll = FeatureCollection<unknown, AnyGeometry> | null;
     .placing { outline: 3px solid var(--accent); outline-offset: -3px; }
     .route-tools {
       position: absolute; left: .75rem; bottom: 2rem; display: flex; gap: .5rem; align-items: center;
-      background: var(--surface); padding: .5rem; border-radius: 8px; box-shadow: 0 2px 8px rgb(0 0 0 / .2);
+      background: var(--surface); padding: .5rem .75rem; border-radius: var(--radius); box-shadow: var(--shadow-float); font-weight: 600;
     }
   `,
 })
@@ -54,6 +58,7 @@ export class FieldMap implements OnDestroy {
   readonly routeFinish = output<Position[]>();
 
   protected readonly draft = signal<Position[]>([]);
+  protected readonly legend = FIELD_LEGEND;
   private readonly mapEl = viewChild.required<ElementRef<HTMLDivElement>>('mapEl');
   private map: MlMap | null = null;
   private fitted = false;
@@ -85,7 +90,12 @@ export class FieldMap implements OnDestroy {
         if (!this.fitted && b?.features.length && this.map) this.fitTo(b);
       });
     });
-    effect(() => this.set('candidates', this.candidates()));
+    effect(() => {
+      const c = this.candidates();
+      this.set('candidates', c);
+      // Before any buildings are imported, the marked and proposed sites set the view.
+      if (!this.fitted && c?.features.length && !this.buildings()?.features.length && this.map) this.fitTo(c);
+    });
     effect(() => this.set('gps', this.gpsCollection() as never));
     effect(() => this.set('draft', this.draftCollection()));
     effect(() => {
@@ -108,15 +118,19 @@ export class FieldMap implements OnDestroy {
       const map = new Map({ container: this.mapEl().nativeElement, style: await basemapStyle(pack), center: [25, -29], zoom: 5 });
       map.addControl(new NavigationControl(), 'top-right');
       // Each basemap change brings a new style; the project layers are added again on top of it.
-      map.on('style.load', () => {
+      map.on('style.load', async () => {
         for (const s of SOURCES) map.addSource(s, { type: 'geojson', data: { type: 'FeatureCollection', features: [] }, promoteId: 'id' });
+        await registerSymbols(map);
+        if (!map.getSource('stands')) return; // the style changed again while the icons were drawn; the next style.load adds the layers
         map.addLayer({ id: 'stands-line', type: 'line', source: 'stands', paint: { 'line-color': '#6e7781', 'line-width': 1 } });
-        const assetColour = ['match', ['get', 'assetType'], ...Object.entries(NETWORK_COLOURS).flat(), '#8c959f'] as never;
+        // The authority's existing network and the field's candidates in the drawing standard's symbols (shared/symbols).
         map.addLayer({ id: 'network-line', type: 'line', source: 'network', filter: ['==', ['geometry-type'], 'LineString'],
-          paint: { 'line-color': assetColour, 'line-width': 2, 'line-opacity': 0.8 } });
-        map.addLayer({ id: 'network-point', type: 'circle', source: 'network', filter: ['==', ['geometry-type'], 'Point'],
-          paint: { 'circle-color': assetColour, 'circle-radius': ['match', ['get', 'assetType'], 'pole', 3, 6] as never,
-            'circle-stroke-color': ['case', ['get', 'incomplete'], '#fb8500', '#ffffff'] as never, 'circle-stroke-width': 1.5 } });
+          paint: { 'line-color': lineColour('assetType') as never, 'line-width': ['match', ['get', 'assetType'], ['mv_line', 'mv_cable'], 3, 2] as never,
+            'line-dasharray': lineDash('assetType') as never, 'line-opacity': 0.85 } });
+        map.addLayer({ id: 'network-point', type: 'symbol', source: 'network', filter: ['==', ['geometry-type'], 'Point'],
+          layout: { 'icon-image': NETWORK_ICON as never, 'icon-size': ['match', ['get', 'assetType'], 'pole', 0.55, 0.8] as never, 'icon-allow-overlap': true, 'icon-ignore-placement': true } });
+        map.addLayer({ id: 'network-incomplete', type: 'circle', source: 'network', filter: ['all', ['==', ['geometry-type'], 'Point'], ['==', ['get', 'incomplete'], true]],
+          paint: { 'circle-radius': 15, 'circle-opacity': 0, 'circle-stroke-color': '#fb8500', 'circle-stroke-width': 2 } });
         const typeColour = ['match', ['get', 'effectiveType'], ...Object.entries(BUILDING_COLOURS).flat(), BUILDING_COLOURS['other']] as never;
         map.addLayer({
           id: 'buildings-fill', type: 'fill', source: 'buildings', filter: ['==', ['geometry-type'], 'Polygon'],
@@ -137,12 +151,17 @@ export class FieldMap implements OnDestroy {
           id: 'buildings-point', type: 'circle', source: 'buildings', filter: ['==', ['geometry-type'], 'Point'],
           paint: { 'circle-radius': 8, 'circle-color': typeColour, 'circle-stroke-color': '#1a7f37', 'circle-stroke-width': 3 },
         });
+        // Routes and sites carry the standard's line styles and symbols; a proposal from the pre-design is faded until confirmed.
+        const faded = ['case', ['==', ['get', 'source'], 'proposed'], 0.55, 1] as never;
         map.addLayer({ id: 'candidates-line', type: 'line', source: 'candidates', filter: ['==', ['geometry-type'], 'LineString'],
-          paint: { 'line-color': ['match', ['get', 'kind'], 'mv_route', CANDIDATE_COLOURS.mv_route, CANDIDATE_COLOURS.lv_route] as never, 'line-width': ['match', ['get', 'kind'], 'mv_route', 4, 3] as never } });
-        map.addLayer({ id: 'candidates-point', type: 'circle', source: 'candidates', filter: ['==', ['geometry-type'], 'Point'],
-          paint: { 'circle-radius': 9, 'circle-color': ['match', ['get', 'kind'], 'transformer', CANDIDATE_COLOURS.transformer, 'minisub', CANDIDATE_COLOURS.minisub, CANDIDATE_COLOURS.pole] as never, 'circle-stroke-color': '#fff', 'circle-stroke-width': 2 } });
-        map.addLayer({ id: 'selected-line', type: 'line', source: 'buildings', filter: ['==', ['id'], ''], paint: { 'line-color': '#fb8500', 'line-width': 5 } });
-        map.addLayer({ id: 'selected-cand', type: 'circle', source: 'candidates', filter: ['==', ['id'], ''], paint: { 'circle-radius': 14, 'circle-color': 'rgba(0,0,0,0)', 'circle-stroke-color': '#fb8500', 'circle-stroke-width': 4 } });
+          paint: { 'line-color': lineColour('kind') as never, 'line-width': ['match', ['get', 'kind'], 'mv_route', 4, 3] as never,
+            'line-dasharray': lineDash('kind') as never, 'line-opacity': faded } });
+        map.addLayer({ id: 'candidates-point', type: 'symbol', source: 'candidates', filter: ['==', ['geometry-type'], 'Point'],
+          layout: { 'icon-image': CANDIDATE_ICON as never, 'icon-size': ['match', ['get', 'kind'], 'pole', 0.7, 1] as never, 'icon-allow-overlap': true, 'icon-ignore-placement': true },
+          paint: { 'icon-opacity': faded } });
+        map.addLayer({ id: 'selected-line', type: 'line', source: 'buildings', filter: ['==', ['get', 'id'], ''], paint: { 'line-color': '#fb8500', 'line-width': 5 } });
+        map.addLayer({ id: 'selected-cand-line', type: 'line', source: 'candidates', filter: ['==', ['get', 'id'], ''], paint: { 'line-color': '#fb8500', 'line-width': 9, 'line-opacity': 0.45 } }, 'candidates-line');
+        map.addLayer({ id: 'selected-cand', type: 'circle', source: 'candidates', filter: ['all', ['==', ['geometry-type'], 'Point'], ['==', ['get', 'id'], '']], paint: { 'circle-radius': 15, 'circle-color': 'rgba(0,0,0,0)', 'circle-stroke-color': '#fb8500', 'circle-stroke-width': 4 } });
         map.addLayer({ id: 'draft-line', type: 'line', source: 'draft', paint: { 'line-color': '#fb8500', 'line-width': 3, 'line-dasharray': [2, 1] } });
         map.addLayer({ id: 'draft-point', type: 'circle', source: 'draft', filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-radius': 6, 'circle-color': '#fb8500' } });
         map.addLayer({ id: 'gps', type: 'circle', source: 'gps', paint: { 'circle-radius': 7, 'circle-color': '#0969da', 'circle-stroke-color': '#fff', 'circle-stroke-width': 3 } });
@@ -153,8 +172,11 @@ export class FieldMap implements OnDestroy {
         this.set('candidates', this.candidates());
         this.set('gps', this.gpsCollection() as never);
         this.set('draft', this.draftCollection());
+        // Start on the buildings; before any are imported, on whatever is marked or proposed.
         const b = this.buildings();
+        const c = this.candidates();
         if (!this.fitted && b?.features.length) this.fitTo(b);
+        else if (!this.fitted && c?.features.length) this.fitTo(c);
         this.highlight(this.selectedId());
       });
       map.on('click', (e: MapMouseEvent) => this.onClick(e));
@@ -210,29 +232,28 @@ export class FieldMap implements OnDestroy {
   }
 
   private set(source: (typeof SOURCES)[number], data: Coll): void {
-    (this.map?.getSource(source) as GeoJSONSource | undefined)?.setData((data ?? { type: 'FeatureCollection', features: [] }) as never);
+    (this.map?.getSource(source) as GeoJSONSource | undefined)?.setData((data ? withIdProperty(data) : emptyCollection()) as never);
   }
 
   private fitTo(fc: NonNullable<Coll>): void {
-    const pts = fc.features.flatMap((f) => positions(f.geometry));
+    const pts = fc.features.flatMap((f) => positionsOf(f.geometry));
     if (!pts.length || !this.map) return;
     this.map.fitBounds(bounds({ type: 'Polygon', coordinates: [pts] }), { padding: 40, duration: 0, maxZoom: 18 });
     this.fitted = true;
   }
 
+  /** Highlights by the `id` property that `withIdProperty` copies: MapLibre's `['id']` expression does not match promoted ids in a filter. */
   private highlight(id: string | null): void {
     if (!this.map?.getLayer('selected-line')) return;
-    this.map.setFilter('selected-line', ['==', ['id'], id ?? '']);
-    this.map.setFilter('selected-cand', ['==', ['id'], id ?? '']);
+    this.map.setFilter('selected-line', ['==', ['get', 'id'], id ?? '']);
+    this.map.setFilter('selected-cand', ['all', ['==', ['geometry-type'], 'Point'], ['==', ['get', 'id'], id ?? '']]);
+    this.map.setFilter('selected-cand-line', ['==', ['get', 'id'], id ?? '']);
     const f = [...(this.buildings()?.features ?? []), ...(this.candidates()?.features ?? [])].find((x) => x.id === id);
     if (!f) return;
-    const pts = positions(f.geometry);
+    const pts = positionsOf(f.geometry);
     const [sw, ne] = bounds({ type: 'Polygon', coordinates: [pts] });
     const view = this.map.getBounds();
-    if (!view.contains(sw) || !view.contains(ne)) this.map.fitBounds([sw, ne], { padding: 120, duration: 300, maxZoom: 19 });
+    // Bring a selected item into view, and close enough to see: a selection from a list may come from far away.
+    if (!view.contains(sw) || !view.contains(ne) || this.map.getZoom() < 15) this.map.fitBounds([sw, ne], { padding: 120, duration: 300, maxZoom: 18 });
   }
-}
-
-function positions(g: AnyGeometry): Position[] {
-  return g.type === 'Polygon' ? g.coordinates[0] : g.type === 'LineString' ? g.coordinates : [g.coordinates];
 }

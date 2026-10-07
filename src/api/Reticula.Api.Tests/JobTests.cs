@@ -7,13 +7,13 @@ using Reticula.Api.Auth;
 using Reticula.Api.Jobs;
 using Reticula.Domain.Auth;
 using Reticula.Infrastructure.Jobs;
+using static Reticula.Api.Tests.TestFixtures;
 
 namespace Reticula.Api.Tests;
 
 [Collection(ApiCollection.Name)]
 public class JobTests(ReticulaApiFactory factory)
 {
-    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(20);
 
     [Fact]
     public async Task Diagnostics_job_runs_to_completion()
@@ -82,10 +82,10 @@ public class JobTests(ReticulaApiFactory factory)
 
         var run = await EnqueueAsync(GatedJob.JobKind);
         await hub.InvokeAsync("Watch", run.Id);
-        Assert.True(await factory.Gate.WaitStartedAsync(Timeout), "job never started");
+        Assert.True(await factory.Gate.WaitStartedAsync(JobTimeout), "job never started");
         factory.Gate.Release();
 
-        var last = await finished.Task.WaitAsync(Timeout);
+        var last = await finished.Task.WaitAsync(JobTimeout);
         Assert.Equal("succeeded", last.Status);
         Assert.Equal(100, last.ProgressPct);
         Assert.Equal("succeeded", (await WaitFinishedAsync(client, run.Id)).Status);
@@ -96,7 +96,7 @@ public class JobTests(ReticulaApiFactory factory)
     {
         var client = await factory.EngineerClientAsync();
         var run = await EnqueueAsync(GatedJob.JobKind);
-        Assert.True(await factory.Gate.WaitStartedAsync(Timeout), "job never started");
+        Assert.True(await factory.Gate.WaitStartedAsync(JobTimeout), "job never started");
 
         var r = await client.PostAsync($"/api/jobs/{run.Id}/cancel", null);
         Assert.Equal(HttpStatusCode.Accepted, r.StatusCode);
@@ -150,16 +150,4 @@ public class JobTests(ReticulaApiFactory factory)
 
     private async Task<string> AccessTokenAsync() =>
         (await ReticulaApiFactory.LoginAsync(factory.CreateClient(), ReticulaApiFactory.EngineerEmail, ReticulaApiFactory.EngineerPassword)).AccessToken;
-
-    private static async Task<JobDto> WaitFinishedAsync(HttpClient client, Guid id)
-    {
-        var deadline = DateTime.UtcNow + Timeout;
-        while (DateTime.UtcNow < deadline)
-        {
-            var job = await client.GetFromJsonAsync<JobDto>($"/api/jobs/{id}");
-            if (job!.Status is "succeeded" or "failed" or "cancelled") return job;
-            await Task.Delay(100);
-        }
-        throw new TimeoutException($"Job {id} did not finish within {Timeout}.");
-    }
 }

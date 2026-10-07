@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Net.Http.Headers;
+using Reticula.Api.Infrastructure;
 using Reticula.Api.Jobs;
 using Reticula.Domain.Auth;
 using Reticula.Domain.Jobs;
@@ -36,7 +37,7 @@ public static class MapPackEndpoints
 
     private static async Task<Results<Ok<MapPackStatus>, NotFound>> Status(Guid projectId, ReticulaDbContext db, CancellationToken ct)
     {
-        if (!await db.Projects.AnyAsync(p => p.Id == projectId && p.ArchivedAt == null, ct)) return TypedResults.NotFound();
+        if (!await db.Projects.AnyActiveAsync(projectId, ct)) return TypedResults.NotFound();
         var pack = await db.MapPacks.AsNoTracking().FirstOrDefaultAsync(m => m.ProjectId == projectId, ct);
         var job = await LatestJobAsync(db, projectId, ct);
         if (job is not null && pack is not null && job.CreatedAt <= pack.BuiltAt && job.IsFinished) job = null;
@@ -46,11 +47,11 @@ public static class MapPackEndpoints
     /// <summary>Starts building the pack, or returns the build already under way.</summary>
     private static async Task<Results<Accepted<JobDto>, NotFound>> Build(Guid projectId, ReticulaDbContext db, IJobQueue queue, ClaimsPrincipal user, CancellationToken ct)
     {
-        if (!await db.Projects.AnyAsync(p => p.Id == projectId && p.ArchivedAt == null, ct)) return TypedResults.NotFound();
+        if (!await db.Projects.AnyActiveAsync(projectId, ct)) return TypedResults.NotFound();
         var running = await LatestJobAsync(db, projectId, ct);
         var run = running is { IsFinished: false }
             ? running
-            : await queue.EnqueueAsync(MapPackJob.JobKind, null, Guid.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!), projectId, ct);
+            : await queue.EnqueueAsync(MapPackJob.JobKind, null, user.UserId(), projectId, ct);
         return TypedResults.Accepted($"/api/jobs/{run.Id}", JobDto.From(run));
     }
 

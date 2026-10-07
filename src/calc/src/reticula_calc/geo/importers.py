@@ -11,6 +11,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import math
 import re
 import zipfile
 from collections import Counter
@@ -19,7 +20,10 @@ from typing import Any, Literal
 from xml.etree import ElementTree as ET
 
 import ezdxf
+import numpy as np
 import shapefile
+import tifffile
+from contourpy import contour_generator
 from ezdxf import recover
 from ezdxf.path import make_path
 from pydantic import BaseModel
@@ -39,10 +43,11 @@ from shapely.geometry import (
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import transform
 
+from ..issues import MAX_SAMPLES, Issue
 from . import crs as crs_mod
 
 Kind = Literal["stands", "buildings", "roads", "contours", "network"]
-Format = Literal["kml", "kmz", "geojson", "dxf", "overpass", "shapefile", "csv"]
+Format = Literal["kml", "kmz", "geojson", "dxf", "overpass", "shapefile", "csv", "geotiff"]
 GEOD = Geod(ellps="WGS84")
 
 POLYGON_KINDS = ("stands", "buildings")
@@ -61,8 +66,6 @@ CAPACITY_KEYS = ("capacity_kva", "available_kva", "capacity", "spare_kva", "nmd_
 FAULT_KEYS = ("fault_level_ka", "fault_ka", "fault_level", "fault_current_ka", "ik_ka")
 LON_COLUMNS = ("lon", "long", "longitude", "lng", "x", "easting", "y_lo")
 LAT_COLUMNS = ("lat", "latitude", "y", "northing", "x_lo")
-MAX_ISSUE_SAMPLES = 10
-
 # Existing network asset types, matched against the type field (or DXF layer and block names), first match wins.
 # Lines are told apart by voltage words. The fields each type must have so later design steps can use it:
 # connection points carry what the spec says the app must never guess (capacity and fault level).
@@ -90,14 +93,6 @@ REQUIRED_FIELDS: dict[str, tuple[str, ...]] = {
     "connection_point": ("voltage_kv", "capacity_kva", "fault_level_ka"),
 }
 DEFAULT_KV = {"lv_line": 0.4, "lv_cable": 0.4}
-
-
-class Issue(BaseModel):
-    severity: Literal["error", "warning"]
-    code: str
-    message: str
-    count: int = 1
-    samples: list[str] = []
 
 
 class LayerInfo(BaseModel):
@@ -162,6 +157,8 @@ def detect_format(filename: str, data: bytes) -> Format:
         return "dxf"
     if name.endswith(".csv"):
         return "csv"
+    if name.endswith((".tif", ".tiff")):
+        return "geotiff"
     if name.endswith(".zip"):
         return "shapefile"
     if name.endswith((".geojson", ".json")):
@@ -173,7 +170,7 @@ def detect_format(filename: str, data: bytes) -> Format:
     if name.endswith(".shp"):
         raise UnreadableFileError("Zip the shapefile with its .dbf, .shx and .prj files and import the zip")
     raise UnreadableFileError(
-        f"Unsupported file type for {filename}; use KML, KMZ, GeoJSON, Overpass JSON, DXF, a zipped shapefile or CSV"
+        f"Unsupported file type for {filename}; use KML, KMZ, GeoJSON, Overpass JSON, DXF, GeoTIFF, a zipped shapefile or CSV"
     )
 
 
@@ -441,6 +438,93 @@ def _parse_csv(data: bytes) -> list[_Raw]:
     return out
 
 
+GEOTIFF_MAX_CELLS = 4_000_000
+GEOTIFF_DEFAULT_INTERVAL_M = 1.0
+
+
+def _geokeys(tag) -> dict[int, int]:
+    """GeoKeyDirectoryTag as key id → value, for the keys stored inline (location 0)."""
+    v = [int(x) for x in tag.value]
+    return {v[i]: v[i + 3] for i in range(4, 4 + 4 * v[3], 4) if v[i + 1] == 0}
+
+
+def _parse_geotiff(data: bytes, interval_m: float | None = None) -> tuple[list[_Raw], list[Issue]]:
+    """Contours traced from a GeoTIFF elevation model, already in WGS84.
+
+    Georeferencing: ModelTransformationTag (a 4 × 4 matrix), or ModelPixelScaleTag with ModelTiepointTag. The CRS is
+    the EPSG code of ProjectedCSTypeGeoKey (3072) for a projected model, or GeographicTypeGeoKey (2048). Cell values
+    stand for the cell centre unless GTRasterTypeGeoKey (1025) says PixelIsPoint. GDAL_NODATA cells are left out.
+    Contours are traced with contourpy every `interval_m` metres (1 m by default); rasters over GEOTIFF_MAX_CELLS
+    cells are thinned first, and the result says so.
+    """
+    issues: list[Issue] = []
+    try:
+        with tifffile.TiffFile(io.BytesIO(data)) as tif:
+            if not tif.pages:
+                raise UnreadableFileError("The GeoTIFF has no image.")
+            page = tif.pages[0]
+            z = np.asarray(page.asarray(), dtype=float)
+            tags = {t.code: t for t in page.tags.values()}
+    except (OSError, ValueError, KeyError, IndexError, tifffile.TiffFileError) as e:
+        raise UnreadableFileError(f"Cannot read the GeoTIFF: {e}") from e
+    if z.ndim == 3:
+        z = z[..., 0] if z.shape[-1] <= 4 else z[0]
+    if z.ndim != 2 or min(z.shape) < 2:
+        raise UnreadableFileError("The GeoTIFF is not an elevation grid of at least 2 × 2 cells.")
+
+    if 34264 in tags:
+        m = [float(x) for x in tags[34264].value]
+        a, b, c, d, e, f = m[0], m[1], m[3], m[4], m[5], m[7]
+    elif 33550 in tags and 33922 in tags:
+        sx, sy = (float(x) for x in tags[33550].value[:2])
+        i, j, _, x0, y0, _ = (float(x) for x in tags[33922].value[:6])
+        a, b, c, d, e, f = sx, 0.0, x0 - i * sx, 0.0, -sy, y0 + j * sy
+    else:
+        raise UnreadableFileError("The GeoTIFF has no georeferencing (ModelTransformation, or ModelPixelScale and ModelTiepoint). "
+                                  "Export it from GIS as a georeferenced GeoTIFF.")
+    keys = _geokeys(tags[34735]) if 34735 in tags else {}
+    model = keys.get(1024)
+    epsg = keys.get(3072) if model == 1 or (model is None and 3072 in keys) else keys.get(2048)
+    if not epsg or epsg == 32767:
+        raise UnreadableFileError("The GeoTIFF does not name its coordinate system by EPSG code. Export it with an EPSG code.")
+    try:
+        tf = Transformer.from_crs(CRS.from_epsg(epsg), "EPSG:4326", always_xy=True)
+    except CRSError as err:
+        raise UnreadableFileError(f"Unknown coordinate system EPSG:{epsg} in the GeoTIFF.") from err
+    offset = 0.0 if keys.get(1025) == 2 else 0.5  # PixelIsPoint, else PixelIsArea
+
+    if 42113 in tags:
+        try:
+            z[z == float(str(tags[42113].value).strip("\x00 "))] = np.nan
+        except ValueError:
+            pass
+    step = 1
+    if z.size > GEOTIFF_MAX_CELLS:
+        step = math.ceil(math.sqrt(z.size / GEOTIFF_MAX_CELLS))
+        z = z[::step, ::step]
+        issues.append(Issue(severity="warning", code="raster_thinned",
+                            message=f"The elevation model has more than {GEOTIFF_MAX_CELLS:,} cells; every {step}th cell was used."))
+    interval = interval_m if interval_m and interval_m > 0 else GEOTIFF_DEFAULT_INTERVAL_M
+    finite = z[np.isfinite(z)]
+    if finite.size == 0:
+        raise UnreadableFileError("The GeoTIFF has no elevation values.")
+    levels = np.arange(math.ceil(finite.min() / interval) * interval, finite.max() + 1e-9, interval)
+    rows, cols = z.shape
+    gen = contour_generator(x=np.arange(cols) * step + offset * step, y=np.arange(rows) * step + offset * step,
+                            z=np.ma.masked_invalid(z), line_type="Separate")
+    out: list[_Raw] = []
+    for level in levels:
+        for line in gen.lines(float(level)):
+            if len(line) < 2:
+                continue
+            col, row = line[:, 0], line[:, 1]
+            x, y = a * col + b * row + c, d * col + e * row + f
+            lon, lat = tf.transform(x, y)
+            out.append(_Raw(f"contour-{len(out) + 1}", LineString(list(zip(lon, lat, strict=True))),
+                            {"elevation": round(float(level), 3), "_z": round(float(level), 3)}))
+    return out, issues
+
+
 # ---------- normalise ----------
 
 
@@ -470,7 +554,7 @@ def _length_m(geom: BaseGeometry) -> float:
 
 
 def _sample(items: list[str]) -> list[str]:
-    return items[:MAX_ISSUE_SAMPLES]
+    return items[:MAX_SAMPLES]
 
 
 def asset_type(props: dict[str, Any], is_line: bool) -> str | None:
@@ -510,6 +594,7 @@ def import_file(
     source_crs: str | None = None,
     layer: str | None = None,
     area: dict[str, Any] | None = None,
+    interval_m: float | None = None,
 ) -> ImportResult:
     fmt = detect_format(filename, data)
     issues: list[Issue] = []
@@ -529,6 +614,11 @@ def import_file(
         raws, prj = _parse_shapefile(data)
     elif fmt == "csv":
         raws = _parse_csv(data)
+    elif fmt == "geotiff":
+        if kind != "contours":
+            raise UnreadableFileError("GeoTIFF import is only supported for contours")
+        raws, more = _parse_geotiff(data, interval_m)
+        issues += more
     else:
         raws, layers, more = _parse_dxf(data, layer, kind)
         issues += more
@@ -543,6 +633,8 @@ def import_file(
     tf: Transformer | None = None
     if fmt in ("kml", "kmz", "overpass"):
         spec, reason = "WGS84", f"{fmt.upper()} is always longitude/latitude"
+    elif fmt == "geotiff":
+        spec, reason = "WGS84", "contours traced from the GeoTIFF and projected from its EPSG code"
     elif source_crs:
         spec, reason = crs_mod.normalise(source_crs), "chosen by the user"
     elif prj:

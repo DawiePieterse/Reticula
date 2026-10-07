@@ -6,38 +6,21 @@ using Reticula.Api.Maps;
 using Reticula.Api.Projects;
 using Reticula.Infrastructure.Calc;
 using Reticula.Infrastructure.Geo;
+using static Reticula.Api.Tests.TestFixtures;
 
 namespace Reticula.Api.Tests;
 
 [Collection(ApiCollection.Name)]
 public class MapPackTests(ReticulaApiFactory factory)
 {
-    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(20);
-
-    private static PolygonDto Square(double lon, double lat, double d) =>
-        new("Polygon", [[[lon, lat], [lon + d, lat], [lon + d, lat + d], [lon, lat + d], [lon, lat]]]);
-
-    private async Task<(HttpClient Client, Guid ProjectId)> ProjectAsync()
-    {
-        var client = await factory.EngineerClientAsync();
-        var p = await (await client.PostAsJsonAsync("/api/projects", new SaveProjectRequest($"Map {Guid.NewGuid():N}", "eskom/0.1.0", Square(28.10, -25.52, 0.02), null)))
-            .Content.ReadFromJsonAsync<ProjectDto>();
-        return (client, p!.Id);
-    }
+    private Task<(HttpClient Client, Guid ProjectId)> ProjectAsync() => factory.NewProjectAsync("Map", Square(28.10, -25.52, 0.02));
 
     private static async Task<JobDto> BuildAsync(HttpClient client, Guid projectId)
     {
         var r = await client.PostAsync($"/api/projects/{projectId}/map-pack", null);
         Assert.Equal(HttpStatusCode.Accepted, r.StatusCode);
         var job = (await r.Content.ReadFromJsonAsync<JobDto>())!;
-        var deadline = DateTime.UtcNow + Timeout;
-        while (DateTime.UtcNow < deadline)
-        {
-            job = (await client.GetFromJsonAsync<JobDto>($"/api/jobs/{job.Id}"))!;
-            if (job.Status is "succeeded" or "failed" or "cancelled") return job;
-            await Task.Delay(100);
-        }
-        throw new TimeoutException("Map pack job did not finish.");
+        return await WaitFinishedAsync(client, job.Id);
     }
 
     [Fact]

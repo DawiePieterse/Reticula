@@ -268,7 +268,7 @@ describe('FieldSync', () => {
     await goOnline();
     const create = http.expectOne(`${base}/candidates/${id}`);
     expect(create.request.body).toMatchObject({ version: null, opId: expect.any(String) });
-    create.flush({ type: 'Feature', id, geometry: { type: 'Point', coordinates: [28.1, -25.52] }, properties: { kind: 'transformer', notes: null, createdAt: '', version: 11 } });
+    create.flush({ type: 'Feature', id, geometry: { type: 'Point', coordinates: [28.1, -25.52] }, properties: { kind: 'transformer', notes: null, createdAt: '', version: 11, source: 'field' } });
     await settle();
     const edit = http.expectOne(`${base}/candidates/${id}`);
     expect(edit.request.body).toMatchObject({ notes: 'Next to the tap', version: 11 });

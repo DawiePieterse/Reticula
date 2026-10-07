@@ -2,15 +2,16 @@ import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { toApiProblem } from '../../core/api-problem';
+import { SymbolIcon } from '../../shared/symbol';
 import { ConductorLibrary } from './conductor-library';
 import { FEEDER_COLOURS, LvFeederResult, LvLayers, LvNetwork, LvNetworkApi, PHASE_COLOURS, PHASE_NAMES, lvLayers, sourceLinkResult } from './lv-network.api';
 
 /** The LV network model (plan 2.1): the marked LV routes and sites joined into a network, with its feeders and what to fix. */
 @Component({
   selector: 'app-lv-network',
-  imports: [DatePipe, DecimalPipe, ConductorLibrary],
+  imports: [DatePipe, DecimalPipe, ConductorLibrary, SymbolIcon],
   template: `
-    <section class="lv">
+    <section class="lv card">
       <div class="page-head">
         <h3>LV network</h3>
         @if (canEdit()) {
@@ -26,7 +27,7 @@ import { FEEDER_COLOURS, LvFeederResult, LvLayers, LvNetwork, LvNetworkApi, PHAS
         @if (n.stale) { <p class="banner warn" role="status">Out of date: {{ n.stale }}{{ canEdit() ? ' Build again to update it.' : '' }}</p> }
         <ul class="chips" aria-label="LV network summary">
           <li>{{ n.summary.routes }} routes, {{ n.summary.routeLengthM / 1000 | number: '1.2-2' }} km</li>
-          <li [class.warn]="n.summary.sourcesConnected < n.summary.sources">{{ n.summary.sourcesConnected }} of {{ n.summary.sources }} sources connected</li>
+          <li [class.warn]="n.summary.sourcesConnected < n.summary.sources"><app-symbol name="transformer" [size]="22" /> {{ n.summary.sourcesConnected }} of {{ n.summary.sources }} sources connected</li>
           <li>{{ n.summary.feeders }} feeders</li>
           @if (n.summary.poles) { <li [class.warn]="n.summary.polesPlaced < n.summary.poles">{{ n.summary.polesPlaced }} of {{ n.summary.poles }} poles on a route</li> }
           @if (n.summary.unfedLengthM) { <li class="warn">{{ n.summary.unfedLengthM | number: '1.0-0' }} m not fed</li> }

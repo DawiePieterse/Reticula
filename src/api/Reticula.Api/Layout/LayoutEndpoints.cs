@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Reticula.Api.Infrastructure;
 using Reticula.Domain.Auth;
 using Reticula.Domain.Layout;
 using Reticula.Infrastructure.Calc;
@@ -72,7 +73,7 @@ public static class LayoutEndpoints
         Guid projectId, IFormFile? file, [FromForm] string kind, [FromForm] string? source, [FromForm] string? sourceCrs, [FromForm] string? layer,
         [FromForm] bool? dryRun, ReticulaDbContext db, LayoutService layout, ClaimsPrincipal user, CancellationToken ct)
     {
-        var project = await db.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.Id == projectId && p.ArchivedAt == null, ct);
+        var project = await db.Projects.ActiveAsync(projectId, ct);
         if (project is null) return TypedResults.NotFound();
 
         // source=osm fetches buildings or roads for the project area from OpenStreetMap instead of reading a file.
@@ -89,7 +90,7 @@ public static class LayoutEndpoints
         ImportOutcome outcome;
         try
         {
-            var userId = Guid.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var userId = user.UserId();
             if (fromOsm)
             {
                 outcome = await layout.ImportOsmAsync(project, kind, dryRun ?? false, userId, ct);
@@ -179,27 +180,32 @@ public static class LayoutEndpoints
 
     private static async Task<Results<Ok<LayoutSummary>, NotFound>> Summary(Guid projectId, ReticulaDbContext db, CancellationToken ct)
     {
-        if (!await db.Projects.AnyAsync(p => p.Id == projectId && p.ArchivedAt == null, ct)) return TypedResults.NotFound();
-        var stands = await db.Stands.CountAsync(s => s.ProjectId == projectId, ct);
-        var withoutErf = await db.Stands.CountAsync(s => s.ProjectId == projectId && s.ErfNumber == null, ct);
-        var buildings = db.Buildings.Where(b => b.ProjectId == projectId);
-        var byType = await buildings.Where(b => b.Status == BuildingStatus.Predicted)
+        if (!await db.Projects.AnyActiveAsync(projectId, ct)) return TypedResults.NotFound();
+        // One pass over each table: the counts are conditional aggregates of a single group.
+        var stands = await db.Stands.Where(s => s.ProjectId == projectId).GroupBy(_ => 1)
+            .Select(g => new { Total = g.Count(), WithoutErf = g.Count(s => s.ErfNumber == null) }).FirstOrDefaultAsync(ct);
+        var buildings = await db.Buildings.Where(b => b.ProjectId == projectId).GroupBy(_ => 1).Select(g => new
+        {
+            Total = g.Count(),
+            LowConfidence = g.Count(b => b.Status == BuildingStatus.Predicted && b.LowConfidence),
+            Inspected = g.Count(b => b.Status != BuildingStatus.Predicted),
+        }).FirstOrDefaultAsync(ct);
+        var byType = await db.Buildings.Where(b => b.ProjectId == projectId && b.Status == BuildingStatus.Predicted)
             .GroupBy(b => b.PredictedType).Select(g => new { g.Key, Count = g.Count() }).ToDictionaryAsync(x => x.Key, x => x.Count, ct);
+        var assets = await db.NetworkAssets.Where(a => a.ProjectId == projectId).GroupBy(_ => 1)
+            .Select(g => new { Total = g.Count(), Incomplete = g.Count(a => a.MissingJson != "[]") }).FirstOrDefaultAsync(ct);
         return TypedResults.Ok(new LayoutSummary(
-            stands, withoutErf,
-            await buildings.CountAsync(ct),
-            await buildings.CountAsync(b => b.Status == BuildingStatus.Predicted && b.LowConfidence, ct),
-            await buildings.CountAsync(b => b.Status != BuildingStatus.Predicted, ct),
+            stands?.Total ?? 0, stands?.WithoutErf ?? 0,
+            buildings?.Total ?? 0, buildings?.LowConfidence ?? 0, buildings?.Inspected ?? 0,
             byType,
             await db.Roads.CountAsync(r => r.ProjectId == projectId, ct),
             await db.Contours.CountAsync(c => c.ProjectId == projectId, ct),
-            await db.NetworkAssets.CountAsync(a => a.ProjectId == projectId, ct),
-            await db.NetworkAssets.CountAsync(a => a.ProjectId == projectId && a.MissingJson != "[]", ct)));
+            assets?.Total ?? 0, assets?.Incomplete ?? 0));
     }
 
     private static async Task<Results<NoContent, NotFound>> Repredict(Guid projectId, ReticulaDbContext db, LayoutService layout, CancellationToken ct)
     {
-        var project = await db.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.Id == projectId && p.ArchivedAt == null, ct);
+        var project = await db.Projects.ActiveAsync(projectId, ct);
         if (project is null) return TypedResults.NotFound();
         await layout.RefreshBuildingsAsync(project, ct);
         return TypedResults.NoContent();

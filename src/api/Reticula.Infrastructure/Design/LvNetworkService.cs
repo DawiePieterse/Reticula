@@ -32,7 +32,7 @@ public sealed class LvNetworkService(ReticulaDbContext db, ICalcClient calc, Tim
         var input = candidates.Select(c => new LvCandidate(c.Id.ToString(), c.Kind, JsonSerializer.SerializeToElement(GeometryInput.ToDto(c.Geometry), Json))).ToList();
         var result = await calc.BuildLvNetworkAsync(project.RulesRef, input, ct);
 
-        var (buildings, classes) = await LoadInputsAsync(project.Id, ct);
+        var (buildings, classes) = await ProjectLoads.ReadAsync(db, project.Id, ct);
         CalcLvLoads? loads = null;
         CalcLvAnalysis? analysis = null;
         var issues = result.Issues.ToList();
@@ -108,28 +108,5 @@ public sealed class LvNetworkService(ReticulaDbContext db, ICalcClient calc, Tim
             loads = built != await db.Buildings.CountAsync(b => b.ProjectId == project.Id && b.Status != BuildingStatus.NotPresent, ct);
         }
         return loads ? "Buildings or their loads changed after the network was built." : null;
-    }
-
-    /// <summary>
-    /// Every building still standing, with its load when it has one, and each residential load's Herman-Beta class by load id.
-    /// Buildings without a load are reported, not guessed.
-    /// </summary>
-    private async Task<(List<LvLoadIn> Inputs, Dictionary<string, string?> Classes)> LoadInputsAsync(Guid projectId, CancellationToken ct)
-    {
-        var rows = await (
-            from b in db.Buildings.AsNoTracking()
-            where b.ProjectId == projectId && b.Status != BuildingStatus.NotPresent
-            join s in db.Stands.AsNoTracking() on b.StandId equals s.Id into ss
-            from s in ss.DefaultIfEmpty()
-            join l in db.LoadPoints.AsNoTracking() on b.Id equals l.BuildingId into ls
-            from l in ls.DefaultIfEmpty()
-            orderby b.Id
-            select new { b.Id, b.Location, Erf = s == null ? null : s.ErfNumber, Load = l }).ToListAsync(ct);
-        var inputs = rows.Select(x => new LvLoadIn((x.Load?.Id ?? x.Id).ToString(), x.Id.ToString(), x.Erf, [x.Location.X, x.Location.Y],
-            x.Load?.Kva, x.Load?.Kind ?? LoadKinds.Residential)).ToList();
-        // A residential load point's category is its load class (or the engineer's override); special loads have none.
-        var classes = rows.Where(x => x.Load is { Kind: LoadKinds.Residential })
-            .ToDictionary(x => x.Load!.Id.ToString(), x => x.Load!.ClassOverride ?? x.Load!.Category);
-        return (inputs, classes);
     }
 }

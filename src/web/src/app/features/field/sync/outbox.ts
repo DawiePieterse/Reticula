@@ -166,6 +166,8 @@ export function overlay(s: FieldSnapshot, ops: readonly OutboxOp[]): FieldView {
   const photoCounts = { ...s.photoCounts };
   const unsynced = new Set<string>();
   const issues = new Map<string, OutboxOp>();
+  let buildingsChanged = false;
+  let candidatesChanged = false;
 
   for (const op of ops) {
     const key = subject(op.body);
@@ -180,21 +182,24 @@ export function overlay(s: FieldSnapshot, ops: readonly OutboxOp[]): FieldView {
       case 'inspect': {
         const f = buildings.get(b.buildingId);
         if (f) buildings.set(f.id, { ...f, properties: inspected(f.properties, b.req) });
+        buildingsChanged ||= f !== undefined;
         break;
       }
       case 'addBuilding':
         buildings.set(b.req.id, addedBuilding(b.req));
+        buildingsChanged = true;
         break;
       case 'saveCandidate': {
+        candidatesChanged = true;
         const f = candidates.get(b.candidateId);
         candidates.set(b.candidateId, {
           type: 'Feature', id: b.candidateId, geometry: b.req.geometry,
-          properties: { kind: b.req.kind, notes: b.req.notes ?? null, createdAt: f?.properties.createdAt ?? b.req.capturedAt ?? op.createdAt, version: f?.properties.version ?? 0 },
+          properties: { kind: b.req.kind, notes: b.req.notes ?? null, createdAt: f?.properties.createdAt ?? b.req.capturedAt ?? op.createdAt, version: f?.properties.version ?? 0, source: 'field' },
         });
         break;
       }
       case 'archiveCandidate':
-        candidates.delete(b.candidateId);
+        if (candidates.delete(b.candidateId)) candidatesChanged = true;
         break;
       case 'saveLoad':
         loads.set(b.buildingId, pendingLoad(b.buildingId, b.req, loads.get(b.buildingId), op.createdAt));
@@ -205,14 +210,15 @@ export function overlay(s: FieldSnapshot, ops: readonly OutboxOp[]): FieldView {
     }
   }
 
-  const bf = [...buildings.values()];
-  const cf = [...candidates.values()];
+  // Untouched collections are returned as they are, so the map does not reload them for a load or photo change.
+  const bf = buildingsChanged ? { type: 'FeatureCollection' as const, features: [...buildings.values()] } : s.buildings;
+  const cf = candidatesChanged ? { type: 'FeatureCollection' as const, features: [...candidates.values()] } : s.candidates;
   return {
-    buildings: { type: 'FeatureCollection', features: bf },
-    candidates: { type: 'FeatureCollection', features: cf },
+    buildings: bf,
+    candidates: cf,
     loads,
     photoCounts,
-    progress: progressOf(bf, loads, cf, s.assumptionsOpen),
+    progress: progressOf(bf.features, loads, cf.features, s.assumptionsOpen),
     unsynced,
     issues,
   };
@@ -441,6 +447,7 @@ function observations(o: Record<string, unknown> | undefined): string {
   return entries.map(([k, v]) => `${pretty(k)}: ${Array.isArray(v) ? v.map(String).map(pretty).join(', ') : pretty(String(v))}`).join('; ');
 }
 
-function pretty(s: string): string {
+/** A rules-file key as words: `block_of_flats` → `block of flats`. */
+export function pretty(s: string): string {
   return s.replace(/_/g, ' ');
 }

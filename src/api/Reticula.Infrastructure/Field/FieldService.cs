@@ -42,22 +42,26 @@ public sealed class FieldService(ReticulaDbContext db, ICalcClient calc, TimePro
             estimate.Overridden ? request.OverrideReason : null, JsonSerializer.Serialize(estimate.Missing, Json),
             estimate.Raw, estimate.RulesHash, userId, now);
 
+        var assumptions = await db.Assumptions
+            .Where(a => a.ProjectId == project.Id && a.SubjectType == LoadPointSubject && a.SubjectId == lp.Id)
+            .ToListAsync(ct);
+        var byCode = assumptions.GroupBy(a => a.Code).ToDictionary(g => g.Key, g => g.First());
         var label = erf is null ? "building without an erf" : $"erf {erf}";
         var kva = Kva(estimate.AdmdKva.Value);
         var est = Kva(estimate.EstimatedKva);
-        await UpsertAsync(project.Id, lp.Id, AssumptionCodes.AdmdEstimated, true,
+        Upsert(byCode, project.Id, lp.Id, AssumptionCodes.AdmdEstimated, true,
             estimate.Kind == LoadKinds.Special
                 ? $"Special load '{request.SpecialLoad}' at {label} taken as {kva} kVA (rules default {est} kVA)."
                 : estimate.LoadClass is { } lc
                     ? $"ADMD at {label} taken as {est} kVA: class {lc.Description} ({lc.TableSource}), " +
                       (lc.ChosenBy == "engineer" ? "chosen by the engineer." : $"from the site-observation score (band {estimate.IncomeBand}).")
                     : $"ADMD at {label} estimated as {est} kVA from site observations (income band {estimate.IncomeBand}, category {estimate.Category}).",
-            userId, now, ct);
-        await UpsertAsync(project.Id, lp.Id, AssumptionCodes.AdmdOverridden, estimate.Overridden,
-            $"ADMD at {label} overridden to {kva} kVA (method gave {est} kVA): {request.OverrideReason}", userId, now, ct);
-        await UpsertAsync(project.Id, lp.Id, AssumptionCodes.IndicatorsMissing, estimate.Missing.Count > 0,
+            userId, now);
+        Upsert(byCode, project.Id, lp.Id, AssumptionCodes.AdmdOverridden, estimate.Overridden,
+            $"ADMD at {label} overridden to {kva} kVA (method gave {est} kVA): {request.OverrideReason}", userId, now);
+        Upsert(byCode, project.Id, lp.Id, AssumptionCodes.IndicatorsMissing, estimate.Missing.Count > 0,
             $"At {label}, {estimate.Missing.Count} indicator(s) not recorded and scored as zero: {string.Join(", ", estimate.Missing)}.",
-            userId, now, ct);
+            userId, now);
 
         db.Inspections.Add(new Inspection(opId ?? Guid.CreateVersion7(), project.Id, InspectionActions.Load, building.Id, null, estimate.Kind,
             null, null, capturedAt ?? now, null, userId, now));
@@ -77,18 +81,18 @@ public sealed class FieldService(ReticulaDbContext db, ICalcClient calc, TimePro
         await db.SaveChangesAsync(ct);
     }
 
-    private async Task UpsertAsync(Guid projectId, Guid subjectId, string code, bool applies, string text, Guid userId, DateTimeOffset now, CancellationToken ct)
+    /// <summary>Opens, reopens or clears the load point's assumption of this code. <paramref name="existing"/> is the point's assumptions by code.</summary>
+    private void Upsert(Dictionary<string, Assumption> existing, Guid projectId, Guid subjectId, string code, bool applies, string text, Guid userId, DateTimeOffset now)
     {
-        var existing = await db.Assumptions.FirstOrDefaultAsync(
-            a => a.ProjectId == projectId && a.SubjectType == LoadPointSubject && a.SubjectId == subjectId && a.Code == code, ct);
+        var current = existing.GetValueOrDefault(code);
         if (applies)
         {
-            if (existing is null) db.Assumptions.Add(new Assumption(Guid.CreateVersion7(), projectId, LoadPointSubject, subjectId, code, text, now));
-            else existing.Reopen(text, now);
+            if (current is null) db.Assumptions.Add(new Assumption(Guid.CreateVersion7(), projectId, LoadPointSubject, subjectId, code, text, now));
+            else current.Reopen(text, now);
         }
-        else if (existing is { Status: AssumptionStatus.Open })
+        else if (current is { Status: AssumptionStatus.Open })
         {
-            existing.Clear(userId, "No longer applies after re-estimate.", now);
+            current.Clear(userId, "No longer applies after re-estimate.", now);
         }
     }
 

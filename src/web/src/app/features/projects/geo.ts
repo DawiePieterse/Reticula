@@ -1,5 +1,15 @@
 export type Position = [lon: number, lat: number];
 
+export interface GeoJsonPoint {
+  type: 'Point';
+  coordinates: Position;
+}
+
+export interface GeoJsonLineString {
+  type: 'LineString';
+  coordinates: Position[];
+}
+
 export interface GeoJsonPolygon {
   type: 'Polygon';
   coordinates: Position[][];
@@ -45,6 +55,20 @@ function segmentsIntersect(p1: Position, q1: Position, p2: Position, q2: Positio
     (o3 === 0 && onSegment(p2, p1, q2)) ||
     (o4 === 0 && onSegment(p2, q1, q2))
   );
+}
+
+/** The positions of any geometry, flat: a polygon's outer ring, a line's vertices, or the one point. */
+export function positionsOf(g: GeoJsonPolygon | GeoJsonPoint | GeoJsonLineString): Position[] {
+  return g.type === 'Polygon' ? g.coordinates[0] : g.type === 'LineString' ? g.coordinates : [g.coordinates];
+}
+
+/** MapLibre reads a feature's id from a property (`promoteId`), so the GeoJSON id is copied there for selection and highlights. */
+export function withIdProperty<T extends { features: { id?: string | number; properties: unknown }[] }>(fc: T): T {
+  return { ...fc, features: fc.features.map((f) => (f.id === undefined ? f : { ...f, properties: { ...(f.properties as object), id: f.id } })) };
+}
+
+export function emptyCollection(): { type: 'FeatureCollection'; features: never[] } {
+  return { type: 'FeatureCollection', features: [] };
 }
 
 export function bounds(polygon: GeoJsonPolygon): [Position, Position] {

@@ -83,7 +83,7 @@ import { OutboxOp, compare, describe, titleOf } from './outbox';
   styles: `
     h3 { margin-top: 0; }
     .status { margin: .5rem 0; }
-    .issue { border: 1px solid var(--border); border-radius: 8px; padding: .75rem; margin: .75rem 0; background: var(--surface); }
+    .issue { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: .9rem; margin: .75rem 0; background: var(--surface-2); }
     .issue[data-state='conflict'] { border-color: var(--danger); }
     .issue header { display: flex; justify-content: space-between; gap: .5rem; flex-wrap: wrap; }
     table { font-size: .9rem; margin: .5rem 0; }

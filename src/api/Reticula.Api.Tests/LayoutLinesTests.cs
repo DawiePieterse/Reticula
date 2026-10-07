@@ -6,6 +6,7 @@ using Reticula.Api.Layout;
 using Reticula.Api.Projects;
 using Reticula.Infrastructure.Calc;
 using Reticula.Infrastructure.Geo;
+using static Reticula.Api.Tests.TestFixtures;
 
 namespace Reticula.Api.Tests;
 
@@ -15,19 +16,11 @@ public class LayoutLinesTests(ReticulaApiFactory factory)
 {
     private const double Lon = 28.10, Lat = -25.52;
 
-    private static PolygonDto Square(double lon, double lat, double d) =>
-        new("Polygon", [[[lon, lat], [lon + d, lat], [lon + d, lat + d], [lon, lat + d], [lon, lat]]]);
-
     private static GeoJsonGeometry Street(double dy = 0) => GeoJsonGeometry.Line([Lon, Lat + dy], [Lon + 0.002, Lat + dy]);
 
     private static CalcImportResult Result(string kind, params CalcFeature[] features) => new(kind, "geojson", "WGS84", "test", features, [], []);
 
-    private async Task<(HttpClient Client, Guid ProjectId)> NewProjectAsync()
-    {
-        var client = await factory.EngineerClientAsync();
-        var r = await client.PostAsJsonAsync("/api/projects", new SaveProjectRequest($"Lines {Guid.NewGuid():N}", "eskom/0.1.0", Square(28.09, -25.53, 0.03), null));
-        return (client, (await r.Content.ReadFromJsonAsync<ProjectDto>())!.Id);
-    }
+    private Task<(HttpClient Client, Guid ProjectId)> NewProjectAsync() => factory.NewProjectAsync("Lines", Square(28.09, -25.53, 0.03));
 
     private static Task<HttpResponseMessage> UploadAsync(HttpClient client, Guid projectId, string kind, string? source = null)
     {

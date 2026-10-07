@@ -44,12 +44,14 @@ Every check and every rules-file value that comes from a standard points to an e
 
 | Id | Check or value | Standard | Clause | Edition | Used by | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| SANS780-RATING | Standard ratings of distribution transformers | SANS 780 | to confirm | not listed in rules | Phase 3.1 | not yet used |
+| SANS780-RATING | Standard ratings of distribution transformers | SANS 780 | to confirm | not listed in rules | `eskom/*` rules from 0.7.0: `mv_design.transformer_ratings_kva` (plan 2.0 placement); Phase 3.1 | preferred series 16–500 kVA transcribed from memory 2026-10-06; to confirm against the standard |
 | SANS1019-VOLT | Standard system voltages and insulation levels | SANS 1019 | to confirm | not listed in rules | `voltage.mv_nominal_kv`; Phase 3 | not yet used |
 | SANS1029-MINISUB | Miniature substation construction and ratings | SANS 1029 | – | – | – | withdrawn 2026-10-05: not used by the engineer; see ESKOM-MINISUB |
 | SANS97-MVCABLE | MV cable construction and ratings | SANS 97 | to confirm | not listed in rules | Phase 3.3 | not yet used |
 | NRS048-MVLIMIT | MV voltage limits and tap setting range | NRS 048-2 | to confirm | 2024 (rules, unconfirmed) | Phase 3.4 | not yet used |
 | IEC60909-FAULT | Short-circuit currents: method, voltage factor c, 3-phase and 1-phase | IEC 60909-0 | to confirm | 2016 (rules, unconfirmed) | Phase 4.4 (pandapower) | not yet used |
+| SANS182-ACSR | Bare overhead conductors for MV lines (ACSR and AAAC named Fox, Gopher, Hare, Mink, Oak, Rabbit, Squirrel, Wolf, Panther): resistance, rating, mass, breaking load | SANS 182 (ACSR) and SANS 1418 (AAAC); conductor names as in Eskom 240-87658920 §4.3.4 | to confirm | not listed in rules | `eskom/*` rules from 0.8.0: `mv_conductors`, `overhead.mechanical` | unverified: typical published values, every field marked placeholder |
+| ESKOM-SUPPLY | Bulk supply: notified maximum demand steps, MV switchgear short-time rating, fault clearing times, IEC 60909 voltage factors | Eskom supply and protection standards, numbers to identify; IEC 60909-0 Table 1 for c | to confirm | to identify | `eskom/*` rules from 0.8.0: `bulk`; plan 4.4–4.5 | to identify; voltage factors are the well-known Table 1 values, to confirm against the edition held |
 
 ### Eskom standards (govern Eskom projects)
 
@@ -68,6 +70,7 @@ The engineer designs Eskom projects to Eskom's own standards. Where a document n
 | ESKOM-LVCABLE-FAULT | Short-circuit withstand of LV cables: I = K·A/√t, K 0,115 (Cu) and 0,076 (Al); phase and earth fault levels | Eskom 240-56030637 *General information and requirements for LV cable systems* | §3.9.1 m); Tables 1–5 | Rev 2, Aug 2021 | `eskom/*` rules from 0.5.0: `conductors[*].fault_k`; formula `lv.cable.withstand.v1` | transcribed 2026-10-05 into eskom/0.5.0, checked by the calc tests against Tables 1 and 2; Rev 2 confirmed current; engineer to confirm the transcription |
 | ESKOM-LVPROT | LV feeder protection per cable size (MCCB and fuse ratings); at most 5 LV feeders from a Type A mini-sub, 6 from a Type B | Eskom 240-56030637 *General information and requirements for LV cable systems* | §3.6; §3.9.12 a); Table 10 and its note | Rev 2, Aug 2021 | Phases 2.4 and 3.2 | clause located 2026-10-05; Rev 2 confirmed current by the engineer; values to confirm when transcribed into a rules file. LV protection philosophy is in 240-57649065 (not held) |
 | ESKOM-KIOSK | Underground supply: LV feeders supply metering kiosks, never customers directly; at each kiosk, MCBs on one phase grouped, at most 4 per phase, and the kiosk balanced across phases | Eskom 240-56030637 *General information and requirements for LV cable systems* | §2.3.1 (LV feeder cable); §3.5.3 d)–f); §3.10 e) | Rev 2, Aug 2021 | Underground load allocation (kiosks not yet modelled: plan 2.2 covers overhead only; see ADR 0007) | clause located 2026-10-05; Rev 2 confirmed current by the engineer; values to confirm when transcribed into a rules file |
+| ESKOM-DRAW | Drawing practice for electrification networks: symbols (Annex B legend), MV red and LV green (§4.3.4), underground MV magenta and LV blue (Annex D), transformer zones (§4.3.8), MV and LV line styles by conductor and phase (§4.3.4), pole tags (§4.3.5) | Eskom 240-87658920 (alt. DST 34-195) *Standard drawing practice for CAD users ... and for electrification networks* | Annex B, Annex C, Annex D, §4.3.4–4.3.8 | Rev 1, September 2009; stabilised March 2019 | Web: `src/web/src/app/shared/symbols.ts` (map markers, tool buttons, legends). Later: DXF/DGN export (plan 6) must use ElecCell.cel and ElecLines.rsc, which the document names but does not contain | document held (2026-10-06); symbols transcribed as SVG from Annex B; line styles per phase and conductor not yet drawn |
 
 ### Later and supporting
 
@@ -97,6 +100,9 @@ These values are Reticula's own and say so in their `clause` text. They are list
 | RETICULA-PREDICT | Building-type prediction from OSM tags, zoning and footprint | Reticula heuristic v1 | `building_prediction` | heuristic: tune per authority |
 | RETICULA-SCORE | Income indicator scoring and thresholds | Reticula heuristic v1 | `income_admd` indicator points and bands | heuristic: needs calibrating (docs/load-data.md) |
 | RETICULA-LVMODEL | Drawing tolerances for joining marked LV routes and sites into a network: join, near-miss, source and pole reach | Reticula LV network tolerances v1 | `lv_network` (from eskom/0.3.0); plan 2.1 | own values: tune to how routes are drawn in the field |
+| RETICULA-MVMODEL | MV network drawing tolerances (join, near miss, connection point and tee-off reach) and MV design defaults | Reticula setting, not a standard | – | – | `eskom/*` rules from 0.8.0: `mv_network`; plan 3.3 | Reticula's own; conductor and power factor defaults are placeholders |
+| RETICULA-ECON | Default economic assumptions for lifetime cost: period, discount rate, energy cost, growth, loss load factor, rate uncertainty | Reticula setting, not a standard | – | – | `eskom/*` rules from 0.8.0: `economics`; plan 5.1 | Reticula's own; a design run may override every value |
+| RETICULA-LOADCLASS | Load class of a building not yet inspected, from its stand's zoning | Reticula setting, not a standard | – | – | `eskom/*` rules from 0.8.1: `load_classes`; plans 1.3, 2.0 | Reticula's own; the engineer sets the zoning-to-class table for each area; the inspection replaces it |
 
 ## Answers from the engineer (2026-10-05)
 
@@ -111,6 +117,7 @@ These values are Reticula's own and say so in their `clause` text. They are list
 | --- | --- | --- | --- |
 | Eskom 240-56030637 (alt. 34-1176) *General information and requirements for low-voltage cable systems* | Rev 2, August 2021 | 2026-10-05, from the engineer | Underground LV only. Its next review date (August 2026) has passed; the engineer confirmed on 2026-10-05 that Rev 2 is current. Controlled disclosure, Eskom copyright: the PDF is not kept in this repository; rules files carry only the values the calculations use, with clause references. |
 | Eskom 240-92934300 *Technical evaluation criteria for LV ABC with bare or insulated supporting neutral* | Rev 2 (Rev 1 March 2015) | 2026-10-05, from the engineer (also on etenders.gov.za) | A tender evaluation report: no design values. It names the ABC specification, 240-84758170, whose Technical Schedules A and B carry the conductor data, and the product codes in D-DT 3141. |
+| Eskom 240-87658920 (alt. DST 34-195) *Standard drawing practice for CAD users in the power plant and control plant technologies environment and for electrification networks* | Rev 1, September 2009 (stabilised 2019-03-11) | 2026-10-06, from the engineer | Symbols, levels and colours for electrification drawings; the cell and line style libraries (ElecCell.cel, ElecLines.rsc) are separate Eskom files not held. Controlled disclosure: the PDF is not kept in this repository. |
 
 ## Still open
 

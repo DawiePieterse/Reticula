@@ -53,7 +53,7 @@ const CRS_OPTIONS = [
   selector: 'app-project-layout',
   imports: [FormsModule, PercentPipe, DecimalPipe],
   template: `
-    <section class="layout">
+    <section class="layout card">
       <h3>Layout data</h3>
 
       @if (summary(); as s) {

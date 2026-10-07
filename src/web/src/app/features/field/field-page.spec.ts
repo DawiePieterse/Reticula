@@ -78,10 +78,10 @@ describe('FieldPage', () => {
   it('shows progress and starts with the lowest-confidence building', async () => {
     const { el, stable } = await setup();
     expect(el.textContent).toContain('1/3 inspected');
-    expect(el.textContent).toContain('2 low-confidence left');
-    expect(el.textContent).toContain('4 assumptions open');
+    expect(el.textContent).toContain('2 low confidence');
+    expect(el.textContent).toContain('4 assumptions');
     expect(el.textContent).toContain('All synced');
-    expect(el.querySelector('header a')?.textContent).toContain('← Soshanguve');
+    expect(el.querySelector('header a')?.textContent).toContain('Soshanguve');
 
     button(el, 'Start with lowest confidence').click();
     await stable();
@@ -101,7 +101,7 @@ describe('FieldPage', () => {
     expect([...el.querySelectorAll('header a')].map((a) => a.textContent)).toEqual([]);
     expect(el.textContent).toContain('1/3 inspected');
 
-    button(el, '+ Building').click();
+    button(el, 'Building').click();
     await stable();
     button(el, 'Use my position').click();
     await stable();
@@ -125,7 +125,7 @@ describe('FieldPage', () => {
     await stable();
     expect(el.textContent).toContain('All synced');
     expect(el.textContent).toContain('2/4 inspected');
-    expect(el.textContent).toContain('5 assumptions open');
+    expect(el.textContent).toContain('5 assumptions');
     expect(el.textContent).not.toContain('Offline');
   });
 
@@ -139,7 +139,7 @@ describe('FieldPage', () => {
 
   it('places a transformer candidate where the map is tapped', async () => {
     const { fixture, el, stable, db } = await setup(false);
-    button(el, '+ Transformer').click();
+    button(el, 'Transformer').click();
     await stable();
     fixture.debugElement.query((d) => d.name === 'app-field-map').componentInstance.mapTap.emit([28.106, -25.516]);
     await stable();

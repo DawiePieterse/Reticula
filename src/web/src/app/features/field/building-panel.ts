@@ -63,7 +63,7 @@ const STATUS_LABEL: Record<string, string> = {
             </button>
           }
         </div>
-        <button type="button" (click)="act('not_present')" [disabled]="busy() || b.props.status === 'notpresent'">Not present</button>
+        <button type="button" class="big" (click)="act('not_present')" [disabled]="busy() || b.props.status === 'notpresent'">Not present</button>
       </div>
 
       <label>Notes (saved with the next action)
@@ -99,19 +99,20 @@ const STATUS_LABEL: Record<string, string> = {
   styles: `
     header { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
     h3 { margin: 0; }
-    .badge { font-size: .85rem; padding: .15rem .6rem; border-radius: 999px; background: var(--warn-bg); }
+    .badge[data-status='predicted'] { background: var(--warn-bg); color: var(--warn); }
     .badge[data-status='confirmed'], .badge[data-status='new'] { background: var(--ok-bg); color: var(--ok); }
-    .badge[data-status='notpresent'] { background: var(--bg); color: var(--muted); }
+    .badge[data-status='notpresent'] { background: var(--fill); color: var(--muted); }
     .actions { display: flex; flex-direction: column; gap: .5rem; margin: .75rem 0; }
-    .big { min-height: 56px; font-size: 1.1rem; justify-content: center; text-transform: capitalize; }
-    .types { display: grid; grid-template-columns: repeat(4, 1fr); gap: .35rem; }
-    .types button { justify-content: center; text-transform: capitalize; }
-    .types button.on { outline: 3px solid var(--accent); }
+    .big { text-transform: capitalize; }
+    .types { display: grid; grid-template-columns: repeat(2, 1fr); gap: .5rem; }
+    .types button { text-transform: capitalize; }
+    .types button.on { background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
     .swatch { display: inline-block; width: .7rem; height: .7rem; border-radius: 2px; margin-right: .35rem; }
     label { display: flex; flex-direction: column; gap: .25rem; }
     textarea { font: inherit; border-radius: 6px; border: 1px solid var(--border); padding: .5rem; background: var(--surface); color: var(--text); }
     .row { display: flex; align-items: center; gap: .75rem; margin-top: .5rem; flex-wrap: wrap; }
-    .gps { margin-left: auto; }
+    .gps { margin-left: auto; font-variant-numeric: tabular-nums; }
+    label { font-weight: 600; }
   `,
 })
 export class BuildingPanel {

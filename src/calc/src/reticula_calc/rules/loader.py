@@ -55,6 +55,15 @@ class Conductor:
     r_ac_ohm_per_km: float | None = None
     """AC resistance at r_ac_temp_c, where the source gives it."""
     r_ac_temp_c: float | None = None
+    c_nf_per_km: float | None = None
+    voltage_kv: float | None = None
+
+    def r_at(self, temp_c: float, coefficients: dict[str, float]) -> float:
+        """Resistance at a conductor temperature: the AC value where the source gives it, else DC corrected for temperature."""
+        if self.r_ac_ohm_per_km is not None:
+            return self.r_ac_ohm_per_km
+        coeff = float(coefficients.get(self.material or "cu", coefficients["cu"]))
+        return self.r_ohm_per_km * (1 + coeff * (temp_c - 20))
 
 
 @dataclass(frozen=True)
@@ -70,13 +79,24 @@ class RuleSet:
         return f"{self.authority}/{self.version}"
 
     def conductor(self, code: str) -> Conductor:
-        for c in self.data["conductors"]:
+        for c in (*self.data["conductors"], *self.data.get("mv_conductors", ())):
             if c["code"] == code:
                 return _conductor(c)
         raise RulesError(f"conductor {code!r} not in rules {self.ref}")
 
     def conductors(self) -> list[Conductor]:
+        """The LV library: feeders and services."""
         return [_conductor(c) for c in self.data["conductors"]]
+
+    def mv_conductors(self) -> list[Conductor]:
+        return [_conductor(c) for c in self.data.get("mv_conductors", ())]
+
+    def section(self, name: str, needs: str) -> dict[str, Any]:
+        """A rules section a calc cannot run without; `needs` names the first rules version that has it."""
+        sec = self.data.get(name)
+        if not sec:
+            raise RulesError(f"rules {self.ref} has no {name} section; this needs {needs} or later")
+        return sec
 
 
 def _conductor(c: dict[str, Any]) -> Conductor:
@@ -99,6 +119,8 @@ def _conductor(c: dict[str, Any]) -> Conductor:
         index=c.get("index", ""),
         r_ac_ohm_per_km=float(c["r_ac_ohm_per_km"]) if "r_ac_ohm_per_km" in c else None,
         r_ac_temp_c=float(c["r_ac_temp_c"]) if "r_ac_temp_c" in c else None,
+        c_nf_per_km=float(c["c_nf_per_km"]) if "c_nf_per_km" in c else None,
+        voltage_kv=float(c["voltage_kv"]) if "voltage_kv" in c else None,
     )
 
 

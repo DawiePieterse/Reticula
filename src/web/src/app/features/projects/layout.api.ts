@@ -1,17 +1,9 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { GeoJsonPolygon, Position } from './geo';
+import { GeoJsonLineString, GeoJsonPoint, GeoJsonPolygon } from './geo';
 
-export interface GeoJsonPoint {
-  type: 'Point';
-  coordinates: Position;
-}
-
-export interface GeoJsonLineString {
-  type: 'LineString';
-  coordinates: Position[];
-}
+export type { GeoJsonLineString, GeoJsonPoint };
 
 export type AnyGeometry = GeoJsonPolygon | GeoJsonPoint | GeoJsonLineString;
 
@@ -149,18 +141,6 @@ export interface NetworkProps {
 }
 
 export type Network = FeatureCollection<NetworkProps, GeoJsonPoint | GeoJsonLineString>;
-
-export const NETWORK_LABELS: Record<NetworkAssetType, string> = {
-  connection_point: 'Connection point', substation: 'Substation', minisub: 'Mini-sub', transformer: 'Transformer',
-  switchgear: 'Switchgear', pole: 'Pole', other: 'Other asset', mv_line: 'MV line', lv_line: 'LV line',
-  mv_cable: 'MV cable', lv_cable: 'LV cable', other_line: 'Other line',
-};
-
-/** Existing network colours: MV in red tones, LV in blue, as on authority drawings. */
-export const NETWORK_COLOURS: Record<NetworkAssetType, string> = {
-  connection_point: '#000000', substation: '#a40e26', minisub: '#cf222e', transformer: '#cf222e', switchgear: '#953800',
-  pole: '#57606a', other: '#8c959f', mv_line: '#cf222e', mv_cable: '#cf222e', lv_line: '#0969da', lv_cable: '#0969da', other_line: '#8c959f',
-};
 
 export const BUILDING_COLOURS: Record<string, string> = {
   house: '#1f6feb',

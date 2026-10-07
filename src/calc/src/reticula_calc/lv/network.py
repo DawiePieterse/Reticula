@@ -34,15 +34,16 @@ from shapely.geometry.base import BaseGeometry
 from shapely.ops import substring, transform
 
 from ..geo import crs as crs_mod
+from ..issues import Issue
+from ..issues import issue as _issue
 from ..rules import RulesError, RuleSet
 
 GEOD = Geod(ellps="WGS84")
 # Points closer than this are the same point; also the shortest piece of route kept.
 EPS_M = 0.05
-MAX_SAMPLES = 10
-SITE_LABELS = {"transformer": "TX", "minisub": "MS", "pole": "P"}
+SITE_LABELS = {"transformer": "TX", "minisub": "MS", "pole": "P", "connection_point": "CP"}
 
-NodeKind = Literal["source", "pole", "junction", "joint", "end"]
+NodeKind = Literal["source", "pole", "tap", "junction", "joint", "end"]
 BranchKind = Literal["route", "link"]
 
 
@@ -52,6 +53,8 @@ class CandidateIn(BaseModel):
     id: str
     kind: str
     geometry: dict[str, Any]
+    label: str | None = None
+    """A label to keep (TX3, K12); otherwise sites are numbered by kind in the order given."""
 
 
 class BuildRequest(BaseModel):
@@ -91,16 +94,6 @@ class Feeder(BaseModel):
     length_m: float
     ends: int
     farthest_m: float
-
-
-class Issue(BaseModel):
-    severity: Literal["error", "warning"]
-    code: str
-    message: str
-    count: int = 1
-    samples: list[str] = []
-    at: list[tuple[float, float]] = []
-    """Where to look, as lon/lat."""
 
 
 class Summary(BaseModel):
@@ -146,6 +139,10 @@ class Params:
     pole_reach_m: float
     sources: tuple[str, ...]
     clause: str
+    taps: tuple[str, ...] = ()
+    """Site kinds linked to a route like a source but fed by it: transformers on the MV network."""
+    tap_reach_m: float = 0.0
+    route_kind: str = "lv_route"
 
 
 def params(rules: RuleSet) -> Params:
@@ -243,25 +240,20 @@ class _Builder:
         return out
 
 
-def _route_lines(candidates: list[CandidateIn]) -> list[tuple[str, BaseGeometry]]:
-    return [(c.id, shape(c.geometry)) for c in candidates if c.kind == "lv_route"]
+def _route_lines(candidates: list[CandidateIn], kind: str = "lv_route") -> list[tuple[str, BaseGeometry]]:
+    return [(c.id, shape(c.geometry)) for c in candidates if c.kind == kind]
 
 
-def _issue(severity: Literal["error", "warning"], code: str, message: str, samples: list[str],
-           at: list[tuple[float, float]]) -> Issue:
-    return Issue(severity=severity, code=code, message=message, count=max(len(samples), len(at), 1),
-                 samples=samples[:MAX_SAMPLES], at=at[:MAX_SAMPLES])
-
-
-def build_network(req: BuildRequest, rules: RuleSet) -> LvNetwork:
-    p = params(rules)
+def build_network(req: BuildRequest, rules: RuleSet, p: Params | None = None) -> LvNetwork:
+    """Joins routes and sites into a network. `p` overrides the rules file's LV tolerances (the MV network uses its own)."""
+    p = p or params(rules)
     issues: list[Issue] = []
 
-    raw_routes = _route_lines(req.candidates)
-    sites = [(c, shape(c.geometry)) for c in req.candidates if c.kind in (*p.sources, "pole")]
+    raw_routes = _route_lines(req.candidates, p.route_kind)
+    sites = [(c, shape(c.geometry)) for c in req.candidates if c.kind in (*p.sources, *p.taps, "pole")]
     all_coords = [xy for _, g in raw_routes for xy in _coords(g)] + [xy for _, g in sites for xy in _coords(g)]
     if not all_coords:
-        return _empty(rules, p, [_issue("error", "no_routes", "No LV routes are marked. Mark them in the field.", [], [])])
+        return _empty(rules, p, [_issue("error", "no_routes", f"No {_what(p)} routes are marked. Mark them in the field.", [], [])])
 
     zone = crs_mod.nearest_lo(sum(x for x, _ in all_coords) / len(all_coords))
     fwd, inv = crs_mod.from_wgs84(zone), crs_mod.to_wgs84(zone)
@@ -284,9 +276,9 @@ def build_network(req: BuildRequest, rules: RuleSet) -> LvNetwork:
         refs.append(ref)
         lines.append(line)
     if bad:
-        issues.append(_issue("warning", "route_unusable", "Some LV routes are not lines with length and were left out.", bad, []))
+        issues.append(_issue("warning", "route_unusable", f"Some {_what(p)} routes are not lines with length and were left out.", bad, []))
     if not lines:
-        issues.append(_issue("error", "no_routes", "No LV routes are marked. Mark them in the field.", [], []))
+        issues.append(_issue("error", "no_routes", f"No {_what(p)} routes are marked. Mark them in the field.", [], []))
         return _empty(rules, p, issues)
 
     b = _Builder(p, lines)
@@ -299,18 +291,18 @@ def build_network(req: BuildRequest, rules: RuleSet) -> LvNetwork:
     labels: list[tuple[_Site, BaseGeometry]] = []
     for c, g in sites:
         counters[c.kind] += 1
-        labels.append((_Site(c.kind, f"{SITE_LABELS[c.kind]}{counters[c.kind]}", c.id), g))
-    unconnected, off_route, doubled = [], [], []
+        labels.append((_Site(c.kind, c.label or f"{SITE_LABELS[c.kind]}{counters[c.kind]}", c.id), g))
+    unconnected, untapped, off_route, doubled = [], [], [], []
     placed = 0
     # Sources first, so that a pole marked at a pole-mounted transformer becomes that transformer's pole.
     for site, g in sorted(labels, key=lambda t: t[0].kind == "pole"):
         if not isinstance(g, Point):
             continue
         pt = project(g)
-        reach = p.pole_reach_m if site.kind == "pole" else p.source_reach_m
+        reach = p.pole_reach_m if site.kind == "pole" else p.tap_reach_m if site.kind in p.taps else p.source_reach_m
         hit = _nearest(tree, pt, reach)
         if hit is None:
-            (off_route if site.kind == "pole" else unconnected).append((site.label, (g.x, g.y)))
+            (off_route if site.kind == "pole" else untapped if site.kind in p.taps else unconnected).append((site.label, (g.x, g.y)))
             continue
         r, d = hit
         tee = b.node_on(r, lines[r].project(pt))
@@ -329,6 +321,10 @@ def build_network(req: BuildRequest, rules: RuleSet) -> LvNetwork:
         src = b.new_node((pt.x, pt.y))
         b.sites[src] = site
         links.append(_Piece("link", src, tee, [(pt.x, pt.y), b.xy[b.find(tee)]], site.candidate_id))
+    if untapped:
+        issues.append(_issue("warning", "tap_unconnected",
+                             f"Transformers more than {p.tap_reach_m:g} m from any {_what(p)} route are not supplied.",
+                             [s for s, _ in untapped], [a for _, a in untapped]))
     if unconnected:
         issues.append(_issue("warning", "source_unconnected",
                              f"Sources more than {p.source_reach_m:g} m from any LV route feed nothing.",
@@ -340,11 +336,16 @@ def build_network(req: BuildRequest, rules: RuleSet) -> LvNetwork:
         issues.append(_issue("warning", "pole_doubled", "Pole sites fall on a node that already has a pole; only the first is kept.",
                              [s for s, _ in doubled], [a for _, a in doubled]))
 
-    if not any(s.kind != "pole" for s, _ in labels):
-        issues.append(_issue("error", "no_sources", "No transformer or mini-sub site is marked, so nothing feeds the LV routes.", [], []))
+    if not any(s.kind in p.sources for s, _ in labels):
+        what = "connection point" if "connection_point" in p.sources else "transformer or mini-sub site"
+        issues.append(_issue("error", "no_sources", f"No {what} is marked, so nothing feeds the {_what(p)} routes.", [], []))
     pieces = b.pieces(refs) + [_Piece(lk.kind, b.find(lk.a), b.find(lk.b), lk.coords, lk.candidate_id) for lk in links]
     return _assemble(rules, p, b, pieces, issues, lonlat, len(refs),
-                     sum(1 for s, _ in labels if s.kind != "pole"), sum(1 for s, _ in labels if s.kind == "pole"), placed)
+                     sum(1 for s, _ in labels if s.kind in p.sources), sum(1 for s, _ in labels if s.kind == "pole"), placed)
+
+
+def _what(p: Params) -> str:
+    return "MV" if p.route_kind == "mv_route" else "LV"
 
 
 def _coords(g: BaseGeometry) -> list[tuple[float, float]]:
@@ -365,23 +366,12 @@ def _join_ends(b: _Builder, tree: STRtree) -> None:
     """Route ends within the join distance become one node; a group of ends near another route tees onto it.
     Ends that come close to another route without joining it are noted in `b.near`."""
     ends = [(r, s, Point(line.coords[i])) for r, line in enumerate(b.lines) for i, s in ((0, 0.0), (-1, line.length))]
-    group = list(range(len(ends)))
-
-    def root(i: int) -> int:
-        while group[i] != i:
-            group[i] = group[group[i]]
-            i = group[i]
-        return i
-
     end_tree = STRtree([pt for _, _, pt in ends])
     a, c = end_tree.query([pt for _, _, pt in ends], predicate="dwithin", distance=b.p.join_m)
+    groups = nx.utils.UnionFind(range(len(ends)))
     for i, j in zip(a.tolist(), c.tolist(), strict=True):
-        ri, rj = root(i), root(j)
-        if ri != rj:
-            group[max(ri, rj)] = min(ri, rj)
-    members: dict[int, list[int]] = defaultdict(list)
-    for i in range(len(ends)):
-        members[root(i)].append(i)
+        groups.union(i, j)
+    members = {min(g): sorted(g) for g in groups.to_sets()}
 
     for first, idx in sorted(members.items()):
         rep = ends[first][2]
@@ -456,7 +446,7 @@ def _assemble(rules: RuleSet, p: Params, b: _Builder, pieces: list[_Piece], issu
     def site(n: int) -> _Site | None:
         return b.sites.get(n)
 
-    nodes = {n: Node(id=node_id[n], kind=_node_kind(site(n), g.degree(n)), coordinates=lonlat(b.xy[n]),
+    nodes = {n: Node(id=node_id[n], kind=_node_kind(site(n), g.degree(n), p), coordinates=lonlat(b.xy[n]),
                      label=site(n).label if site(n) else None, candidate_id=site(n).candidate_id if site(n) else None)
              for n in used}
 
@@ -478,7 +468,7 @@ def _assemble(rules: RuleSet, p: Params, b: _Builder, pieces: list[_Piece], issu
     loops: list[tuple[str, tuple[float, float]]] = []
     for comp in sorted(nx.connected_components(g), key=min):
         sub = g.subgraph(comp)
-        srcs = sorted(n for n in comp if site(n) and site(n).kind != "pole")
+        srcs = sorted(n for n in comp if site(n) and site(n).kind in p.sources)
         cyclomatic = sub.number_of_edges() - sub.number_of_nodes() + 1
         if cyclomatic > 0:
             tree_edges = {frozenset((u, v)) for u, v in nx.bfs_edges(nx.Graph(sub), min(comp))}
@@ -501,13 +491,13 @@ def _assemble(rules: RuleSet, p: Params, b: _Builder, pieces: list[_Piece], issu
             feeders += _orient(srcs[0], sub, pieces, branches, nodes, site(srcs[0]).label, node_id, b)
 
     if unfed:
-        issues.append(_issue("warning", "unfed", "Parts of the LV network have no transformer or mini-sub within reach.",
+        issues.append(_issue("warning", "unfed", f"Parts of the {_what(p)} network have no source within reach.",
                              [s for s, _ in unfed], [a for _, a in unfed]))
     if tied:
         issues.append(_issue("error", "sources_tied", "Sources are joined by LV routes. Mark where the open point goes.",
                              [s for s, _ in tied], [a for _, a in tied]))
     if loops:
-        issues.append(_issue("error", "loop", "The LV routes form a loop; the network must be radial. "
+        issues.append(_issue("error", "loop", f"The {_what(p)} routes form a loop; the network must be radial. "
                              "Break each loop at one of the branches listed.", [s for s, _ in loops], [a for _, a in loops]))
 
     ordered_nodes = [nodes[n] for n in used]
@@ -525,9 +515,9 @@ def _assemble(rules: RuleSet, p: Params, b: _Builder, pieces: list[_Piece], issu
     )
 
 
-def _node_kind(site: _Site | None, degree: int) -> NodeKind:
+def _node_kind(site: _Site | None, degree: int, p: Params) -> NodeKind:
     if site:
-        return "pole" if site.kind == "pole" else "source"
+        return "pole" if site.kind == "pole" else "tap" if site.kind in p.taps else "source"
     return "junction" if degree >= 3 else "joint" if degree == 2 else "end"
 
 

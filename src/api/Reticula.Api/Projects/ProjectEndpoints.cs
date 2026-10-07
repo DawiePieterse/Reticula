@@ -2,11 +2,12 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
-using Reticula.Infrastructure.Geo;
+using Reticula.Api.Infrastructure;
 using Reticula.Domain.Auth;
 using Reticula.Domain.Projects;
 using Reticula.Infrastructure.Calc;
 using Reticula.Infrastructure.Data;
+using Reticula.Infrastructure.Geo;
 
 namespace Reticula.Api.Projects;
 
@@ -45,7 +46,7 @@ public static class ProjectEndpoints
 
     private static async Task<Results<Ok<ProjectDto>, NotFound>> Get(Guid id, ReticulaDbContext db, CancellationToken ct)
     {
-        var p = await db.Projects.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id && x.ArchivedAt == null, ct);
+        var p = await db.Projects.ActiveAsync(id, ct);
         return p is null ? TypedResults.NotFound() : TypedResults.Ok(ProjectDto.From(p));
     }
 
@@ -55,7 +56,7 @@ public static class ProjectEndpoints
         var (area, errors) = await ValidateAsync(req, calc, ct);
         if (errors.Count > 0) return TypedResults.ValidationProblem(errors);
 
-        var userId = Guid.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var userId = user.UserId();
         var project = new Project(Guid.CreateVersion7(), req.Name.Trim(), req.RulesRef, area!, userId, time.GetUtcNow());
         db.Projects.Add(project);
         await db.SaveChangesAsync(ct);
@@ -65,7 +66,7 @@ public static class ProjectEndpoints
     private static async Task<Results<Ok<ProjectDto>, NotFound, ValidationProblem, Conflict<ProblemDetailsBody>>> Update(
         Guid id, SaveProjectRequest req, ReticulaDbContext db, ICalcClient calc, TimeProvider time, CancellationToken ct)
     {
-        var project = await db.Projects.FirstOrDefaultAsync(x => x.Id == id && x.ArchivedAt == null, ct);
+        var project = await db.Projects.ActiveForUpdateAsync(id, ct);
         if (project is null) return TypedResults.NotFound();
 
         var (area, errors) = await ValidateAsync(req, calc, ct);
@@ -87,7 +88,7 @@ public static class ProjectEndpoints
 
     private static async Task<Results<NoContent, NotFound>> Archive(Guid id, ReticulaDbContext db, TimeProvider time, CancellationToken ct)
     {
-        var project = await db.Projects.FirstOrDefaultAsync(x => x.Id == id && x.ArchivedAt == null, ct);
+        var project = await db.Projects.ActiveForUpdateAsync(id, ct);
         if (project is null) return TypedResults.NotFound();
         project.Archive(time.GetUtcNow());
         await db.SaveChangesAsync(ct);

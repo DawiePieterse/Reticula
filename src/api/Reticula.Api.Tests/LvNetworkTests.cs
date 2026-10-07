@@ -8,6 +8,7 @@ using Reticula.Api.Projects;
 using Reticula.Domain.Auth;
 using Reticula.Infrastructure.Calc;
 using Reticula.Infrastructure.Geo;
+using static Reticula.Api.Tests.TestFixtures;
 
 namespace Reticula.Api.Tests;
 
@@ -17,20 +18,12 @@ public class LvNetworkTests(ReticulaApiFactory factory)
 {
     private const double Lon = 28.10, Lat = -25.52;
 
-    private static PolygonDto Square(double lon, double lat, double d) =>
-        new("Polygon", [[[lon, lat], [lon + d, lat], [lon + d, lat + d], [lon, lat + d], [lon, lat]]]);
-
     private static GeometryInput Point(double dx = 0) => new("Point", JsonSerializer.SerializeToElement(new[] { Lon + dx, Lat }));
 
     private static GeometryInput Line(double dy = 0) =>
         new("LineString", JsonSerializer.SerializeToElement(new[] { new[] { Lon, Lat + dy }, new[] { Lon + 0.002, Lat + dy } }));
 
-    private async Task<(HttpClient Client, Guid ProjectId)> NewProjectAsync()
-    {
-        var client = await factory.EngineerClientAsync();
-        var r = await client.PostAsJsonAsync("/api/projects", new SaveProjectRequest($"LV {Guid.NewGuid():N}", "eskom/0.1.0", Square(28.09, -25.53, 0.03), null));
-        return (client, (await r.Content.ReadFromJsonAsync<ProjectDto>())!.Id);
-    }
+    private Task<(HttpClient Client, Guid ProjectId)> NewProjectAsync() => factory.NewProjectAsync("LV", Square(28.09, -25.53, 0.03));
 
     private static async Task<Guid> MarkAsync(HttpClient client, Guid projectId, string kind, GeometryInput geometry)
     {

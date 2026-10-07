@@ -8,10 +8,7 @@ namespace Reticula.Infrastructure.Calc;
 
 public sealed class CalcClient(HttpClient http) : ICalcClient
 {
-    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-    };
+    private static readonly JsonSerializerOptions Json = CalcJson.Options;
 
     public async Task<bool> IsHealthyAsync(CancellationToken ct = default)
     {
@@ -33,9 +30,8 @@ public sealed class CalcClient(HttpClient http) : ICalcClient
 
     public async Task<RulesInfo?> GetRulesInfoAsync(string rulesRef, CancellationToken ct = default)
     {
-        var parts = rulesRef.Split('/');
-        if (parts.Length != 2) return null;
-        using var r = await SendAsync($"/rules/{Uri.EscapeDataString(parts[0])}/{Uri.EscapeDataString(parts[1])}", ct);
+        if (RulesPath(rulesRef) is not { } path) return null;
+        using var r = await SendAsync(path, ct);
         if (r.StatusCode == HttpStatusCode.NotFound) return null;
         if (!r.IsSuccessStatusCode) throw new CalcUnavailableException($"Calc service returned {(int)r.StatusCode} for rules {rulesRef}.");
         return await r.Content.ReadFromJsonAsync<RulesInfo>(Json, ct);
@@ -57,77 +53,65 @@ public sealed class CalcClient(HttpClient http) : ICalcClient
 
     public async Task<CalcImportResult> ImportOsmAsync(string kind, string areaGeoJson, CancellationToken ct = default)
     {
-        using var content = JsonContent.Create(new { kind, area = JsonDocument.Parse(areaGeoJson).RootElement }, options: Json);
-        using var r = await SendAsync(() => http.PostAsync("/geo/osm", content, ct), ct);
-        return await ReadAsync<CalcImportResult>(r, ct);
+        return await PostAsync<CalcImportResult>("/geo/osm", new { kind, area = JsonDocument.Parse(areaGeoJson).RootElement }, ct);
     }
 
     public async Task<PredictionResult> PredictBuildingTypesAsync(string rulesRef, IReadOnlyList<BuildingPredictionInput> buildings, CancellationToken ct = default)
     {
-        using var content = JsonContent.Create(new { rules = rulesRef, buildings }, options: Json);
-        using var r = await SendAsync(() => http.PostAsync("/predict/building-types", content, ct), ct);
-        return await ReadAsync<PredictionResult>(r, ct);
+        return await PostAsync<PredictionResult>("/predict/building-types", new { rules = rulesRef, buildings }, ct);
     }
 
     public async Task<JsonElement> GetAdmdFormAsync(string rulesRef, CancellationToken ct = default)
     {
-        var parts = rulesRef.Split('/');
-        using var r = await SendAsync($"/calc/admd/form/{Uri.EscapeDataString(parts[0])}/{Uri.EscapeDataString(parts.ElementAtOrDefault(1) ?? "")}", ct);
+        var path = RulesPath(rulesRef) ?? throw new CalcRejectedException($"Rules reference '{rulesRef}' is not authority/version.");
+        using var r = await SendAsync($"/calc/admd/form{path["/rules".Length..]}", ct);
         return await ReadAsync<JsonElement>(r, ct);
     }
 
     public async Task<AdmdEstimate> EstimateAdmdAsync(AdmdEstimateRequest request, CancellationToken ct = default)
     {
-        using var content = JsonContent.Create(request, options: Json);
-        using var r = await SendAsync(() => http.PostAsync("/calc/admd/estimate", content, ct), ct);
-        var raw = await ReadAsync<JsonElement>(r, ct);
+        var raw = await PostAsync<JsonElement>("/calc/admd/estimate", request, ct);
         var typed = raw.Deserialize<AdmdEstimate>(Json) ?? throw new CalcUnavailableException("Calc service returned an empty body.");
         return typed with { Raw = raw.GetRawText() };
     }
 
     public async Task<AdmdGroup> GroupAdmdAsync(string rulesRef, IReadOnlyList<AdmdGroupLoad> loads, CancellationToken ct = default)
     {
-        using var content = JsonContent.Create(new { rules = rulesRef, loads }, options: Json);
-        using var r = await SendAsync(() => http.PostAsync("/calc/admd/group", content, ct), ct);
-        return await ReadAsync<AdmdGroup>(r, ct);
+        return await PostAsync<AdmdGroup>("/calc/admd/group", new { rules = rulesRef, loads }, ct);
     }
 
     public async Task<CalcLvNetwork> BuildLvNetworkAsync(string rulesRef, IReadOnlyList<LvCandidate> candidates, CancellationToken ct = default)
     {
-        using var content = JsonContent.Create(new { rules = rulesRef, candidates }, options: Json);
-        using var r = await SendAsync(() => http.PostAsync("/calc/lv/network", content, ct), ct);
-        return await ReadAsync<CalcLvNetwork>(r, ct);
+        return await PostAsync<CalcLvNetwork>("/calc/lv/network", new { rules = rulesRef, candidates }, ct);
     }
 
     public async Task<CalcLvLoads> AllocateLvLoadsAsync(string rulesRef, CalcLvNetwork network, IReadOnlyList<LvLoadIn> loads, CancellationToken ct = default)
     {
-        using var content = JsonContent.Create(new { rules = rulesRef, network, loads }, options: Json);
-        using var r = await SendAsync(() => http.PostAsync("/calc/lv/loads", content, ct), ct);
-        return await ReadAsync<CalcLvLoads>(r, ct);
+        return await PostAsync<CalcLvLoads>("/calc/lv/loads", new { rules = rulesRef, network, loads }, ct);
     }
 
     public async Task<CalcConductorLibrary?> GetConductorsAsync(string rulesRef, CancellationToken ct = default)
     {
-        var parts = rulesRef.Split('/');
-        if (parts.Length != 2) return null;
-        using var r = await SendAsync($"/rules/{Uri.EscapeDataString(parts[0])}/{Uri.EscapeDataString(parts[1])}/conductors", ct);
+        if (RulesPath(rulesRef) is not { } path) return null;
+        using var r = await SendAsync($"{path}/conductors", ct);
         if (r.StatusCode == HttpStatusCode.NotFound) return null;
         return await ReadAsync<CalcConductorLibrary>(r, ct);
     }
 
     public async Task<CalcLvAnalysis> AnalyseLvAsync(string rulesRef, CalcLvNetwork network, IReadOnlyList<LvLoadAt> loads, CancellationToken ct = default)
     {
-        using var content = JsonContent.Create(new { rules = rulesRef, network, loads }, options: Json);
-        using var r = await SendAsync(() => http.PostAsync("/calc/lv/analyse", content, ct), ct);
-        return await ReadAsync<CalcLvAnalysis>(r, ct);
+        return await PostAsync<CalcLvAnalysis>("/calc/lv/analyse", new { rules = rulesRef, network, loads }, ct);
     }
+
+    public async Task<CalcPlacement> PlaceLvAsync(string rulesRef, IReadOnlyList<PlacementRoad> roads, IReadOnlyList<PlacementLoad> loads, double[]? connectionPoint,
+        CancellationToken ct = default) =>
+        await PostAsync<CalcPlacement>("/calc/lv/placement", new { rules = rulesRef, roads, loads, connection_point = connectionPoint }, ct);
 
     public async Task<MapExtract> ExtractMapAsync(double minLon, double minLat, double maxLon, double maxLat, CancellationToken ct = default)
     {
         using var content = JsonContent.Create(new { bbox = new[] { minLon, minLat, maxLon, maxLat } }, options: Json);
         using var r = await SendAsync(() => http.PostAsync("/maps/extract", content, ct), ct);
-        if (r.StatusCode is HttpStatusCode.UnprocessableEntity) throw new CalcRejectedException(await DetailAsync(r, ct));
-        if (!r.IsSuccessStatusCode) throw new CalcUnavailableException($"Calc service returned {(int)r.StatusCode}.");
+        await EnsureAcceptedAsync(r, ct);
         static string Header(HttpResponseMessage r, string name) => r.Headers.TryGetValues(name, out var v) ? v.First() : "";
         return new MapExtract(
             await r.Content.ReadAsByteArrayAsync(ct),
@@ -136,12 +120,66 @@ public sealed class CalcClient(HttpClient http) : ICalcClient
             Header(r, "X-Map-Source"));
     }
 
-    private static async Task<T> ReadAsync<T>(HttpResponseMessage r, CancellationToken ct)
+    public Task<string> RunDesignAsync(string requestJson, CancellationToken ct = default) => PostRawAsync("/calc/design/run", requestJson, ct);
+
+    public Task<string> OptimiseDesignAsync(string requestJson, CancellationToken ct = default) => PostRawAsync("/calc/design/optimise", requestJson, ct);
+
+    public async Task<string> GetDefaultRatesAsync(CancellationToken ct = default)
+    {
+        using var r = await SendAsync("/rates/default", ct);
+        await EnsureAcceptedAsync(r, ct);
+        return await r.Content.ReadAsStringAsync(ct);
+    }
+
+    public Task<CalcFile> RenderDocumentAsync(string kind, string bodyJson, CancellationToken ct = default) =>
+        PostFileAsync($"/calc/documents/{Uri.EscapeDataString(kind)}", bodyJson, ct);
+
+    public Task<CalcFile> PackDocumentsAsync(string bodyJson, CancellationToken ct = default) => PostFileAsync("/calc/documents/pack", bodyJson, ct);
+
+    private async Task<string> PostRawAsync(string path, string json, CancellationToken ct)
+    {
+        using var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+        using var r = await SendAsync(() => http.PostAsync(path, content, ct), ct);
+        await EnsureAcceptedAsync(r, ct);
+        return await r.Content.ReadAsStringAsync(ct);
+    }
+
+    private async Task<CalcFile> PostFileAsync(string path, string json, CancellationToken ct)
+    {
+        using var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+        using var r = await SendAsync(() => http.PostAsync(path, content, ct), ct);
+        if (r.StatusCode == HttpStatusCode.NotFound) throw new CalcRejectedException($"The calc service cannot render '{path}'.");
+        await EnsureAcceptedAsync(r, ct);
+        var name = r.Content.Headers.ContentDisposition?.FileNameStar ?? r.Content.Headers.ContentDisposition?.FileName?.Trim('"') ?? "document";
+        return new CalcFile(await r.Content.ReadAsByteArrayAsync(ct), r.Content.Headers.ContentType?.MediaType ?? "application/octet-stream", name);
+    }
+
+    /// <summary>"/rules/{authority}/{version}" for an authority/version reference, or null when the reference is malformed.</summary>
+    private static string? RulesPath(string rulesRef)
+    {
+        var parts = rulesRef.Split('/');
+        return parts.Length == 2 ? $"/rules/{Uri.EscapeDataString(parts[0])}/{Uri.EscapeDataString(parts[1])}" : null;
+    }
+
+    private async Task<T> PostAsync<T>(string path, object body, CancellationToken ct)
+    {
+        using var content = JsonContent.Create(body, options: Json);
+        using var r = await SendAsync(() => http.PostAsync(path, content, ct), ct);
+        return await ReadAsync<T>(r, ct);
+    }
+
+    /// <summary>A 422 or 413 is the calc service rejecting the request; any other failure means it is unavailable.</summary>
+    private static async Task EnsureAcceptedAsync(HttpResponseMessage r, CancellationToken ct)
     {
         if (r.StatusCode is HttpStatusCode.UnprocessableEntity or HttpStatusCode.RequestEntityTooLarge)
             throw new CalcRejectedException(await DetailAsync(r, ct));
         if (!r.IsSuccessStatusCode)
             throw new CalcUnavailableException($"Calc service returned {(int)r.StatusCode}.");
+    }
+
+    private static async Task<T> ReadAsync<T>(HttpResponseMessage r, CancellationToken ct)
+    {
+        await EnsureAcceptedAsync(r, ct);
         return await r.Content.ReadFromJsonAsync<T>(Json, ct) ?? throw new CalcUnavailableException("Calc service returned an empty body.");
     }
 
@@ -178,8 +216,8 @@ public static class CalcServiceCollectionExtensions
         services.AddHttpClient<ICalcClient, CalcClient>(c =>
         {
             c.BaseAddress = new Uri(baseUrl);
-            // Imports of large layouts can take a while; health checks pass their own short token.
-            c.Timeout = TimeSpan.FromSeconds(120);
+            // Imports of large layouts and design optimisation take a while; health checks pass their own short token.
+            c.Timeout = TimeSpan.FromSeconds(config.GetValue("Calc:TimeoutSeconds", 900));
         });
         return services;
     }

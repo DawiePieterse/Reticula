@@ -50,6 +50,31 @@ public interface ICalcClient
     /// <exception cref="CalcRejectedException">The rules file has no lv_design section.</exception>
     Task<CalcLvAnalysis> AnalyseLvAsync(string rulesRef, CalcLvNetwork network, IReadOnlyList<LvLoadAt> loads, CancellationToken ct = default);
 
+    /// <summary>Pre-design (ADR 0010): proposes transformer sites, the loads each feeds, LV routes along roads and an MV route.</summary>
+    /// <exception cref="CalcRejectedException">The rules file has no mv_design section.</exception>
+    Task<CalcPlacement> PlaceLvAsync(string rulesRef, IReadOnlyList<PlacementRoad> roads, IReadOnlyList<PlacementLoad> loads, double[]? connectionPoint,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// The whole design (plans 2.5 to 5.1) from a design request in the calc service's JSON; returns the Design as the calc service's JSON.
+    /// The API keeps it as given and never recomputes from it.
+    /// </summary>
+    /// <exception cref="CalcRejectedException">The request is invalid or the rules file lacks a section the design needs.</exception>
+    Task<string> RunDesignAsync(string requestJson, CancellationToken ct = default);
+
+    /// <summary>Three options by local search and siting (plans 5.2 to 5.4), each a full design with the request that gives it.</summary>
+    Task<string> OptimiseDesignAsync(string requestJson, CancellationToken ct = default);
+
+    /// <summary>The calc service's indicative rate library, as JSON.</summary>
+    Task<string> GetDefaultRatesAsync(CancellationToken ct = default);
+
+    /// <summary>One design document (Phase 6) from {meta, design, rows?, totals?, sections?}.</summary>
+    /// <exception cref="CalcRejectedException">Unknown kind, or the body does not fit it.</exception>
+    Task<CalcFile> RenderDocumentAsync(string kind, string bodyJson, CancellationToken ct = default);
+
+    /// <summary>The submission pack (plan 6.6) from {meta, design, files}.</summary>
+    Task<CalcFile> PackDocumentsAsync(string bodyJson, CancellationToken ct = default);
+
     Task<AdmdGroup> GroupAdmdAsync(string rulesRef, IReadOnlyList<AdmdGroupLoad> loads, CancellationToken ct = default);
 }
 

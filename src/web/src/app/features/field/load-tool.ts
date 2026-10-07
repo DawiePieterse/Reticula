@@ -3,7 +3,7 @@ import { Component, WritableSignal, computed, effect, inject, input, output, sig
 import { FormsModule } from '@angular/forms';
 import { AdmdForm, AdmdFormField } from './field.api';
 import { FieldSync, stored } from './sync/field-sync.service';
-import { FieldLoad, loadKey } from './sync/outbox';
+import { FieldLoad, loadKey, pretty } from './sync/outbox';
 
 const SPECIAL_FOR_TYPE: Record<string, string> = { school: 'school', shop: 'shop', other: 'other' };
 
@@ -108,8 +108,8 @@ const SPECIAL_FOR_TYPE: Record<string, string> = { school: 'school', shop: 'shop
     label { display: flex; flex-direction: column; gap: .25rem; margin-bottom: .6rem; }
     label.inline { flex-direction: row; align-items: center; gap: .5rem; }
     label.inline input { min-height: auto; }
-    .seg { display: flex; gap: .25rem; margin-bottom: .75rem; }
-    .seg button.on, .chip.on { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+    .seg { display: flex; margin-bottom: .75rem; }
+    .seg button { flex: 1; }
     .chips { border: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .4rem; margin: 0 0 .6rem; }
     .chips legend { margin-bottom: .3rem; }
     .chip { flex-direction: row; align-items: center; border: 1px solid var(--border); border-radius: 999px; padding: .4rem .8rem; min-height: 44px; margin: 0; }
@@ -191,9 +191,7 @@ export class LoadTool {
     return ` · ${r(c.income_min_zar)}–${r(c.income_max_zar)}/month`;
   }
 
-  protected pretty(s: string): string {
-    return s.replace(/_/g, ' ');
-  }
+  protected readonly pretty = pretty;
 
   protected value(key: string): unknown {
     return this.observations()[key] ?? '';

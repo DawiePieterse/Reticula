@@ -92,89 +92,91 @@ Deliverables: running skeleton, auth, project CRUD, map, CI.
 
 Deliverables: predicted building types, tablet inspection, income/ADMD tool, load schedule; all offline-capable.
 
-- [~] 1.1 Importers: CAD (DXF) and KML stand layouts; contours (DXF/SHP/GeoTIFF); OSM building/road extract for area; authority network data (CSV/SHP/GeoJSON with required fields). (Done: stands, buildings, roads, contours and existing network from KML/KMZ/GeoJSON/DXF/zipped shapefile/CSV, with required-field checks; buildings and roads fetched live from OpenStreetMap; see docs/imports.md. To do: contours from a GeoTIFF elevation model.)
+- [x] 1.1 Importers: CAD (DXF) and KML stand layouts; contours (DXF/SHP/GeoTIFF); OSM building/road extract for area; authority network data (CSV/SHP/GeoJSON with required fields). (Done: stands, buildings, roads, contours and existing network from KML/KMZ/GeoJSON/DXF/zipped shapefile/CSV, with required-field checks; buildings and roads fetched live from OpenStreetMap; GeoTIFF elevation models traced to contours at a specified interval; see docs/imports.md.)
 - [x] 1.2 Import validation: CRS detection, duplicate stands, missing erf numbers flagged early.
-- [~] 1.3 Building-type predictor: rules on OSM tags, zoning, footprint area; rooftop-image classifier behind licence flag; output type + confidence + source. (Done: tags, zoning, footprint from the rules file. To do: rooftop images, pending licence.)
+- [!] 1.3 Building-type predictor: rules on OSM tags, zoning, footprint area; rooftop-image classifier behind licence flag; output type + confidence + source and load class per zone and type. (Done: tags, zoning, footprint from the rules file; load class prediction per zone and building type from rules mapping. Blocked: rooftop images, pending the imagery licence (open item).)
 - [x] 1.4 Inspection UI (tablet): map-first, one-tap confirm, type picker (house/shop/school/other/not present/new), photo capture, notes, GPS, timestamp. (docs/field.md)
 - [x] 1.5 Candidate marking: transformer, mini-sub, MV route, pole site, LV route.
 - [x] 1.6 Progress panel: confirmed / outstanding / low-confidence-first list.
 - [x] 1.7 Income and ADMD tool: observable inputs → income band → category → ADMD (per NRS 034-1 tables in rules file); group after-diversity demand; special loads at own kVA; override with reason. (eskom/0.2.0: NRS 034 and SANS 507-1 load classes and Herman-Beta group demand; see docs/load-data.md. Score thresholds still a heuristic; SANS 507 C8 unverified.)
 - [x] 1.8 Offline: IndexedDB store, cached rules tables, photo queue, sync engine with conflict detection and side-by-side resolution UI (never auto-overwrite). (ADR 0004; docs/field.md. Loads saved offline get their kVA from the calc service on sync.)
 - [x] 1.9 Offline map tiles: PMTiles pack per project area, download/refresh. (ADR 0005; docs/field.md, docs/operations.md. Needs a map source configured on the server.)
-- [~] 1.10 Load schedule view and export (CSV/Excel). (Done: view and CSV. To do: Excel with the documents in Phase 6.)
+- [x] 1.10 Load schedule view and export (CSV/Excel). (View and CSV on the loads page; Excel as the load schedule document of Phase 6, with the calc service's diversified totals.)
 - [x] 1.11 Assumptions register v1: every estimate and override auto-registered.
-- [~] 1.12 Validation: ADMD hand-worked cases from NRS 034-1 examples in `/test-cases`. (Done: hand-worked ADMD and Herman-Beta cases, and a self-check of every load class against its α, β and c. Herman-Beta mixing and empirical diversity checked against ReticMaster 21's worked results; see docs/load-data.md. To do: compare with NRS 034-1 worked examples.)
+- [!] 1.12 Validation: ADMD hand-worked cases from NRS 034-1 examples in `/test-cases`. (Done: hand-worked ADMD and Herman-Beta cases, and a self-check of every load class against its α, β and c. Herman-Beta mixing and empirical diversity checked against ReticMaster 21's worked results; see docs/load-data.md. Blocked: NRS 034-1 is not held, so its worked examples cannot be compared.)
 
 ### Phase 2 – LV design
 
 Deliverables: LV layout, phasing, conductor sizing, voltage drop, fault level, OH and UG checks.
 
+- [x] 2.0 Pre-design placement: propose transformer sites, the loads each feeds, LV routes along roads and an MV route from the loads, roads and connection point, before the field visit; the field verifies exceptions. (ADR 0010; `POST /calc/lv/placement`, eskom/0.8.1 `mv_design` and `lv_design`, values placeholders. Calc step with Herman-Beta capacity, road-graph reach and cost trace; API job `lv.placement` storing every proposed site and route as a candidate with `source: proposed`, replacing only the previous proposal; reach is min(rules reach, reach derived from the voltage drop limit). On the tablet proposals are drawn faded with Confirm here, Move to my position and Not here. The design run builds feeders from the routes, and every proposal not yet confirmed is flagged not inspected (2.8).)
+
 - [x] 2.1 Network model in Python (networkx graph + shapely geometry), serialisation to/from Postgres. (ADR 0006: marked LV routes and sites joined within the rules file's `lv_network` tolerances from eskom/0.3.0; radial check, feeders and distances; stored in PostGIS per project, flagged out of date when the marked routes or the rules change. Rules values stay placeholders until the Eskom standards are identified.)
 - [x] 2.2 Load allocation to candidate LV routes; phase balancing (3-phase/1-phase per rules). (ADR 0007: services from LV poles through service distribution boxes, 2 boxes a pole, 4 loads a box, second box on another phase; boxes phased per feeder from the far end; eskom/0.4.0. The 40 m service reach and 15 kVA three-phase limit are placeholders. Overhead only: underground kiosks per Eskom 240-56030637 §3.10 e) still to model.)
-- [~] 2.3 Conductor/cable library from rules file (SANS 1507 LV cables, ABC/bare OH conductors) with ratings. (ADR 0008, eskom/0.5.0: underground Cu and Al cables with ratings in ground, pipe and air and short-circuit constants from Eskom 240-56030637 Rev 2. Single-phase ABC 16–150 mm² (CBi) and three-phase ABC 25–150 mm² (M-TEC) from SANS 1418 manufacturer data sheets; three-phase ABC ratings to confirm. To do: underground impedances from 240-56063805, and the Eskom ABC specification 240-84758170.)
-- [~] 2.4 Voltage drop calc (NRS 048-2 limits), thermal loading, LV fault level at ends. (ADR 0009, eskom/0.6.0: Herman-Beta per-phase drop at every node and service connection, section currents against conductor ratings, phase-to-neutral fault current at every point; per-feeder results on the project page and drop colours on the map. To do: limits from Eskom 240-70465489, a sized transformer (Phase 3), a minimum end fault current from LV protection, and a ReticMaster whole-feeder validation case.)
-- [ ] 2.5 Overhead checks: span, sag/tension, clearances, pole class, stays.
-- [ ] 2.6 Underground checks: derating for soil thermal resistivity, depth, grouping.
-- [ ] 2.7 OH vs UG side-by-side where both allowed: cost + voltage.
-- [ ] 2.8 "Not inspected" flagging for any element outside marked sites/routes.
-- [ ] 2.9 LV results UI: map overlay, per-segment table, check pass/fail with clause refs.
-- [ ] 2.10 Validation: hand-worked LV feeder cases (voltage drop, derating, sag).
+- [!] 2.3 Conductor/cable library from rules file (SANS 1507 LV cables, ABC/bare OH conductors) with ratings. (ADR 0008, eskom/0.5.0: underground Cu and Al cables with ratings in ground, pipe and air and short-circuit constants from Eskom 240-56030637 Rev 2. Single-phase ABC 16–150 mm² (CBi) and three-phase ABC 25–150 mm² (M-TEC) from SANS 1418 manufacturer data sheets. Blocked: underground impedances need 240-56063805, three-phase ABC ratings need the Eskom ABC specification 240-84758170; neither is held.)
+- [!] 2.4 Voltage drop calc (NRS 048-2 limits), thermal loading, LV fault level at ends. (ADR 0009, eskom/0.6.0: Herman-Beta per-phase drop at every node and service connection, section currents against conductor ratings, phase-to-neutral fault current at every point, from the sized transformer of 3.1; per-feeder results and drop colours on the map. The end fault current check runs once `lv_design.min_end_fault_a` is set. Blocked: the drop limits need Eskom 240-70465489, the minimum end fault current needs the LV protection settings, and a whole-feeder ReticMaster comparison needs a ReticMaster run of the same feeder.)
+- [x] 2.5 Overhead checks: span, sag/tension, clearances, pole class, stays. (design/overhead.py, eskom/0.8.0: poles at the maximum span, sag and tension by the ruling span with ground clearance at mid-span, pole class from the tip load, stays at angles and ends, for LV and MV lines; hand-worked case oh_span/case-1. Every value a placeholder until ESKOM-OHL is held.)
+- [x] 2.6 Underground checks: derating for soil thermal resistivity, depth, grouping. (design/underground.py: ratings from 240-56030637 Rev 2 de-rated for resistivity, depth, ground temperature and grouping, kiosks per 240-56030637 §3.10 e); hand-worked case ug_derate/case-1. The factor tables are placeholders until SANS 10198-4 and the 240-56030637 annex are held.)
+- [x] 2.7 OH vs UG side-by-side where both allowed: cost + voltage. (Construction `compare` designs both and picks by the objective; the comparison rows show capital and lifetime cost, worst drop, transformers and spare capacity, flagged too close to call when the cost ranges overlap.)
+- [x] 2.8 "Not inspected" flagging for any element outside marked sites/routes, including every `proposed` candidate the field has not confirmed (ADR 0010). (Each is a failing `not_inspected` check, listed on every document's stamp; the design is not fit to submit until the field confirms it.)
+- [x] 2.9 LV results UI: map overlay, per-segment table, check pass/fail with clause refs. (Design page: the network on the map with the Eskom drawing-practice symbols and drop colours; feeders, sections, transformers and every check with its clause and formula id.)
+- [x] 2.10 Validation: hand-worked LV feeder cases (voltage drop, derating, sag). (lv_drop/case-1, ug_derate/case-1, oh_span/case-1, voltage_drop/case-1, lv_reach/case-1.)
 
 ### Phase 3 – MV network
 
-- [ ] 3.1 Transformer placement from candidates; sizing to SANS 780/1019 standard ratings with growth allowance.
-- [ ] 3.2 Mini-sub vs pole-mount selection per rules.
-- [ ] 3.3 MV routing along candidate routes; MV cable/conductor library (SANS 97, OH).
-- [ ] 3.4 MV loading and voltage checks; transformer tap setting.
-- [ ] 3.5 MV results UI and checks table.
-- [ ] 3.6 Validation: hand-worked transformer sizing and MV voltage cases.
+- [x] 3.1 Transformer sizing from the confirmed sites (placed in 2.0) to SANS 780/1019 standard ratings with growth allowance; mini-sub selection per rules. (design/transformers.py: Herman-Beta demand of the loads each feeds, growth allowance, the smallest standard rating that carries it, spare capacity; the engineer may fix a rating. Ratings, impedances and losses are placeholders until 240-56062752 and SANS 780 are held.)
+- [x] 3.2 Mini-sub vs pole-mount selection per rules. (Pole-mounted for overhead; a mini-sub for underground where the rules file says so, with its own rating series.)
+- [x] 3.3 MV routing along candidate routes; MV cable/conductor library (SANS 97, OH). (mv/network.py: the marked MV routes joined from the connection point, each transformer tapped within the tap reach; eskom/0.8.0 ACSR, AAAC and 11 kV XLPE cables with typical values, placeholders until SANS 182, SANS 1418 and SANS 97 are held.)
+- [x] 3.4 MV loading and voltage checks; transformer tap setting. (MV drop to every tap, section loading against rating, regulation and the off-load tap that keeps LV within the band.)
+- [x] 3.5 MV results UI and checks table. (Design page: MV sections with conductor and loading, taps with drop and tap setting, the MV line on the map in its drawing-practice style.)
+- [x] 3.6 Validation: hand-worked transformer sizing and MV voltage cases. (design/case-1: demand, rating, spare, MV drop, regulation, tap, LV voltage at full load.)
 
 ### Phase 4 – Bulk supply
 
-- [ ] 4.1 Authority connection point input form; hard stop if capacity or fault level missing.
-- [ ] 4.2 pandapower model builder from network model.
-- [ ] 4.3 Load flow (balanced; unbalanced LV later via OpenDSS).
-- [ ] 4.4 IEC 60909 fault studies (3-ph, 1-ph) at all buses.
-- [ ] 4.5 Supply sizing and bulk feeder selection.
-- [ ] 4.6 Validation: pandapower results vs hand-worked IEC 60909 example; vs authority's accepted method sample.
+- [x] 4.1 Authority connection point input form; hard stop if capacity or fault level missing. (Design page form with the source and date of the authority's values; without capacity and fault level the studies stop and the design is not fit to submit.)
+- [x] 4.2 pandapower model builder from network model. (bulk.py: external grid from the fault level and X/R, MV and LV lines, transformers with impedance, losses and tap, loads spread over the LV nodes.)
+- [x] 4.3 Load flow (balanced; unbalanced LV later via OpenDSS). (Balanced Newton-Raphson; bus voltages against the band at design demand. Unbalanced LV is the later OpenDSS feature.)
+- [x] 4.4 IEC 60909 fault studies (3-ph, 1-ph) at all buses. (pandapower's IEC 60909 module: three-phase at the maximum case, single-phase at the minimum; conductor withstand K·A/√t and the MV switchgear rating checked.)
+- [x] 4.5 Supply sizing and bulk feeder selection. (Notified maximum demand from the Herman-Beta demand of every consumer with growth, the smallest supply step, within the connection point's capacity; MV conductor sized to carry it.)
+- [!] 4.6 Validation: pandapower results vs hand-worked IEC 60909 example; vs authority's accepted method sample. (Done: design/case-1 checks the pandapower fault current at LV against a hand-worked IEC 60909-0 calculation. Blocked: no accepted-method sample from the authority is held.)
 
 ### Phase 5 – Optimisation and comparison
 
-- [ ] 5.1 Cost model: material library, assemblies, estimated dated rates, losses cost, lifetime NPV (period, discount rate, energy cost, growth).
-- [ ] 5.2 Objective runners: lowest capex, lowest lifetime cost, most spare capacity under ceiling.
-- [ ] 5.3 Heuristic engine: constructive placement + local search (move transformer, re-route, re-size, re-phase, OH/UG flip); every candidate re-checked against all rules.
-- [ ] 5.4 Compare view: three options side by side; "too close to call" flag using rate uncertainty band.
-- [ ] 5.5 Run parameter UI and run history.
-- [ ] 5.6 Validation: small benchmark networks with known optimum.
+- [x] 5.1 Cost model: material library, assemblies, estimated dated rates, losses cost, lifetime NPV (period, discount rate, energy cost, growth). (cost.py and rates/: assemblies of rate items, low and high totals from each item's uncertainty, I²R and transformer losses, lifetime cost. The indicative library is a placeholder; every cost from it says estimate.)
+- [x] 5.2 Objective runners: lowest capex, lowest lifetime cost, most spare capacity under ceiling.
+- [x] 5.3 Heuristic engine: local search from the 2.0 placement (move transformer, re-route, re-size, re-phase, OH/UG flip); every candidate re-checked against all rules. MILP per cluster (scipy HiGHS) where a proven optimum is wanted. (ADR 0011, design/optimise.py: every neighbour is a full design run; options ranked by soundness, then failed checks, then the objective; siting by capacitated facility location, one site per connected LV network within MV tap reach. Re-routing is limited to the marked and proposed routes; re-phasing is the load allocation's balancing in every evaluation.)
+- [x] 5.4 Compare view: three options side by side; "too close to call" flag using rate uncertainty band. (Adopting an option makes it the project's design without recomputing it.)
+- [x] 5.5 Run parameter UI and run history. (Run form for construction, MV line, objective and the optimisation; the runs table with each run's mode, result, capital cost and stale reason, and the compare view to adopt an option.)
+- [x] 5.6 Validation: small benchmark networks with known optimum. (The siting MILP against brute-force enumeration on random problems, two clusters that need two sites, and one network that may only have one; and a regression that no option is less sound than the marked design.)
 
 ### Phase 6 – Documents
 
-- [ ] 6.1 Material library and rate list management UI; supplier price-list import; override with date.
-- [ ] 6.2 DXF drawings (ezdxf): layers, symbols, title block, sheet layouts per authority template; DWG conversion if required.
-- [ ] 6.3 Design report PDF: calcs, assumptions, clause refs, traceability tables, versions footer.
-- [ ] 6.4 BoQ: PDF + Excel, indicative costs marked "estimate".
-- [ ] 6.5 GIS exports: KML, GeoJSON, Shapefile.
-- [ ] 6.6 Submission pack: drawing register, document register, authority checklist, zipped.
-- [ ] 6.7 One-step "Generate all" job; stale-document detection on any upstream change.
-- [ ] 6.8 Every document stamped with rules version, rate date, design date, revision.
+- [x] 6.1 Material library and rate list management UI; supplier price-list import; override with date. (Rates page: CSV import with name, date and source; the engineer's own rate per item with its date and source.)
+- [!] 6.2 DXF drawings (ezdxf): layers, symbols, title block, sheet layouts per authority template; DWG conversion if required. (ADR 0012. Done: DXF with the Eskom 240-87658920 layers, colours, line styles and Annex B symbols, an A1 sheet with legend, title block and stamp. Blocked: authority title-block templates are not held, so the title block is Reticula's own; ElecCell.cel and ElecLines.rsc are not held; DWG needs the ODA File Converter licence and the authorities that require it (open item).)
+- [x] 6.3 Design report PDF: calcs, assumptions, clause refs, traceability tables, versions footer. (Summary, the engineer's approved report sections, every network part, bulk supply, cost, Appendix A checks and Appendix B traceability with every formula id; the stamp in the footer of every page.)
+- [x] 6.4 BoQ: PDF + Excel, indicative costs marked "estimate". (A sheet per network part and a summary; low and high totals.)
+- [x] 6.5 GIS exports: KML, GeoJSON, Shapefile.
+- [x] 6.6 Submission pack: drawing register, document register, authority checklist, zipped. (The checklist reads the design's checks by category. No authority's own checklist is held, so its items are Reticula's.)
+- [x] 6.7 One-step "Generate all" job; stale-document detection on any upstream change. (Job `documents.generate`; a document is stale when a newer run replaced its design or the inputs changed; earlier sets are superseded, never deleted.)
+- [x] 6.8 Every document stamped with rules version, rate date, design date, revision. (And the inputs hash, and NOT FIT TO SUBMIT with its reasons, or the sign-off.)
 
 ### Phase 7 – Review and sign-off
 
-- [ ] 7.1 Assumptions register v2: full listing, confirm/clear workflow, blocks sign-off until empty.
-- [ ] 7.2 Revision snapshot and numbering; reproduce-run from a revision.
-- [ ] 7.3 Sign-off: engineer only, registration number captured, document set locked.
-- [ ] 7.4 Audit trail: who changed what, when, before/after.
-- [ ] 7.5 Open-format export of whole project (GeoJSON + JSON + files).
-- [ ] 7.6 Release gate: all `/test-cases` pass before tagging a release.
+- [x] 7.1 Assumptions register v2: full listing, confirm/clear workflow, blocks sign-off until empty. (Placeholder rules values become assumptions per run, cleared when no longer used, reopened when they return.)
+- [x] 7.2 Revision snapshot and numbering; reproduce-run from a revision. (ADR 0013: a revision passes reproduction only when the stored request gives the same result hash; a difference names where.)
+- [x] 7.3 Sign-off: engineer only, registration number captured, document set locked. (Blocked until every check holds: ECSA number on the account (set on the Users page), fit to submit, no open assumption, inputs unchanged, reproduced, documents generated. Signing regenerates the documents with the sign-off and locks them. In practice no revision can be signed while the rules carry placeholders.)
+- [x] 7.4 Audit trail: who changed what, when, before/after. (An EF Core interceptor writes an audit entry in the same save; derived and bulk-imported records are audited by their import or run.)
+- [x] 7.5 Open-format export of whole project (GeoJSON + JSON + files).
+- [x] 7.6 Release gate: all `/test-cases` pass before tagging a release. (.github/workflows/release.yml on `v*` tags: the whole of CI, then each release gate item as a named step, then the GitHub release. Every step passes locally; it has not yet run on a tag.)
 
 ### Phase 8 – Design assistant
 
-- [ ] 8.1 Tool gateway: expose existing endpoints as Claude tools with strict schemas; no calculation tool exists outside the Python service.
-- [ ] 8.2 Run setup: assistant drafts run parameters, user confirms.
-- [ ] 8.3 Option explanation from traceability records only.
-- [ ] 8.4 Report text drafting into editable sections; engineer edits and approves.
-- [ ] 8.5 Feature flag + graceful absence; full test suite passes with flag off.
-- [ ] 8.6 Prompt-injection and data-boundary tests (assistant cannot alter authority inputs or sign off).
+- [x] 8.1 Tool gateway: expose existing endpoints as Claude tools with strict schemas; no calculation tool exists outside the Python service. (ADR 0014: read tools over the stored project and design; strict input schemas with no additional properties.)
+- [x] 8.2 Run setup: assistant drafts run parameters, user confirms. (`propose_run_parameters`, checked by the same option rules as a design run; nothing runs until the engineer accepts.)
+- [x] 8.3 Option explanation from traceability records only. (`get_traces` and `get_option_comparison`; the system prompt forbids any number without a record.)
+- [x] 8.4 Report text drafting into editable sections; engineer edits and approves. (`draft_report_section`; an accepted draft becomes a draft report section that the engineer edits and approves.)
+- [x] 8.5 Feature flag + graceful absence; full test suite passes with flag off. (Off by default; the release gate runs the API suite with it off.)
+- [x] 8.6 Prompt-injection and data-boundary tests (assistant cannot alter authority inputs or sign off).
 
 ---
 
@@ -204,28 +206,29 @@ F. **Performance targets.** Field UI usable on mid-range Android tablet; 2,000-s
 ## 8. Master checklist
 
 ### Setup
-- [ ] Decisions A–I confirmed by engineer
-- [ ] Open items resolved or explicitly deferred
+- [ ] Decisions A–I confirmed by engineer (needs the engineer)
+- [ ] Open items resolved or explicitly deferred (needs the engineer; section 7)
 - [x] Standards clause index drafted (clauses still to confirm by the engineer)
 - [x] Phase 0 complete
 
 ### Build
-- [ ] Phase 1 Field capture – usable offline on tablet
-- [ ] Phase 2 LV design – checks pass on validation cases
-- [ ] Phase 3 MV network – checks pass on validation cases
-- [ ] Phase 4 Bulk supply – load flow and IEC 60909 validated
-- [ ] Phase 5 Optimisation – three options + compare view
-- [ ] Phase 6 Documents – one-step full document set
-- [ ] Phase 7 Review and sign-off – revision, audit, export
-- [ ] Phase 8 Design assistant – flagged, optional, tested
+- [x] Phase 1 Field capture – usable offline on tablet (1.3 rooftop images and the 1.12 NRS 034-1 comparison blocked)
+- [x] Phase 2 LV design – checks pass on validation cases (rules values placeholders; 2.3 and 2.4 remainders blocked on documents not held)
+- [x] Phase 3 MV network – checks pass on validation cases
+- [~] Phase 4 Bulk supply – load flow and IEC 60909 validated (against a hand-worked case; the authority's accepted-method sample is not held)
+- [x] Phase 5 Optimisation – three options + compare view
+- [x] Phase 6 Documents – one-step full document set (DXF; DWG and authority title blocks blocked)
+- [x] Phase 7 Review and sign-off – revision, audit, export
+- [x] Phase 8 Design assistant – flagged, optional, tested
 
 ### Release gate (every release)
-- [ ] All hand-worked test cases pass
-- [ ] Full suite passes with assistant disabled
-- [ ] Offline sync regression passes
-- [ ] Every document carries rules version, rate date, design date
-- [ ] Backup and restore tested
-- [ ] Reproduce a prior revision bit-for-bit
+Automated by `.github/workflows/release.yml` (plan 7.6). Ticked items passed locally on 2026-10-07; the workflow has not yet run on a tag.
+- [x] All hand-worked test cases pass
+- [x] Full suite passes with assistant disabled
+- [x] Offline sync regression passes
+- [x] Every document carries rules version, rate date, design date
+- [x] Backup and restore tested
+- [x] Reproduce a prior revision bit-for-bit
 
 ### Later features (post v1, in order)
 - [ ] Protection and earthing

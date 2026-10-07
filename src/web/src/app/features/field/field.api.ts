@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
+import { SymbolName } from '../../shared/symbols';
 import { Position as LonLat } from '../projects/geo';
 import { FeatureCollection, GeoJsonLineString, GeoJsonPoint } from '../projects/layout.api';
 
@@ -46,6 +47,8 @@ export interface NewBuildingRequest {
 }
 
 export type CandidateKind = 'transformer' | 'minisub' | 'pole' | 'mv_route' | 'lv_route';
+/** field: marked on the tablet; proposed: placed by the pre-design (ADR 0010), not yet inspected. */
+export type CandidateSource = 'field' | 'proposed';
 export const SITE_KINDS: CandidateKind[] = ['transformer', 'minisub', 'pole'];
 export const ROUTE_KINDS: CandidateKind[] = ['mv_route', 'lv_route'];
 export const CANDIDATE_LABELS: Record<CandidateKind, string> = {
@@ -55,12 +58,13 @@ export const CANDIDATE_LABELS: Record<CandidateKind, string> = {
   mv_route: 'MV route',
   lv_route: 'LV route',
 };
-export const CANDIDATE_COLOURS: Record<CandidateKind, string> = {
-  transformer: '#cf222e',
-  minisub: '#8250df',
-  pole: '#6e7781',
-  mv_route: '#cf222e',
-  lv_route: '#1f6feb',
+/** The drawing symbol for each kind (shared/symbols): field poles are LV service poles. */
+export const CANDIDATE_SYMBOLS: Record<CandidateKind, SymbolName> = {
+  transformer: 'transformer',
+  minisub: 'minisub',
+  pole: 'pole_lv',
+  mv_route: 'mv_line',
+  lv_route: 'lv_line',
 };
 
 export interface CandidateProps {
@@ -68,6 +72,7 @@ export interface CandidateProps {
   notes: string | null;
   createdAt: string;
   version: number;
+  source: CandidateSource;
 }
 
 export type CandidateGeometry = GeoJsonPoint | GeoJsonLineString;

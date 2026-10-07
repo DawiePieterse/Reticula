@@ -17,13 +17,22 @@ public static class CandidateKinds
     public static bool IsRoute(string kind) => Routes.Contains(kind);
 }
 
+/// <summary>Where a candidate came from: marked in the field, or proposed by the pre-design placement (ADR 0010).</summary>
+public static class CandidateSources
+{
+    public const string Field = "field";
+    public const string Proposed = "proposed";
+}
+
 /// <summary>A site or route the inspector marked as possible for the design. Sites are points, routes are lines.</summary>
 public sealed class Candidate
 {
     private Candidate() { } // EF
 
-    public Candidate(Guid id, Guid projectId, string kind, Geometry geometry, string? notes, Guid createdBy, DateTimeOffset now)
+    public Candidate(Guid id, Guid projectId, string kind, Geometry geometry, string? notes, Guid createdBy, DateTimeOffset now,
+        string source = CandidateSources.Field)
     {
+        Source = source;
         Id = id;
         ProjectId = projectId;
         Kind = kind;
@@ -39,16 +48,19 @@ public sealed class Candidate
     public string Kind { get; private set; } = "";
     public Geometry Geometry { get; private set; } = null!;
     public string? Notes { get; private set; }
+    public string Source { get; private set; } = CandidateSources.Field;
     public Guid CreatedBy { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
     public DateTimeOffset? ArchivedAt { get; private set; }
     public uint Version { get; private set; }
 
+    /// <summary>A change from the field. A proposed candidate that the inspector confirms or moves becomes a field candidate: it has been seen.</summary>
     public void Update(Geometry geometry, string? notes, DateTimeOffset now)
     {
         Geometry = geometry;
         Notes = notes;
+        Source = CandidateSources.Field;
         UpdatedAt = now;
     }
 

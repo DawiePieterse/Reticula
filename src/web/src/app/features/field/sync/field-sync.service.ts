@@ -183,8 +183,7 @@ export class FieldSync implements OnDestroy {
     return projects
       .map((p) => ({
         ...p,
-        queued: ops.filter((o) => o.projectId === p.projectId && o.state === 'pending').length,
-        needsDecision: ops.filter((o) => o.projectId === p.projectId && o.state !== 'pending').length,
+        ...countOps(ops.filter((o) => o.projectId === p.projectId)),
       }))
       .sort((a, b) => a.projectName.localeCompare(b.projectName));
   }
@@ -499,9 +498,9 @@ export class FieldSync implements OnDestroy {
   private async recount(): Promise<void> {
     if (!this.auth.user()) return;
     try {
-      const ops = await this.db().ops();
-      this.queued.set(ops.filter((o) => o.state === 'pending').length);
-      this.needsDecision.set(ops.filter((o) => o.state !== 'pending').length);
+      const { queued, needsDecision } = countOps(await this.db().ops());
+      this.queued.set(queued);
+      this.needsDecision.set(needsDecision);
     } catch {
       // Counts are informative.
     }
@@ -549,4 +548,10 @@ export function stored(e: unknown): string {
 
 function now(): string {
   return new Date().toISOString();
+}
+
+/** How many changes are still to send, and how many wait for a decision or a retry. */
+function countOps(ops: readonly OutboxOp[]): { queued: number; needsDecision: number } {
+  const queued = ops.filter((o) => o.state === 'pending').length;
+  return { queued, needsDecision: ops.length - queued };
 }

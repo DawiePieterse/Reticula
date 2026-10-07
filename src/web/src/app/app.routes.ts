@@ -3,7 +3,10 @@ import { authGuard, engineerGuard, onlineGuard } from './core/auth/guards';
 
 export const routes: Routes = [
   { path: 'login', loadComponent: () => import('./features/auth/login').then((m) => m.Login) },
-  { path: 'offline', loadComponent: () => import('./features/offline/offline').then((m) => m.Offline) },
+  {
+    path: 'offline',
+    loadComponent: () => import('./features/offline/offline').then((m) => m.Offline),
+  },
   {
     path: '',
     canActivate: [authGuard],
@@ -34,7 +37,25 @@ export const routes: Routes = [
         canActivate: [onlineGuard],
         loadComponent: () => import('./features/field/loads-page').then((m) => m.LoadsPage),
       },
-      { path: 'system', loadComponent: () => import('./features/system/system-status').then((m) => m.SystemStatus) },
+      {
+        path: 'projects/:id/design',
+        canActivate: [onlineGuard],
+        loadComponent: () => import('./features/design/design-page').then((m) => m.DesignPage),
+      },
+      {
+        path: 'rates',
+        canActivate: [engineerGuard, onlineGuard],
+        loadComponent: () => import('./features/design/rates-page').then((m) => m.RatesPage),
+      },
+      {
+        path: 'users',
+        canActivate: [engineerGuard, onlineGuard],
+        loadComponent: () => import('./features/auth/users-page').then((m) => m.UsersPage),
+      },
+      {
+        path: 'system',
+        loadComponent: () => import('./features/system/system-status').then((m) => m.SystemStatus),
+      },
     ],
   },
   { path: '**', redirectTo: '' },

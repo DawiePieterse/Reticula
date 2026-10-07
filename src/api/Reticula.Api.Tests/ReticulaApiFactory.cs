@@ -1,12 +1,16 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Authentication.BearerToken;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
+using Microsoft.Extensions.Configuration;
+using Reticula.Infrastructure.Assistant;
 using Reticula.Infrastructure.Calc;
 using Reticula.Infrastructure.Jobs;
 
@@ -30,6 +34,28 @@ public sealed class ReticulaApiFactory : WebApplicationFactory<Program>, IAsyncL
     private string ConnectionString => new NpgsqlConnectionStringBuilder(BaseConnection) { Database = _dbName }.ConnectionString;
 
     public FakeCalc Calc { get; } = new();
+    public ScriptedModel Model { get; } = new();
+
+    /// <summary>Turns the design assistant on until disposed; the suite otherwise runs with it off (plan 8.5).</summary>
+    public IDisposable EnableAssistant(int maxTurns = 6)
+    {
+        var config = Services.GetRequiredService<IConfiguration>();
+        config["Assistant:Enabled"] = "true";
+        config["Assistant:ApiKey"] = "test-key-never-sent-in-a-message";
+        config["Assistant:MaxTurns"] = maxTurns.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return new Reset(() =>
+        {
+            config["Assistant:Enabled"] = "false";
+            config["Assistant:ApiKey"] = "";
+            config["Assistant:MaxTurns"] = "6";
+            Model.Clear();
+        });
+    }
+
+    private sealed class Reset(Action undo) : IDisposable
+    {
+        public void Dispose() => undo();
+    }
     public JobGate Gate { get; } = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -45,6 +71,7 @@ public sealed class ReticulaApiFactory : WebApplicationFactory<Program>, IAsyncL
         builder.ConfigureServices(s =>
         {
             s.Replace(ServiceDescriptor.Singleton<ICalcClient>(Calc));
+            s.Replace(ServiceDescriptor.Singleton<IAssistantModel>(Model));
             s.AddSingleton(Gate);
             s.AddJobHandler<GatedJob>();
             s.AddJobHandler<FailingJob>();
@@ -175,6 +202,21 @@ public sealed class FakeCalc : ICalcClient
 
     public double[]? LastExtractBox { get; private set; }
 
+    /// <summary>Set by a test to decide what the pre-design placement proposes.</summary>
+    public Func<IReadOnlyList<PlacementRoad>, IReadOnlyList<PlacementLoad>, double[]?, CalcPlacement> OnPlace { get; set; } =
+        (roads, loads, cp) => new CalcPlacement("eskom/0.7.0", "0123456789abcdef", "test", [], [], [], [], [],
+            JsonDocument.Parse("{}").RootElement, null, [], []);
+
+    public (IReadOnlyList<PlacementRoad> Roads, IReadOnlyList<PlacementLoad> Loads, double[]? ConnectionPoint)? LastPlacement { get; private set; }
+
+    public Task<CalcPlacement> PlaceLvAsync(string rulesRef, IReadOnlyList<PlacementRoad> roads, IReadOnlyList<PlacementLoad> loads, double[]? connectionPoint,
+        CancellationToken ct = default)
+    {
+        Throw();
+        LastPlacement = (roads, loads, connectionPoint);
+        return Task.FromResult(OnPlace(roads, loads, connectionPoint));
+    }
+
     public Task<MapExtract> ExtractMapAsync(double minLon, double minLat, double maxLon, double maxLat, CancellationToken ct = default)
     {
         Throw();
@@ -288,9 +330,189 @@ public sealed class FakeCalc : ICalcClient
         ]));
     }
 
+    // ---------- design runs, rates and documents ----------
+
+    /// <summary>What the fake design says about fitness; a test sets it to make a design fit to submit.</summary>
+    public bool DesignFit { get; set; }
+
+    public List<string> DesignPlaceholders { get; } = ["lv_design.max_drop_pct: PLACEHOLDER value 5"];
+
+    public List<string> DesignRequests { get; } = [];
+    public List<string> OptimiseRequests { get; } = [];
+    public Dictionary<string, string> DocumentBodies { get; } = [];
+    public string? LastPackBody { get; private set; }
+
+    /// <summary>Set by a test to change the design the fake returns (to make a reproduction differ).</summary>
+    public Func<JsonObject, JsonObject>? OnDesign { get; set; }
+
+    public Task<string> RunDesignAsync(string requestJson, CancellationToken ct = default)
+    {
+        Throw();
+        lock (DesignRequests) DesignRequests.Add(requestJson);
+        return Task.FromResult(FakeDesign(JsonNode.Parse(requestJson)!.AsObject(), 0).ToJsonString());
+    }
+
+    public Task<string> OptimiseDesignAsync(string requestJson, CancellationToken ct = default)
+    {
+        Throw();
+        lock (OptimiseRequests) OptimiseRequests.Add(requestJson);
+        var req = JsonNode.Parse(requestJson)!.AsObject();
+        var design = req["design"]!.AsObject();
+        var objectives = req["options"]?["objectives"]?.AsArray().Select(o => o!.GetValue<string>()).ToList() ?? ["capex", "lifetime", "spare"];
+        var options = new JsonArray();
+        var rows = new JsonArray();
+        foreach (var (o, i) in objectives.Select((o, i) => (o, i)))
+        {
+            var request = (JsonObject)design.DeepClone();
+            request["options"]!["transformer_ratings"] = new JsonObject { ["TX1"] = 100.0 + 50 * i };
+            var d = FakeDesign(request, i);
+            options.Add(new JsonObject
+            {
+                ["objective"] = o, ["value"] = d["cost"]!["capex"]!.GetValue<double>(), ["design"] = d, ["request"] = request,
+                ["moves"] = new JsonArray(new JsonObject { ["kind"] = "transformer_rating", ["target"] = "TX1", ["detail"] = $"{100 + 50 * i} kVA" }),
+                ["start"] = "engineer",
+            });
+            rows.Add(new JsonObject
+            {
+                ["objective"] = o, ["construction"] = "overhead", ["capex"] = d["cost"]!["capex"]!.DeepClone(), ["failures"] = 0, ["moves"] = 1,
+                ["too_close"] = new JsonArray(), ["same_as"] = new JsonArray(),
+            });
+        }
+        return Task.FromResult(new JsonObject
+        {
+            ["rules_ref"] = design["rules"]!.DeepClone(), ["rules_hash"] = "0123456789abcdef", ["inputs_hash"] = "fedcba9876543210",
+            ["options"] = options, ["comparison"] = rows, ["siting"] = null, ["evaluations"] = 3 * objectives.Count, ["issues"] = new JsonArray(),
+        }.ToJsonString());
+    }
+
+    /// <summary>A Design with what the API reads off it: summary, cost, checks, placeholders, uninspected candidates, bulk stop.</summary>
+    private JsonObject FakeDesign(JsonObject req, int variant)
+    {
+        var loads = req["loads"]!.AsArray().Count;
+        var construction = req["options"]?["construction"]?.GetValue<string>() is "underground" ? "underground" : "overhead";
+        var cp = req["connection_point"] as JsonObject;
+        var stopped = cp?["capacity_kva"] is null || cp["fault_3ph_ka"] is null ? "No connection point capacity and fault level from the authority." : null;
+        var proposed = req["candidates"]!.AsArray().OfType<JsonObject>().Where(c => c["source"]?.GetValue<string>() == "proposed")
+            .Select(c => (JsonNode)new JsonObject { ["candidate_id"] = c["id"]!.DeepClone(), ["kind"] = c["kind"]!.DeepClone(), ["label"] = null, ["elements"] = new JsonArray() })
+            .ToList();
+        var capex = 10000.0 + 1000 * loads + 500 * variant;
+        var rates = req["rates"] as JsonObject;
+        var d = new JsonObject
+        {
+            ["rules_ref"] = req["rules"]!.DeepClone(), ["rules_hash"] = "0123456789abcdef", ["inputs_hash"] = "fedcba9876543210",
+            ["construction"] = construction, ["lv"] = new JsonObject(),
+            ["transformers"] = new JsonObject
+            {
+                ["transformers"] = new JsonArray(new JsonObject
+                {
+                    ["id"] = "TX1", ["rating_kva"] = 100.0,
+                    ["trace"] = new JsonObject
+                    {
+                        ["value"] = 100.0, ["unit"] = "kVA", ["formula_id"] = "tx.size.v1", ["formula"] = "S_r = min{r : r >= S_d (1 + g)}",
+                        ["clause"] = "test transformer clause", ["rules_hash"] = "0123456789abcdef", ["inputs"] = new JsonArray(),
+                    },
+                }),
+            },
+            ["bulk"] = new JsonObject { ["stopped"] = stopped },
+            ["cost"] = new JsonObject
+            {
+                ["capex"] = capex, ["lifetime"] = capex * 1.5, ["library"] = rates?["name"]?.DeepClone(), ["rate_date"] = rates?["rate_date"]?.DeepClone(),
+                ["indicative"] = rates?["indicative"]?.DeepClone() ?? true,
+            },
+            ["comparison"] = new JsonArray(),
+            ["checks"] = new JsonArray(new JsonObject
+            {
+                ["id"] = "lv_drop:N1", ["category"] = "lv_drop", ["element"] = "N1", ["value"] = 4.2, ["limit"] = 5.0, ["unit"] = "%", ["passes"] = true,
+                ["clause"] = "test clause",
+            }),
+            ["not_inspected"] = new JsonArray([.. proposed]),
+            ["issues"] = new JsonArray(),
+            ["placeholders"] = new JsonArray([.. DesignPlaceholders.Select(p => (JsonNode)p)]),
+            ["fit_to_submit"] = DesignFit && DesignPlaceholders.Count == 0 && stopped is null && proposed.Count == 0,
+            ["summary"] = new JsonObject
+            {
+                ["construction"] = construction, ["loads"] = loads, ["connected"] = loads, ["transformers"] = 1, ["transformer_kva"] = 100.0, ["poles"] = 0,
+                ["stays"] = 0, ["kiosks"] = 0, ["lv_km"] = 0.1, ["mv_km"] = 0.2, ["worst_lv_drop_pct"] = 4.2, ["worst_mv_drop_pct"] = 0.5, ["nmd_kva"] = 50.0,
+                ["capex"] = capex, ["lifetime"] = capex * 1.5, ["spare_pct"] = 20.0, ["checks"] = 1, ["failures"] = 0,
+            },
+        };
+        return OnDesign?.Invoke(d) ?? d;
+    }
+
+    public Task<string> GetDefaultRatesAsync(CancellationToken ct = default)
+    {
+        Throw();
+        return Task.FromResult("""
+            {"name":"indicative","rate_date":"2026-01-01","source":"Reticula placeholder rates","currency":"ZAR","indicative":true,
+             "items":[{"code":"M-ABC-70","description":"LV ABC 70 mm²","unit":"m","rate":120.0,"category":"material","rate_date":"2026-01-01","source":"placeholder","uncertainty_pct":30},
+                      {"code":"M-POLE-9","description":"Wood pole 9 m","unit":"each","rate":2500.0,"category":"material","rate_date":"2026-01-01","source":"placeholder","uncertainty_pct":30},
+                      {"code":"L-TEAM-DAY","description":"Construction team","unit":"day","rate":8000.0,"category":"labour","rate_date":"2026-01-01","source":"placeholder","uncertainty_pct":30}],
+             "assemblies":[{"code":"A-LV-OH","description":"LV overhead line","unit":"m","components":[{"item":"M-ABC-70","qty":1.0}]}]}
+            """);
+    }
+
+    public Task<CalcFile> RenderDocumentAsync(string kind, string bodyJson, CancellationToken ct = default)
+    {
+        Throw();
+        lock (DocumentBodies) DocumentBodies[kind] = bodyJson;
+        var rev = JsonNode.Parse(bodyJson)!["meta"]!["revision_number"]!.GetValue<int>();
+        var ext = kind switch { "drawing_dxf" => "dxf", "report_pdf" or "boq_pdf" => "pdf", "boq_xlsx" or "load_schedule_xlsx" => "xlsx", "geojson" => "geojson",
+            "kml" => "kml", _ => "zip" };
+        return Task.FromResult(new CalcFile(Encoding.UTF8.GetBytes($"FAKE {kind} R{rev}"), "application/octet-stream", $"test_{kind}_R{rev}.{ext}"));
+    }
+
+    public Task<CalcFile> PackDocumentsAsync(string bodyJson, CancellationToken ct = default)
+    {
+        Throw();
+        LastPackBody = bodyJson;
+        var rev = JsonNode.Parse(bodyJson)!["meta"]!["revision_number"]!.GetValue<int>();
+        return Task.FromResult(new CalcFile(Encoding.UTF8.GetBytes($"FAKE pack R{rev}"), "application/zip", $"test_submission-pack_R{rev}.zip"));
+    }
+
     private void Throw()
     {
         if (Unreachable) throw new CalcUnavailableException("Calc service unreachable.");
+    }
+}
+
+/// <summary>A model that answers from a script, one reply per call, and keeps every request it was sent.</summary>
+public sealed class ScriptedModel : IAssistantModel
+{
+    private readonly Queue<JsonObject> _replies = new();
+    public List<JsonObject> Requests { get; } = [];
+
+    public ScriptedModel Text(string text) => Enqueue(new JsonObject
+    {
+        ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = text }), ["stop_reason"] = "end_turn",
+    });
+
+    public ScriptedModel Tool(string name, object input, string? text = null)
+    {
+        var content = new JsonArray();
+        if (text is not null) content.Add(new JsonObject { ["type"] = "text", ["text"] = text });
+        content.Add(new JsonObject
+        {
+            ["type"] = "tool_use", ["id"] = $"toolu_{Guid.NewGuid():N}", ["name"] = name, ["input"] = JsonSerializer.SerializeToNode(input),
+        });
+        return Enqueue(new JsonObject { ["content"] = content, ["stop_reason"] = "tool_use" });
+    }
+
+    private ScriptedModel Enqueue(JsonObject reply)
+    {
+        lock (_replies) _replies.Enqueue(reply);
+        return this;
+    }
+
+    public void Clear()
+    {
+        lock (_replies) _replies.Clear();
+        Requests.Clear();
+    }
+
+    public Task<JsonObject> CreateMessageAsync(JsonObject request, CancellationToken ct)
+    {
+        Requests.Add((JsonObject)request.DeepClone());
+        lock (_replies) return Task.FromResult(_replies.Count > 0 ? _replies.Dequeue() : JsonNode.Parse("""{"content":[{"type":"text","text":"(script ended)"}],"stop_reason":"end_turn"}""")!.AsObject());
     }
 }
 

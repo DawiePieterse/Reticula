@@ -19,7 +19,7 @@ public sealed class MapPackJob(ReticulaDbContext db, ICalcClient calc, IFileStor
 
     public async Task<object?> RunAsync(JobContext context, CancellationToken ct)
     {
-        var project = await db.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.Id == context.ProjectId && p.ArchivedAt == null, ct)
+        var project = (context.ProjectId is { } projectId ? await db.Projects.ActiveAsync(projectId, ct) : null)
                       ?? throw new InvalidOperationException("The project no longer exists.");
         var box = project.Area.EnvelopeInternal.Copy();
         box.ExpandBy(MarginDeg);

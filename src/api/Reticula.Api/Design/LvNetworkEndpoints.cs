@@ -2,12 +2,14 @@ using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using Reticula.Api.Infrastructure;
 using Reticula.Domain.Auth;
 using Reticula.Domain.Design;
 using Reticula.Domain.Projects;
 using Reticula.Infrastructure.Calc;
 using Reticula.Infrastructure.Data;
 using Reticula.Infrastructure.Design;
+using Reticula.Infrastructure.Geo;
 
 namespace Reticula.Api.Design;
 
@@ -47,7 +49,7 @@ public static class LvNetworkEndpoints
     /// <summary>The conductor library of the project's rules file (plan 2.3), with each conductor's placeholder values marked.</summary>
     private static async Task<Results<Ok<CalcConductorLibrary>, NotFound>> Conductors(Guid projectId, ReticulaDbContext db, ICalcClient calc, CancellationToken ct)
     {
-        var project = await db.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.Id == projectId && p.ArchivedAt == null, ct);
+        var project = await db.Projects.ActiveAsync(projectId, ct);
         if (project is null) return TypedResults.NotFound();
         var library = await calc.GetConductorsAsync(project.RulesRef, ct);
         return library is null ? TypedResults.NotFound() : TypedResults.Ok(library);
@@ -55,7 +57,7 @@ public static class LvNetworkEndpoints
 
     private static async Task<Results<Ok<LvNetworkStatus>, NotFound>> Get(Guid projectId, ReticulaDbContext db, LvNetworkService service, CancellationToken ct)
     {
-        var project = await db.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.Id == projectId && p.ArchivedAt == null, ct);
+        var project = await db.Projects.ActiveAsync(projectId, ct);
         if (project is null) return TypedResults.NotFound();
         var network = await db.LvNetworks.AsNoTracking().FirstOrDefaultAsync(n => n.ProjectId == projectId, ct);
         return TypedResults.Ok(new LvNetworkStatus(network is null ? null : await ToDtoAsync(db, service, project, network, ct)));
@@ -65,12 +67,12 @@ public static class LvNetworkEndpoints
     private static async Task<Results<Ok<LvNetworkDto>, NotFound, ValidationProblem>> Build(
         Guid projectId, ReticulaDbContext db, LvNetworkService service, ClaimsPrincipal user, CancellationToken ct)
     {
-        var project = await db.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.Id == projectId && p.ArchivedAt == null, ct);
+        var project = await db.Projects.ActiveAsync(projectId, ct);
         if (project is null) return TypedResults.NotFound();
         LvNetwork network;
         try
         {
-            network = await service.BuildAsync(project, Guid.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!), ct);
+            network = await service.BuildAsync(project, user.UserId(), ct);
         }
         catch (CalcRejectedException e)
         {
@@ -90,7 +92,7 @@ public static class LvNetworkEndpoints
             JsonSerializer.Deserialize<List<LvFeeder>>(n.FeedersJson, json) ?? [],
             JsonSerializer.Deserialize<List<LvIssue>>(n.IssuesJson, json) ?? [],
             [.. nodes.Select(x => new LvNodeDto(x.Key, x.Kind, [x.Geometry.X, x.Geometry.Y], x.Label, x.CandidateId, x.Feeder, x.DistanceM))],
-            [.. branches.Select(x => new LvBranchDto(x.Key, x.Kind, x.FromKey, x.ToKey, [.. x.Geometry.Coordinates.Select(c => new[] { c.X, c.Y })],
+            [.. branches.Select(x => new LvBranchDto(x.Key, x.Kind, x.FromKey, x.ToKey, LineStringDto.From(x.Geometry).Coordinates,
                 x.LengthM, x.CandidateId, x.Feeder))],
             await LoadsAsync(db, n, ct),
             n.AnalysisJson is null ? null : JsonSerializer.Deserialize<CalcLvAnalysis>(n.AnalysisJson, json));
@@ -106,6 +108,6 @@ public static class LvNetworkEndpoints
             JsonSerializer.Deserialize<List<LvFeederPhases>>(n.PhasesJson, json) ?? [],
             JsonSerializer.Deserialize<List<LvBox>>(n.BoxesJson, json) ?? [],
             [.. rows.Select(x => new LvLoadDto(x.LoadPointId, x.BuildingId, x.Label, x.Kind, x.Kva, x.BranchKey, x.NodeKey, x.OffsetM, x.ServiceM,
-                x.Box, x.Feeder, x.DistanceM, x.Phase, [.. x.Service.Coordinates.Select(c => new[] { c.X, c.Y })]))]);
+                x.Box, x.Feeder, x.DistanceM, x.Phase, LineStringDto.From(x.Service).Coordinates))]);
     }
 }

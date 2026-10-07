@@ -8,7 +8,9 @@ using Reticula.Api.Layout;
 using Reticula.Api.Projects;
 using Reticula.Domain.Auth;
 using Reticula.Infrastructure.Calc;
+using Reticula.Infrastructure.Field;
 using Reticula.Infrastructure.Geo;
+using static Reticula.Api.Tests.TestFixtures;
 
 namespace Reticula.Api.Tests;
 
@@ -19,25 +21,20 @@ public class FieldTests(ReticulaApiFactory factory)
 
     private sealed record Ctx(HttpClient Engineer, Guid ProjectId, List<Guid> Buildings);
 
-    private static PolygonDto Square(double lon, double lat, double d) =>
-        new("Polygon", [[[lon, lat], [lon + d, lat], [lon + d, lat + d], [lon, lat + d], [lon, lat]]]);
-
     /// <summary>A project with one stand (erf 7001) and three imported buildings on it.</summary>
     private async Task<Ctx> SetupAsync()
     {
-        var client = await factory.EngineerClientAsync();
-        var p = await (await client.PostAsJsonAsync("/api/projects", new SaveProjectRequest($"Field {Guid.NewGuid():N}", "eskom/0.1.0", Square(28.09, -25.53, 0.03), null)))
-            .Content.ReadFromJsonAsync<ProjectDto>();
+        var (client, projectId) = await factory.NewProjectAsync("Field", Square(28.09, -25.53, 0.03));
 
         factory.Calc.OnImport = r => new CalcImportResult(r.Kind, "kml", "WGS84", "test",
             [new CalcFeature("s1", Square(Lon, Lat, 0.001), 5000, "7001", "Residential 1", null, [], [])], [], []);
-        await UploadAsync(client, p!.Id, "stands");
+        await UploadAsync(client, projectId, "stands");
         factory.Calc.OnImport = r => new CalcImportResult(r.Kind, "geojson", "WGS84", "test",
             [.. Enumerable.Range(0, 3).Select(i => new CalcFeature($"way/{i}", Square(Lon + 0.0002 * (i + 1), Lat + 0.0002, 0.0001), 80, null, null, $"way/{i}", new() { ["building"] = "yes" }, []))], [], []);
-        await UploadAsync(client, p.Id, "buildings");
+        await UploadAsync(client, projectId, "buildings");
 
-        var fc = await client.GetFromJsonAsync<GeoFeatureCollection<BuildingProps>>($"/api/projects/{p.Id}/buildings");
-        return new Ctx(client, p.Id, [.. fc!.Features.Select(f => Guid.Parse(f.Id))]);
+        var fc = await client.GetFromJsonAsync<GeoFeatureCollection<BuildingProps>>($"/api/projects/{projectId}/buildings");
+        return new Ctx(client, projectId, [.. fc!.Features.Select(f => Guid.Parse(f.Id))]);
     }
 
     private static async Task UploadAsync(HttpClient client, Guid projectId, string kind)

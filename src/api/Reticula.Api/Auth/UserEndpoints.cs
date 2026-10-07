@@ -9,6 +9,9 @@ namespace Reticula.Api.Auth;
 public sealed record UserDto(Guid Id, string Email, string DisplayName, string? RegistrationNo, IReadOnlyList<string> Roles);
 public sealed record CreateUserRequest(string Email, string DisplayName, string Password, string Role, string? RegistrationNo);
 
+/// <param name="RegistrationNo">ECSA registration number; the signing engineer needs one (plan 7.3). Empty removes it.</param>
+public sealed record UpdateUserRequest(string? DisplayName, string? RegistrationNo);
+
 /// <summary>User management. Engineer only: there is no self-registration.</summary>
 public static class UserEndpoints
 {
@@ -17,6 +20,7 @@ public static class UserEndpoints
         var g = app.MapGroup("/api/users").WithTags("Users").RequireAuthorization(Policies.Engineer);
         g.MapGet("/", List);
         g.MapPost("/", Create);
+        g.MapPut("/{userId:guid}", Update);
         return app;
     }
 
@@ -52,5 +56,24 @@ public static class UserEndpoints
 
         await users.AddToRoleAsync(user, req.Role);
         return TypedResults.Created($"/api/users/{user.Id}", new UserDto(user.Id, user.Email, user.DisplayName, user.RegistrationNo, [req.Role]));
+    }
+
+    private static async Task<Results<Ok<UserDto>, NotFound, ValidationProblem>> Update(Guid userId, UpdateUserRequest req, UserManager<AppUser> users)
+    {
+        var user = await users.FindByIdAsync(userId.ToString());
+        if (user is null) return TypedResults.NotFound();
+        if (req.DisplayName is { } name)
+        {
+            if (string.IsNullOrWhiteSpace(name) || name.Length > 200)
+                return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["displayName"] = ["A name of at most 200 characters."] });
+            user.DisplayName = name.Trim();
+        }
+        if (req.RegistrationNo is { } reg)
+        {
+            if (reg.Length > 50) return TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["registrationNo"] = ["At most 50 characters."] });
+            user.RegistrationNo = string.IsNullOrWhiteSpace(reg) ? null : reg.Trim();
+        }
+        await users.UpdateAsync(user);
+        return TypedResults.Ok(new UserDto(user.Id, user.Email ?? "", user.DisplayName, user.RegistrationNo, [.. await users.GetRolesAsync(user)]));
     }
 }

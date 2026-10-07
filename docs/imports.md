@@ -9,10 +9,12 @@ Imports run per project from the project screen. Each file is checked first and 
 | Stands | KML, KMZ, GeoJSON, DXF, shapefile | Polygons with an erf number and, if present, zoning |
 | Buildings | Overpass JSON, GeoJSON, shapefile, or fetched from OpenStreetMap | Building footprints with their OpenStreetMap tags |
 | Roads | KML, KMZ, GeoJSON, DXF, Overpass JSON, shapefile, or fetched from OpenStreetMap | Lines with a street name and class |
-| Contours | GeoJSON, DXF, KML, shapefile | Lines with an elevation |
+| Contours | GeoJSON, DXF, KML, shapefile, GeoTIFF | Lines with an elevation; GeoTIFF elevation models are traced to contours |
 | Existing network | CSV, GeoJSON, DXF, KML, shapefile | The authority's assets: points and lines with a type and the fields each type needs |
 
 Shapefiles are imported as one zip holding the `.shp`, `.dbf`, `.shx` and `.prj` files. The `.prj` sets the coordinate system.
+
+**GeoTIFF elevation models** (contours only) are georeferenced rasters that are read via their ModelPixelScale, ModelTiepoint or ModelTransformation tags and the GeoKeyDirectory for the EPSG code. Contour lines are traced from the elevation grid at a specified interval (default 1 m, set on upload). Rasters larger than 4 million cells are downsampled for performance. The file must be geospatial (have CRS tags); non-geospatial TIFFs are rejected.
 
 **Fetch from OpenStreetMap** (buildings and roads) asks OpenStreetMap's Overpass service for everything in the project area, then checks it like a file. Nothing is stored until you choose Import. The server it asks is set by `RETICULA_OVERPASS_URL` on the calc service; the main public server is the default.
 

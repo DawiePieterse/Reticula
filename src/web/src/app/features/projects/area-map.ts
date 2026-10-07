@@ -10,10 +10,12 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
-import type { Feature as GjFeature, FeatureCollection as GjCollection } from 'geojson';
+import type { Feature as GjFeature } from 'geojson';
 import type { GeoJSONSource, Map as MlMap, MapMouseEvent, StyleSpecification } from 'maplibre-gl';
-import { GeoJsonPolygon, Position, bounds } from './geo';
-import { AnyGeometry, BUILDING_COLOURS, FeatureCollection, NETWORK_COLOURS, flagIncomplete } from './layout.api';
+import { GeoJsonPolygon, Position, bounds, emptyCollection, positionsOf, withIdProperty } from './geo';
+import { MapLegend } from '../../shared/map-legend';
+import { LAYOUT_LEGEND, NETWORK_ICON, lineColour, lineDash, registerSymbols } from '../../shared/symbols';
+import { AnyGeometry, BUILDING_COLOURS, FeatureCollection, flagIncomplete } from './layout.api';
 import { LvLayers } from './lv-network.api';
 import { PolygonDraw } from './polygon-draw';
 
@@ -56,8 +58,12 @@ export type AnyCollection = FeatureCollection<unknown, AnyGeometry> | null;
 /** MapLibre map that shows a project area and, when editable, lets the user tap out a polygon. */
 @Component({
   selector: 'app-area-map',
+  imports: [MapLegend],
   template: `
-    <div class="map" #mapEl></div>
+    <div class="map-wrap">
+      <div class="map" #mapEl></div>
+      <app-map-legend [items]="legend" />
+    </div>
     @if (editable()) {
       <div class="tools">
         @if (drawing()) {
@@ -78,7 +84,8 @@ export type AnyCollection = FeatureCollection<unknown, AnyGeometry> | null;
   `,
   styles: `
     :host { display: block; }
-    .map { height: 420px; border: 1px solid var(--border); border-radius: 8px; }
+    .map-wrap { position: relative; }
+    .map { height: 460px; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
     .tools { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-top: .5rem; }
     .hint { color: var(--muted); }
     .warn { color: var(--danger); }
@@ -97,6 +104,7 @@ export class AreaMap implements OnDestroy {
   readonly network = input<AnyCollection>(null);
   /** The LV network model: branches coloured by feeder, nodes, and where its issues are. */
   readonly lv = input<LvLayers | null>(null);
+  protected readonly legend = LAYOUT_LEGEND;
   /** Building to zoom to and highlight. */
   readonly focusId = input<string | null>(null);
   readonly featureClick = output<string>();
@@ -142,8 +150,10 @@ export class AreaMap implements OnDestroy {
       const map = new Map({ container: this.mapEl().nativeElement, style: OSM_STYLE, center: SOUTH_AFRICA_CENTRE, zoom: 5 });
       map.addControl(new NavigationControl(), 'top-right');
       // Not 'load': that waits for the basemap tiles, so a slow or blocked tile server would hide the project's own layers.
-      map.on('style.load', () => {
+      map.on('style.load', async () => {
         for (const id of [CONTOURS, ROADS, STANDS, BUILDINGS, NETWORK, LV_SERVICES, LV_LOADS, LV_BRANCHES, LV_NODES, LV_ISSUES, PREVIEW]) map.addSource(id, { type: 'geojson', data: emptyCollection(), promoteId: 'id' });
+        await registerSymbols(map);
+        if (!map.getSource(STANDS)) return; // the style changed while the icons were drawn
         map.addLayer({ id: 'contours-line', type: 'line', source: CONTOURS, paint: { 'line-color': '#bc8f5a', 'line-width': 0.8, 'line-opacity': 0.8 } });
         map.addLayer({ id: 'contours-label', type: 'symbol', source: CONTOURS, minzoom: 15,
           layout: { 'symbol-placement': 'line', 'text-field': ['to-string', ['get', 'elevationM']], 'text-size': 10 },
@@ -158,16 +168,15 @@ export class AreaMap implements OnDestroy {
           },
         });
         map.addLayer({ id: 'buildings-low', type: 'line', source: BUILDINGS, filter: ['==', ['get', 'lowConfidence'], true], paint: { 'line-color': '#cf222e', 'line-width': 1.5 } });
-        map.addLayer({ id: 'buildings-focus', type: 'line', source: BUILDINGS, filter: ['==', ['id'], ''], paint: { 'line-color': '#fb8500', 'line-width': 4 } });
-        const assetColour = ['match', ['get', 'assetType'], ...Object.entries(NETWORK_COLOURS).flat(), '#8c959f'] as never;
-        const lineWidth = ['match', ['get', 'assetType'], ['mv_line', 'mv_cable'], 3, 2] as never;
-        map.addLayer({ id: 'network-line', type: 'line', source: NETWORK, filter: ['all', ['==', ['geometry-type'], 'LineString'], ['!', ['in', 'cable', ['get', 'assetType']]]] as never,
-          paint: { 'line-color': assetColour, 'line-width': lineWidth } });
-        map.addLayer({ id: 'network-cable', type: 'line', source: NETWORK, filter: ['all', ['==', ['geometry-type'], 'LineString'], ['in', 'cable', ['get', 'assetType']]] as never,
-          paint: { 'line-color': assetColour, 'line-width': lineWidth, 'line-dasharray': [3, 2] } });
-        map.addLayer({ id: 'network-point', type: 'circle', source: NETWORK, filter: ['==', ['geometry-type'], 'Point'],
-          paint: { 'circle-color': assetColour, 'circle-radius': ['match', ['get', 'assetType'], 'pole', 3, 6] as never,
-            'circle-stroke-color': ['case', ['get', 'incomplete'], '#fb8500', '#ffffff'] as never, 'circle-stroke-width': 2 } });
+        map.addLayer({ id: 'buildings-focus', type: 'line', source: BUILDINGS, filter: ['==', ['get', 'id'], ''], paint: { 'line-color': '#fb8500', 'line-width': 4 } });
+        // The authority's network in the drawing standard's symbols (shared/symbols); the LV model keeps its feeder colours.
+        map.addLayer({ id: 'network-line', type: 'line', source: NETWORK, filter: ['==', ['geometry-type'], 'LineString'],
+          paint: { 'line-color': lineColour('assetType') as never, 'line-width': ['match', ['get', 'assetType'], ['mv_line', 'mv_cable'], 3, 2] as never,
+            'line-dasharray': lineDash('assetType') as never } });
+        map.addLayer({ id: 'network-point', type: 'symbol', source: NETWORK, filter: ['==', ['geometry-type'], 'Point'],
+          layout: { 'icon-image': NETWORK_ICON as never, 'icon-size': ['match', ['get', 'assetType'], 'pole', 0.5, 0.75] as never, 'icon-allow-overlap': true, 'icon-ignore-placement': true } });
+        map.addLayer({ id: 'network-incomplete', type: 'circle', source: NETWORK, filter: ['all', ['==', ['geometry-type'], 'Point'], ['==', ['get', 'incomplete'], true]],
+          paint: { 'circle-radius': 14, 'circle-opacity': 0, 'circle-stroke-color': '#fb8500', 'circle-stroke-width': 2 } });
         map.addLayer({ id: 'lv-service', type: 'line', source: LV_SERVICES, paint: { 'line-color': ['get', 'colour'] as never, 'line-width': 1.5 } });
         map.addLayer({ id: 'lv-load', type: 'circle', source: LV_LOADS,
           paint: { 'circle-radius': 3, 'circle-color': ['get', 'colour'] as never, 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1 } });
@@ -179,13 +188,13 @@ export class AreaMap implements OnDestroy {
           paint: { 'line-color': ['get', 'colour'] as never, 'line-width': 2.5, 'line-dasharray': [1.5, 1] } });
         map.addLayer({ id: 'lv-node', type: 'circle', source: LV_NODES, filter: ['!', ['in', ['get', 'kind'], ['literal', ['source', 'pole']]]] as never,
           minzoom: 15, paint: { 'circle-radius': 2.5, 'circle-color': '#ffffff', 'circle-stroke-color': '#24292f', 'circle-stroke-width': 1 } });
-        map.addLayer({ id: 'lv-pole', type: 'circle', source: LV_NODES, filter: ['==', ['get', 'kind'], 'pole'],
-          paint: { 'circle-radius': 3.5, 'circle-color': '#57606a', 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1 } });
+        map.addLayer({ id: 'lv-pole', type: 'symbol', source: LV_NODES, filter: ['==', ['get', 'kind'], 'pole'],
+          layout: { 'icon-image': 'pole_lv', 'icon-size': 0.45, 'icon-allow-overlap': true, 'icon-ignore-placement': true } });
         // Voltage drop band as a ring around each node, so it shows over the pole markers.
         map.addLayer({ id: 'lv-drop', type: 'circle', source: LV_NODES, filter: ['to-boolean', ['get', 'dropColour']] as never,
           paint: { 'circle-radius': 6, 'circle-opacity': 0, 'circle-stroke-color': ['get', 'dropColour'] as never, 'circle-stroke-width': 2.5 } });
-        map.addLayer({ id: 'lv-source', type: 'circle', source: LV_NODES, filter: ['==', ['get', 'kind'], 'source'],
-          paint: { 'circle-radius': 7, 'circle-color': '#24292f', 'circle-stroke-color': '#ffd33d', 'circle-stroke-width': 2.5 } });
+        map.addLayer({ id: 'lv-source', type: 'symbol', source: LV_NODES, filter: ['==', ['get', 'kind'], 'source'],
+          layout: { 'icon-image': 'transformer', 'icon-size': 0.9, 'icon-allow-overlap': true, 'icon-ignore-placement': true } });
         map.addLayer({ id: 'lv-issue', type: 'circle', source: LV_ISSUES,
           paint: { 'circle-radius': 11, 'circle-opacity': 0, 'circle-stroke-width': 2.5,
             'circle-stroke-color': ['match', ['get', 'severity'], 'error', '#cf222e', '#fb8500'] as never } });
@@ -281,7 +290,7 @@ export class AreaMap implements OnDestroy {
 
   private setData(source: string, data: AnyCollection): void {
     const src = this.map?.getSource(source) as GeoJSONSource | undefined;
-    src?.setData((data ?? emptyCollection()) as never);
+    src?.setData((data ? withIdProperty(data) : emptyCollection()) as never);
   }
 
   private fitCollection(fc: FeatureCollection<unknown, AnyGeometry>): void {
@@ -293,7 +302,7 @@ export class AreaMap implements OnDestroy {
 
   private focusOn(id: string | null): void {
     if (!this.map) return;
-    this.map.setFilter('buildings-focus', ['==', ['id'], id ?? '']);
+    this.map.setFilter('buildings-focus', ['==', ['get', 'id'], id ?? '']);
     const f = (this.buildings()?.features ?? []).find((x) => x.id === id);
     if (f) this.map.fitBounds(bounds({ type: 'Polygon', coordinates: [positionsOf(f.geometry)] }), { padding: 80, duration: 300, maxZoom: 19 });
   }
@@ -303,13 +312,5 @@ export class AreaMap implements OnDestroy {
     if (!this.map || !polygon) return;
     this.map.fitBounds(bounds(polygon), { padding: 40, duration: 0, maxZoom: 17 });
   }
-}
-
-function positionsOf(g: AnyGeometry): Position[] {
-  return g.type === 'Polygon' ? g.coordinates[0] : g.type === 'LineString' ? g.coordinates : [g.coordinates];
-}
-
-function emptyCollection(): GjCollection {
-  return { type: 'FeatureCollection', features: [] };
 }
 

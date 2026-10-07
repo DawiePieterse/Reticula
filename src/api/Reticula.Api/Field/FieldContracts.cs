@@ -21,7 +21,8 @@ public sealed record BuildingFieldDto(
 public sealed record CandidateRequest(string Kind, GeometryInput Geometry, string? Notes, uint? Version, PositionDto? Position, DateTimeOffset? CapturedAt,
     Guid? OpId = null);
 
-public sealed record CandidateProps(string Kind, string? Notes, DateTimeOffset CreatedAt, uint Version);
+/// <param name="Source">field: marked on the tablet; proposed: placed by the pre-design (ADR 0010), not yet inspected.</param>
+public sealed record CandidateProps(string Kind, string? Notes, DateTimeOffset CreatedAt, uint Version, string Source = "field");
 
 /// <param name="Version">The load point version the inspector saw; null when the building had no load. A mismatch returns 409 with the current state.</param>
 /// <param name="LoadClass">A class the engineer chooses instead of the score; null to use the score.</param>
@@ -47,13 +48,3 @@ public sealed record FieldProgress(
     int Buildings, int Confirmed, int NotPresent, int Added, int Outstanding, int OutstandingLowConfidence,
     int LoadsEstimated, int LoadsConfirmed, int BuildingsWithoutLoad, int AssumptionsOpen,
     IReadOnlyDictionary<string, int> Candidates);
-
-public sealed record LoadScheduleRow(
-    string? Erf, Guid BuildingId, string BuildingType, string BuildingStatus, string? LoadKind, string? Category, string? IncomeBand,
-    double? Kva, double? EstimatedKva, bool Overridden, string? OverrideReason, string? LoadStatus);
-
-public sealed record LoadScheduleTotals(int ResidentialCount, int SpecialCount, double? DiversityFactor, double ResidentialKva,
-    double SpecialKva, double TotalKva, string Formula, string Clause, string Method, int? Phases, double? ConfidencePct, double? DesignCurrentA);
-
-public sealed record LoadSchedule(string Project, string RulesRef, string RulesHash, DateTimeOffset GeneratedAt,
-    IReadOnlyList<LoadScheduleRow> Rows, LoadScheduleTotals? Totals);

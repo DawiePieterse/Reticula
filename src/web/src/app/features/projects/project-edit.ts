@@ -19,8 +19,11 @@ import { ProjectsApi } from './projects.api';
       <h2>{{ isNew() ? 'New project' : form.controls.name.value || 'Project' }}</h2>
       <div class="row">
         @if (id(); as projectId) {
-          <a class="button primary" [routerLink]="['/projects', projectId, 'field']">Field inspection</a>
+          <a class="button primary" [routerLink]="['/projects', projectId, 'field']"
+            >Field inspection</a
+          >
           <a class="button" [routerLink]="['/projects', projectId, 'loads']">Loads</a>
+          <a class="button" [routerLink]="['/projects', projectId, 'design']">Design</a>
         }
         <a routerLink="/projects">Back to projects</a>
       </div>
@@ -28,7 +31,10 @@ import { ProjectsApi } from './projects.api';
 
     @if (conflict()) {
       <div class="banner warn" role="alert">
-        <p>This project was changed elsewhere since you opened it. Your changes were not saved and are still shown below.</p>
+        <p>
+          This project was changed elsewhere since you opened it. Your changes were not saved and
+          are still shown below.
+        </p>
         <button type="button" (click)="reloadLatest()">Discard mine and load the latest</button>
       </div>
     }
@@ -36,20 +42,26 @@ import { ProjectsApi } from './projects.api';
       <p class="error" role="alert">{{ p.message }}</p>
     }
 
-    <form [formGroup]="form" (ngSubmit)="save()">
+    <form class="card" [formGroup]="form" (ngSubmit)="save()">
       <label>
         Name
         <input formControlName="name" autocomplete="off" />
-        @for (e of fieldErrors('name'); track e) { <span class="field-error">{{ e }}</span> }
+        @for (e of fieldErrors('name'); track e) {
+          <span class="field-error">{{ e }}</span>
+        }
       </label>
 
       <label>
         Rules file
         <select formControlName="rulesRef">
           <option value="" disabled>Choose authority rules</option>
-          @for (r of rules(); track r) { <option [value]="r">{{ r }}</option> }
+          @for (r of rules(); track r) {
+            <option [value]="r">{{ r }}</option>
+          }
         </select>
-        @for (e of fieldErrors('rulesRef'); track e) { <span class="field-error">{{ e }}</span> }
+        @for (e of fieldErrors('rulesRef'); track e) {
+          <span class="field-error">{{ e }}</span>
+        }
       </label>
 
       <div class="field">
@@ -68,7 +80,9 @@ import { ProjectsApi } from './projects.api';
           [focusId]="focusId()"
           (featureClick)="focusId.set($event)"
         />
-        @for (e of fieldErrors('area'); track e) { <span class="field-error">{{ e }}</span> }
+        @for (e of fieldErrors('area'); track e) {
+          <span class="field-error">{{ e }}</span>
+        }
       </div>
 
       @if (canEdit()) {
@@ -87,7 +101,11 @@ import { ProjectsApi } from './projects.api';
         (layersChange)="layers.set($event)"
         (focus)="focusId.set($event)"
       />
-      <app-lv-network [projectId]="projectId" [canEdit]="canEdit()" (layersChange)="lv.set($event)" />
+      <app-lv-network
+        [projectId]="projectId"
+        [canEdit]="canEdit()"
+        (layersChange)="lv.set($event)"
+      />
     }
   `,
 })
@@ -100,7 +118,10 @@ export class ProjectEdit {
   protected readonly canEdit = inject(AuthService).isEngineer;
 
   protected readonly form = new FormGroup({
-    name: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(200)] }),
+    name: new FormControl('', {
+      nonNullable: true,
+      validators: [Validators.required, Validators.maxLength(200)],
+    }),
     rulesRef: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
   });
   protected readonly area = signal<GeoJsonPolygon | null>(null);
@@ -109,14 +130,26 @@ export class ProjectEdit {
   protected readonly conflict = signal(false);
   protected readonly saving = signal(false);
   protected readonly isNew = computed(() => !this.id());
-  protected readonly layers = signal<LayoutLayers>({ stands: null, buildings: null, preview: null, roads: null, contours: null, network: null });
+  protected readonly layers = signal<LayoutLayers>({
+    stands: null,
+    buildings: null,
+    preview: null,
+    roads: null,
+    contours: null,
+    network: null,
+  });
   protected readonly focusId = signal<string | null>(null);
   protected readonly lv = signal<LvLayers | null>(null);
   private version: number | undefined;
 
   constructor() {
     if (!this.canEdit()) this.form.disable();
-    this.api.rules().subscribe({ next: (r) => this.rules.set(r), error: (e: unknown) => this.problem.set(toApiProblem(e)) });
+    this.api
+      .rules()
+      .subscribe({
+        next: (r) => this.rules.set(r),
+        error: (e: unknown) => this.problem.set(toApiProblem(e)),
+      });
     effect(() => {
       const id = this.id();
       if (id) untracked(() => void this.load(id));

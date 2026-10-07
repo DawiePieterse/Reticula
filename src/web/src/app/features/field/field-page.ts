@@ -7,7 +7,8 @@ import { ConnectivityService } from '../../core/connectivity.service';
 import { Position } from '../projects/geo';
 import { BUILDING_COLOURS } from '../projects/layout.api';
 import { BuildingPanel, SelectedBuilding } from './building-panel';
-import { BUILDING_TYPES, CANDIDATE_LABELS, CandidateKind, Candidates, ROUTE_KINDS, SITE_KINDS, toPoint } from './field.api';
+import { SymbolIcon } from '../../shared/symbol';
+import { BUILDING_TYPES, CANDIDATE_LABELS, CANDIDATE_SYMBOLS, CandidateKind, Candidates, ROUTE_KINDS, SITE_KINDS, toPoint } from './field.api';
 import { FieldMap, FieldMode } from './field-map';
 import { GeolocationService } from './geolocation.service';
 import { MapPackPanel } from './map/map-pack-panel';
@@ -22,28 +23,29 @@ import { SyncPanel } from './sync/sync-panel';
  */
 @Component({
   selector: 'app-field-page',
-  imports: [FormsModule, RouterLink, DatePipe, FieldMap, BuildingPanel, SyncPanel, MapPackPanel],
+  imports: [FormsModule, RouterLink, DatePipe, FieldMap, BuildingPanel, SyncPanel, MapPackPanel, SymbolIcon],
   template: `
     <div class="field">
       <header class="bar">
         @if (connectivity.online()) {
-          <a [routerLink]="['/projects', id()]">← {{ projectName() }}</a>
+          <a class="back" [routerLink]="['/projects', id()]"><span aria-hidden="true">‹</span> {{ projectName() }}</a>
         } @else {
-          <strong>{{ projectName() }}</strong>
+          <strong class="back">{{ projectName() }}</strong>
         }
         @if (progress(); as p) {
           <div class="progress" [attr.aria-label]="'Inspected ' + inspected() + ' of ' + p.buildings">
             <div class="meter"><span [style.width.%]="p.buildings ? (inspected() * 100) / p.buildings : 0"></span></div>
-            <span>{{ inspected() }}/{{ p.buildings }} inspected</span>
-            <span [class.warn]="p.outstandingLowConfidence > 0">{{ p.outstandingLowConfidence }} low-confidence left</span>
-            <span>{{ p.buildingsWithoutLoad }} without load</span>
-            <span [class.warn]="p.assumptionsOpen > 0">{{ p.assumptionsOpen }} assumptions open</span>
+            <span class="badge">{{ inspected() }}/{{ p.buildings }} inspected</span>
+            <span class="badge" [class.warn]="p.outstandingLowConfidence > 0">{{ p.outstandingLowConfidence }} low confidence</span>
+            <span class="badge">{{ p.buildingsWithoutLoad }} without load</span>
+            @if (proposals().length) { <span class="badge accent">{{ proposals().length }} proposed to check</span> }
+            <span class="badge" [class.warn]="p.assumptionsOpen > 0">{{ p.assumptionsOpen }} assumptions</span>
           </div>
         }
         <button type="button" class="sync" [class.attention]="issueCount() > 0" (click)="showSync.set(!showSync())" [attr.aria-pressed]="showSync()">
           {{ syncLabel() }}
         </button>
-        @if (connectivity.online()) { <a [routerLink]="['/projects', id(), 'loads']">Loads</a> }
+        @if (connectivity.online()) { <a class="button quiet" [routerLink]="['/projects', id(), 'loads']">Loads</a> }
       </header>
       @if (!connectivity.online() && sync.snapshot(); as s) {
         <p class="offline" role="status">
@@ -53,14 +55,28 @@ import { SyncPanel } from './sync/sync-panel';
       }
 
       <nav class="tools" aria-label="Tools">
-        <button type="button" [class.on]="mode() === 'select'" (click)="setMode('select')">Select</button>
-        <button type="button" [class.on]="mode() === 'building'" (click)="setMode('building')">+ Building</button>
-        @for (k of siteKinds; track k) {
-          <button type="button" [class.on]="mode() === 'site' && kind() === k" (click)="setMode('site', k)">+ {{ labels[k] }}</button>
-        }
-        @for (k of routeKinds; track k) {
-          <button type="button" [class.on]="mode() === 'route' && kind() === k" (click)="setMode('route', k)">+ {{ labels[k] }}</button>
-        }
+        <div class="seg">
+          <button type="button" class="tool" [class.on]="mode() === 'select'" (click)="setMode('select')" aria-label="Select">
+            <app-symbol name="select" [size]="26" /><span>Select</span>
+          </button>
+          <button type="button" class="tool" [class.on]="mode() === 'building'" (click)="setMode('building')" aria-label="Add building">
+            <app-symbol name="building" [size]="26" /><span>Building</span>
+          </button>
+        </div>
+        <div class="seg">
+          @for (k of siteKinds; track k) {
+            <button type="button" class="tool" [class.on]="mode() === 'site' && kind() === k" (click)="setMode('site', k)" [attr.aria-label]="'Add ' + labels[k]">
+              <app-symbol [name]="icons[k]" [size]="28" /><span>{{ labels[k] }}</span>
+            </button>
+          }
+        </div>
+        <div class="seg">
+          @for (k of routeKinds; track k) {
+            <button type="button" class="tool" [class.on]="mode() === 'route' && kind() === k" (click)="setMode('route', k)" [attr.aria-label]="'Add ' + labels[k]">
+              <app-symbol [name]="icons[k]" [size]="28" /><span>{{ labels[k] }}</span>
+            </button>
+          }
+        </div>
       </nav>
 
       <div class="map-wrap">
@@ -86,7 +102,7 @@ import { SyncPanel } from './sync/sync-panel';
 
         @if (showSync()) {
           <app-sync-panel (show)="showItem($event)" />
-          <button type="button" class="next" (click)="showSync.set(false)">Back to inspection</button>
+          <button type="button" class="big" (click)="showSync.set(false)">Back to inspection</button>
         } @else {
         @switch (mode()) {
           @case ('building') {
@@ -101,16 +117,16 @@ import { SyncPanel } from './sync/sync-panel';
               <label>Notes <input [ngModel]="newNotes()" (ngModelChange)="newNotes.set($event)" name="newNotes" /></label>
             } @else {
               <p>Tap the map where the building is, or use your position.</p>
-              <button type="button" (click)="useGps()" [disabled]="!gps.fix()">Use my position</button>
+              <button type="button" class="big" (click)="useGps()" [disabled]="!gps.fix()">Use my position</button>
             }
           }
           @case ('site') {
-            <h3>Add {{ labels[kind()] }}</h3>
+            <h3 class="with-icon"><app-symbol [name]="icons[kind()]" [size]="30" /> Add {{ labels[kind()] }}</h3>
             <p>Tap the map where the {{ labels[kind()].toLowerCase() }} could go.</p>
-            <button type="button" (click)="useGps()" [disabled]="!gps.fix()">Use my position</button>
+            <button type="button" class="big" (click)="useGps()" [disabled]="!gps.fix()">Use my position</button>
           }
           @case ('route') {
-            <h3>Add {{ labels[kind()] }}</h3>
+            <h3 class="with-icon"><app-symbol [name]="icons[kind()]" [size]="30" /> Add {{ labels[kind()] }}</h3>
             <p>Tap the map along the route, then Finish route.</p>
           }
           @default {
@@ -122,24 +138,55 @@ import { SyncPanel } from './sync/sync-panel';
                 [load]="loadFor(sb.id)"
                 (openSync)="showSync.set(true)"
               />
-              <button type="button" class="next" (click)="next()">Next to check →</button>
+              <button type="button" class="big next" (click)="next()">Next to check →</button>
             } @else if (selectedCandidate(); as c) {
-              <h3>{{ labels[c.properties.kind] }}</h3>
+              <header class="head">
+                <h3 class="with-icon">
+                  <app-symbol [name]="icons[c.properties.kind]" [size]="30" />
+                  {{ c.properties.source === 'proposed' ? 'Proposed ' + lower(labels[c.properties.kind]) : labels[c.properties.kind] }}
+                </h3>
+                <span class="badge" [class.accent]="c.properties.source === 'proposed'" [class.ok]="c.properties.source === 'field'">
+                  {{ c.properties.source === 'proposed' ? 'To check' : 'Marked in the field' }}
+                </span>
+              </header>
               @if (sync.view()?.issues?.get(candidateKey(c.id)); as op) {
                 <div class="banner warn" role="alert">
                   {{ op.state === 'conflict' ? 'This candidate changed on the server after you saw it.' : 'The server refused a change: ' + op.error }}
                   <button type="button" (click)="showSync.set(true)">Decide</button>
                 </div>
               }
-              <label>Notes <textarea rows="3" [ngModel]="candidateNotes()" (ngModelChange)="candidateNotes.set($event)" name="cnotes"></textarea></label>
-              <div class="row">
-                <button type="button" class="primary" (click)="saveCandidateNotes()" [disabled]="busy()">Save notes</button>
-                <button type="button" (click)="removeCandidate()" [disabled]="busy()">Remove</button>
-              </div>
+              @if (c.properties.source === 'proposed') {
+                <p>{{ c.properties.notes || 'Placed by the design before the visit.' }}</p>
+                <p class="muted">Is this a good place? Confirm it, move it to where you stand, or say it cannot go here.</p>
+                <div class="stack">
+                  <button type="button" class="primary big" (click)="confirmProposal()" [disabled]="busy()">Confirm here</button>
+                  @if (c.geometry.type === 'Point') {
+                    <button type="button" class="big" (click)="moveToMe()" [disabled]="busy() || !gps.fix()">Move to my position</button>
+                  }
+                  <button type="button" class="danger big" (click)="removeCandidate()" [disabled]="busy()">Not here</button>
+                </div>
+                <label>Why, or what is in the way <textarea rows="2" [ngModel]="candidateNotes()" (ngModelChange)="candidateNotes.set($event)" name="cnotes"></textarea></label>
+                @if (proposals().length > 1) {
+                  <button type="button" class="big" (click)="nextProposal()">Next proposal →</button>
+                }
+              } @else {
+                <label>Notes <textarea rows="3" [ngModel]="candidateNotes()" (ngModelChange)="candidateNotes.set($event)" name="cnotes"></textarea></label>
+                <div class="row">
+                  <button type="button" class="primary" (click)="saveCandidateNotes()" [disabled]="busy()">Save notes</button>
+                  <button type="button" class="danger" (click)="removeCandidate()" [disabled]="busy()">Remove</button>
+                </div>
+              }
             } @else {
               <h3>Field inspection</h3>
               <p>Tap a building to confirm it, or start with the least certain ones.</p>
-              <button type="button" class="primary" (click)="next()" [disabled]="!outstanding().length">Start with lowest confidence</button>
+              <button type="button" class="primary big" (click)="next()" [disabled]="!outstanding().length">Start with lowest confidence</button>
+              @if (proposals().length) {
+                <section class="proposals">
+                  <h4>Proposed by the design</h4>
+                  <p class="muted">{{ proposals().length }} site{{ proposals().length === 1 ? '' : 's' }} and route{{ proposals().length === 1 ? '' : 's' }} to check on the ground. They are drawn faded until you confirm them.</p>
+                  <button type="button" class="big" (click)="nextProposal()">Check the next proposal</button>
+                </section>
+              }
               <app-map-pack-panel />
             }
           }
@@ -149,34 +196,43 @@ import { SyncPanel } from './sync/sync-panel';
     </div>
   `,
   styles: `
-    :host { display: block; margin: -1rem; }
+    :host { display: block; margin: -1.25rem; }
     .field {
-      display: grid; height: calc(100dvh - 58px);
-      grid-template: 'bar bar' auto 'note note' auto 'tools tools' auto 'map panel' 1fr / 1fr minmax(320px, 400px);
+      display: grid; height: calc(100dvh - 60px); background: var(--bg);
+      grid-template: 'bar bar' auto 'note note' auto 'tools tools' auto 'map panel' 1fr / minmax(0, 1fr) minmax(340px, 420px);
     }
     @media (max-width: 900px) {
-      .field { grid-template: 'bar' auto 'note' auto 'tools' auto 'map' 50dvh 'panel' auto / 1fr; height: auto; }
+      .field { grid-template: 'bar' auto 'note' auto 'tools' auto 'map' 52dvh 'panel' auto / minmax(0, 1fr); height: auto; }
+      .panel { border-left: 0; border-top: 1px solid var(--border); border-radius: var(--radius) var(--radius) 0 0; margin-top: -14px; position: relative; }
     }
-    .bar { grid-area: bar; display: flex; align-items: center; gap: 1rem; padding: .5rem 1rem; border-bottom: 1px solid var(--border); flex-wrap: wrap; background: var(--surface); }
-    .progress { display: flex; align-items: center; gap: .75rem; flex: 1; flex-wrap: wrap; font-size: .9rem; }
-    .meter { width: 10rem; height: .6rem; background: var(--bg); border-radius: 999px; overflow: hidden; border: 1px solid var(--border); }
-    .meter span { display: block; height: 100%; background: var(--ok); }
-    .warn { color: var(--danger); }
-    .tools { grid-area: tools; display: flex; gap: .35rem; padding: .4rem 1rem; overflow-x: auto; border-bottom: 1px solid var(--border); background: var(--surface); }
-    .tools button { white-space: nowrap; }
-    .tools button.on { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+    .bar, .tools, .map-wrap, .panel { min-width: 0; }
+    .bar { grid-area: bar; display: flex; align-items: center; gap: .75rem 1rem; padding: .5rem 1.25rem; border-bottom: 1px solid var(--border); flex-wrap: wrap; background: var(--surface); }
+    .back { font-weight: 650; font-size: 1.05rem; color: var(--accent); display: inline-flex; align-items: center; gap: .25rem; min-height: var(--target); }
+    .back span { font-size: 1.6rem; line-height: 1; }
+    .progress { display: flex; align-items: center; gap: .5rem; flex: 1 1 100%; overflow-x: auto; scrollbar-width: none; order: 10; padding-bottom: 2px; }
+    .progress::-webkit-scrollbar { display: none; }
+    .progress .meter { flex: 0 0 7rem; }
+    .progress .badge { flex: 0 0 auto; }
+    @media (min-width: 1100px) { .progress { flex: 1; order: 0; } }
+    .badge.warn { background: var(--danger-bg); color: var(--danger); }
+    .tools { grid-area: tools; display: flex; gap: .6rem; padding: .5rem 1.25rem; overflow-x: auto; border-bottom: 1px solid var(--border); background: var(--surface); scrollbar-width: none; }
+    .tools::-webkit-scrollbar { display: none; }
+    /* Symbol first, a small caption under it: the inspector finds the tool by the drawing symbol. */
+    .seg .tool { flex-direction: column; gap: .1rem; padding: .25rem .7rem; min-width: 4.6rem; min-height: var(--target); font-size: .78rem; line-height: 1.1; }
+    .with-icon { display: flex; align-items: center; gap: .5rem; }
     .map-wrap { grid-area: map; position: relative; min-height: 300px; }
-    .panel { grid-area: panel; overflow-y: auto; padding: 1rem; border-left: 1px solid var(--border); background: var(--surface); }
-    .types { display: grid; grid-template-columns: repeat(2, 1fr); gap: .4rem; margin: .5rem 0; }
-    .types button { text-transform: capitalize; justify-content: center; }
-    .swatch { display: inline-block; width: .7rem; height: .7rem; border-radius: 2px; margin-right: .35rem; }
-    .next { width: 100%; margin-top: 1rem; justify-content: center; }
-    label { display: flex; flex-direction: column; gap: .25rem; margin: .5rem 0; }
-    textarea { font: inherit; border-radius: 6px; border: 1px solid var(--border); padding: .5rem; background: var(--surface); color: var(--text); }
-    .row { display: flex; gap: .5rem; }
-    .sync { min-height: 36px; padding: .25rem .75rem; font-size: .9rem; }
-    .sync.attention { background: var(--danger-bg); color: var(--danger); border-color: var(--danger); }
-    .offline { grid-area: note; margin: 0; padding: .4rem 1rem; background: var(--warn-bg); font-size: .9rem; }
+    .panel { grid-area: panel; overflow-y: auto; padding: 1.1rem 1.25rem 2rem; border-left: 1px solid var(--border); background: var(--surface); }
+    .head { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+    .types { display: grid; grid-template-columns: repeat(2, 1fr); gap: .5rem; margin: .5rem 0; }
+    .types button { text-transform: capitalize; }
+    .stack { display: grid; gap: .5rem; margin: .75rem 0; }
+    .next { margin-top: 1rem; }
+    .proposals { margin-top: 1.25rem; padding: 1rem; border-radius: var(--radius-sm); background: var(--accent-soft); }
+    .proposals h4 { margin-top: 0; color: var(--accent); }
+    label { display: flex; flex-direction: column; gap: .35rem; margin: .75rem 0; font-weight: 600; }
+    .sync { min-height: calc(var(--target) - 8px); padding: .25rem .9rem; font-size: .95rem; border-radius: 999px; }
+    .sync.attention { background: var(--danger-bg); color: var(--danger); }
+    .offline { grid-area: note; margin: 0; padding: .5rem 1.25rem; background: var(--warn-bg); font-size: .95rem; font-weight: 500; }
   `,
 })
 export class FieldPage implements OnDestroy {
@@ -191,6 +247,7 @@ export class FieldPage implements OnDestroy {
   protected readonly types = BUILDING_TYPES;
   protected readonly colours = BUILDING_COLOURS;
   protected readonly labels = CANDIDATE_LABELS;
+  protected readonly icons = CANDIDATE_SYMBOLS;
   protected readonly siteKinds = SITE_KINDS;
   protected readonly routeKinds = ROUTE_KINDS;
   protected readonly candidateKey = candidateKey;
@@ -235,6 +292,8 @@ export class FieldPage implements OnDestroy {
   });
 
   protected readonly selectedCandidate = computed(() => this.candidates()?.features.find((x) => x.id === this.selectedId()) ?? null);
+  /** Sites and routes the pre-design placed, still to be confirmed or moved on the ground (ADR 0010). */
+  protected readonly proposals = computed(() => (this.candidates()?.features ?? []).filter((c) => c.properties.source === 'proposed'));
 
   protected readonly outstanding = computed(() =>
     (this.buildings()?.features ?? []).filter((b) => b.properties.status === 'predicted').sort((a, b) => a.properties.confidence - b.properties.confidence),
@@ -248,12 +307,18 @@ export class FieldPage implements OnDestroy {
     });
     effect(() => {
       const c = this.selectedCandidate();
-      untracked(() => this.candidateNotes.set(c?.properties.notes ?? ''));
+      // A proposal's note is the design's; the inspector's own note starts empty and is kept with the proposal's if left blank.
+      untracked(() => this.candidateNotes.set(c?.properties.source === 'proposed' ? '' : (c?.properties.notes ?? '')));
     });
   }
 
   ngOnDestroy(): void {
     this.gps.stop();
+  }
+
+  /** "Transformer" → "transformer", but "LV route" stays "LV route". */
+  protected lower(label: string): string {
+    return label.replace(/^[A-Z](?=[a-z])/, (ch) => ch.toLowerCase());
   }
 
   protected loadFor(buildingId: string): FieldLoad | null {
@@ -315,6 +380,36 @@ export class FieldPage implements OnDestroy {
       this.newNotes.set('');
       this.setMode('select');
       this.selectedId.set(id);
+    });
+  }
+
+  /** The next proposal after the selected one, so the inspector can walk through them. */
+  protected nextProposal(): void {
+    const list = this.proposals();
+    if (!list.length) return;
+    const at = list.findIndex((c) => c.id === this.selectedId());
+    this.selectedId.set(list[(at + 1) % list.length].id);
+    this.showSync.set(false);
+  }
+
+  /** Keeps the proposal where it is. Any edit from the field makes it a field candidate on the server. */
+  protected async confirmProposal(): Promise<void> {
+    const c = this.selectedCandidate();
+    if (!c) return;
+    await this.run(async () => {
+      await this.sync.saveCandidate(c.id, c.properties.kind, c.geometry, this.candidateNotes().trim() || c.properties.notes, this.gps.fix());
+      this.nextProposal();
+    });
+  }
+
+  /** Moves a proposed site to where the inspector stands. */
+  protected async moveToMe(): Promise<void> {
+    const c = this.selectedCandidate();
+    const fix = this.gps.fix();
+    if (!c || !fix) return;
+    await this.run(async () => {
+      await this.sync.saveCandidate(c.id, c.properties.kind, toPoint([fix.lon, fix.lat]), this.candidateNotes().trim() || c.properties.notes, fix);
+      this.nextProposal();
     });
   }
 

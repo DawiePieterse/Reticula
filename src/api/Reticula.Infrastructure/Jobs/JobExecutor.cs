@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Reticula.Domain.Jobs;
 using Reticula.Infrastructure.Data;
+using Reticula.Infrastructure.Review;
 
 namespace Reticula.Infrastructure.Jobs;
 
@@ -17,6 +18,7 @@ public sealed class JobExecutor(
     IEnumerable<IJobHandler> handlers,
     IJobNotifier notifier,
     TimeProvider time,
+    AuditActor actor,
     ILogger<JobExecutor> logger)
 {
     [AutomaticRetry(Attempts = 0)]
@@ -51,6 +53,8 @@ public sealed class JobExecutor(
             return;
         }
 
+        // What the handler changes is recorded as the requesting user's doing.
+        actor.UserId = run.RequestedBy;
         run.Start(time.GetUtcNow());
         await SaveAndPublishAsync(run, ct);
 

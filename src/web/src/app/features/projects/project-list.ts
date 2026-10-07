@@ -22,22 +22,29 @@ import { Project, ProjectsApi } from './projects.api';
       @if (list.length === 0) {
         <p class="muted">No projects yet.</p>
       } @else {
-        <table>
-          <thead><tr><th>Name</th><th>Rules</th><th>Updated</th></tr></thead>
-          <tbody>
-            @for (p of list; track p.id) {
-              <tr>
-                <td><a [routerLink]="['/projects', p.id]">{{ p.name }}</a></td>
-                <td>{{ p.rulesRef }}</td>
-                <td>{{ p.updatedAt | date: 'yyyy-MM-dd HH:mm' }}</td>
-              </tr>
-            }
-          </tbody>
-        </table>
+        <ul class="projects">
+          @for (p of list; track p.id) {
+            <li>
+              <a class="project" [routerLink]="['/projects', p.id]">
+                <span class="name">{{ p.name }}</span>
+                <span class="meta"><span class="badge accent">{{ p.rulesRef }}</span><span class="muted">Updated {{ p.updatedAt | date: 'd MMM yyyy, HH:mm' }}</span></span>
+                <span class="chev" aria-hidden="true">›</span>
+              </a>
+            </li>
+          }
+        </ul>
       }
     } @else {
       <p class="muted">Loading…</p>
     }
+  `,
+  styles: `
+    .projects { list-style: none; padding: 0; margin: 0; display: grid; gap: .75rem; }
+    .project { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: .25rem 1rem; padding: 1rem 1.25rem; background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); color: var(--text); text-decoration: none; min-height: calc(var(--target) + 24px); }
+    .project:hover { text-decoration: none; background: var(--surface-2); }
+    .name { font-size: 1.15rem; font-weight: 650; }
+    .meta { grid-column: 1; display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
+    .chev { grid-column: 2; grid-row: 1 / span 2; font-size: 1.8rem; color: var(--muted); }
   `,
 })
 export class ProjectList {

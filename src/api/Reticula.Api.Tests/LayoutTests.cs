@@ -8,6 +8,7 @@ using Reticula.Api.Projects;
 using Reticula.Domain.Auth;
 using Reticula.Infrastructure.Calc;
 using Reticula.Infrastructure.Geo;
+using static Reticula.Api.Tests.TestFixtures;
 
 namespace Reticula.Api.Tests;
 
@@ -15,9 +16,6 @@ namespace Reticula.Api.Tests;
 public class LayoutTests(ReticulaApiFactory factory)
 {
     private const double Lon = 28.10, Lat = -25.52;
-
-    private static PolygonDto Square(double lon, double lat, double d) =>
-        new("Polygon", [[[lon, lat], [lon + d, lat], [lon + d, lat + d], [lon, lat + d], [lon, lat]]]);
 
     private static CalcFeature Stand(string erf, double lon, string? zoning = "Residential 1") =>
         new($"pm-{erf}", Square(lon, Lat, 0.0003), 1000, erf, zoning, null, [], []);
@@ -28,13 +26,7 @@ public class LayoutTests(ReticulaApiFactory factory)
     private static CalcImportResult Result(string kind, IReadOnlyList<CalcFeature> features, params CalcIssue[] issues) =>
         new(kind, "kml", "WGS84", "test", features, issues, []);
 
-    private async Task<(HttpClient Client, Guid ProjectId)> NewProjectAsync()
-    {
-        var client = await factory.EngineerClientAsync();
-        var r = await client.PostAsJsonAsync("/api/projects", new SaveProjectRequest($"Layout {Guid.NewGuid():N}", "eskom/0.1.0", Square(28.09, -25.53, 0.03), null));
-        r.EnsureSuccessStatusCode();
-        return (client, (await r.Content.ReadFromJsonAsync<ProjectDto>())!.Id);
-    }
+    private Task<(HttpClient Client, Guid ProjectId)> NewProjectAsync() => factory.NewProjectAsync("Layout", Square(28.09, -25.53, 0.03));
 
     private static Task<HttpResponseMessage> UploadAsync(HttpClient client, Guid projectId, string kind, bool dryRun = false, string fileName = "layout.kml")
     {

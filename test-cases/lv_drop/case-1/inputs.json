@@ -1,0 +1,8 @@
+{
+  "rules": "eskom/0.8.0",
+  "conductor": "ABC-3C-70",
+  "route_m": 300,
+  "link_m": 5,
+  "kva": 30,
+  "phase": "RWB"
+}

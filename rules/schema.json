@@ -66,6 +66,16 @@
           "type": "string",
           "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)+$",
           "description": "Id of the clause in docs/standards-index.md"
+        },
+        "mv_max_drop_pct": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Largest MV voltage drop from the connection point to a transformer, % of nominal"
+        },
+        "lv_max_rise_pct": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Highest LV voltage above nominal at light load, %, which limits the transformer tap boost"
         }
       }
     },
@@ -180,7 +190,8 @@
                 "rating_a",
                 "ratings_a",
                 "fault_k",
-                "r_ac_ohm_per_km"
+                "r_ac_ohm_per_km",
+                "c_nf_per_km"
               ]
             },
             "description": "Fields whose values are placeholders, not yet from the governing standard"
@@ -197,6 +208,11 @@
           "r_ac_temp_c": {
             "type": "number",
             "description": "Conductor temperature for r_ac_ohm_per_km, °C"
+          },
+          "c_nf_per_km": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Capacitance to earth, nF/km (for load flow)"
           }
         }
       }
@@ -869,6 +885,1096 @@
           "type": "number",
           "exclusiveMinimum": 0,
           "description": "Smallest phase-to-neutral fault current allowed anywhere on a feeder; unset: reported only"
+        }
+      }
+    },
+    "mv_design": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Pre-design placement (plan 2.0): transformer sites, LV coverage and MV routing proposed from the loads and the road network before the field visit.",
+      "required": [
+        "transformer_ratings_kva",
+        "growth_pct",
+        "lv_reach_m",
+        "site_spacing_m",
+        "max_feeders",
+        "costs"
+      ],
+      "properties": {
+        "clause": {
+          "type": "string"
+        },
+        "index": {
+          "type": "string",
+          "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)+$",
+          "description": "Id of the clause in docs/standards-index.md"
+        },
+        "transformer_ratings_kva": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "description": "Standard distribution transformer ratings a site may be sized to"
+        },
+        "growth_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Load growth allowance: a transformer is sized so the design demand is at most rating × (1 − growth)"
+        },
+        "lv_reach_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Longest road distance from a transformer to a load it may supply, standing in for the voltage drop limit until the LV checks run"
+        },
+        "site_spacing_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Spacing of candidate transformer sites along roads"
+        },
+        "max_feeders": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "LV feeders a transformer may have; more is reported, not prevented"
+        },
+        "costs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "transformer_zar",
+            "lv_zar_per_m",
+            "mv_zar_per_m"
+          ],
+          "properties": {
+            "transformer_zar": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "number",
+                "minimum": 0
+              },
+              "description": "Installed cost per rating (kVA as the key), until the rate library carries it"
+            },
+            "lv_zar_per_m": {
+              "type": "number",
+              "minimum": 0
+            },
+            "mv_zar_per_m": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "mv_conductors": {
+      "type": "array",
+      "minItems": 0,
+      "items": {
+        "type": "object",
+        "required": [
+          "code",
+          "kind",
+          "r_ohm_per_km",
+          "x_ohm_per_km",
+          "rating_a"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "overhead",
+              "underground"
+            ]
+          },
+          "r_ohm_per_km": {
+            "type": "number",
+            "minimum": 0
+          },
+          "x_ohm_per_km": {
+            "type": "number",
+            "minimum": 0
+          },
+          "rating_a": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "clause": {
+            "type": "string"
+          },
+          "index": {
+            "type": "string",
+            "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)+$",
+            "description": "Id of the clause in docs/standards-index.md"
+          },
+          "material": {
+            "type": "string",
+            "enum": [
+              "cu",
+              "al"
+            ]
+          },
+          "size_mm2": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Nominal phase conductor size"
+          },
+          "cores": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "uses": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": [
+                "mv"
+              ]
+            },
+            "description": "mv: MV distribution"
+          },
+          "ratings_a": {
+            "type": "object",
+            "additionalProperties": false,
+            "minProperties": 1,
+            "properties": {
+              "ground": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "pipe": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "air": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            },
+            "description": "Continuous current rating by installation, A, at the standard conditions of the rating clause"
+          },
+          "fault_k": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "K in I = K·A/√t, giving kA with A in mm² and t in s"
+          },
+          "placeholder": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": [
+                "r_ohm_per_km",
+                "x_ohm_per_km",
+                "rating_a",
+                "ratings_a",
+                "fault_k",
+                "r_ac_ohm_per_km",
+                "c_nf_per_km"
+              ]
+            },
+            "description": "Fields whose values are placeholders, not yet from the governing standard"
+          },
+          "rating_clause": {
+            "type": "string",
+            "description": "Where the ratings and fault constant come from, when that differs from clause"
+          },
+          "r_ac_ohm_per_km": {
+            "type": "number",
+            "minimum": 0,
+            "description": "AC resistance at r_ac_temp_c, ohm/km"
+          },
+          "r_ac_temp_c": {
+            "type": "number",
+            "description": "Conductor temperature for r_ac_ohm_per_km, °C"
+          },
+          "c_nf_per_km": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Capacitance to earth, nF/km (for load flow)"
+          },
+          "voltage_kv": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Rated system voltage"
+          }
+        }
+      },
+      "description": "MV overhead conductors and cables (Phase 3.3), in the same shape as conductors"
+    },
+    "overhead": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "clause": {
+          "type": "string"
+        },
+        "index": {
+          "type": "string",
+          "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)+$",
+          "description": "Id of the clause in docs/standards-index.md"
+        },
+        "lv": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "max_span_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "min_span_m": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Route vertices closer than this to the last pole get no pole of their own"
+            },
+            "pole_heights_m": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            },
+            "attachment_below_top_m": {
+              "type": "number",
+              "minimum": 0
+            },
+            "setting_depth_fraction": {
+              "type": "number",
+              "minimum": 0
+            },
+            "setting_depth_fixed_m": {
+              "type": "number",
+              "minimum": 0
+            },
+            "min_ground_clearance_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "everyday_tension_pct": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Everyday tension, % of breaking load"
+            },
+            "max_tension_pct": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Largest tension in any state, % of breaking load"
+            },
+            "default_conductor": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "max_span_m",
+            "min_span_m",
+            "pole_heights_m",
+            "attachment_below_top_m",
+            "setting_depth_fraction",
+            "setting_depth_fixed_m",
+            "min_ground_clearance_m",
+            "everyday_tension_pct",
+            "max_tension_pct"
+          ]
+        },
+        "mv": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "max_span_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "min_span_m": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Route vertices closer than this to the last pole get no pole of their own"
+            },
+            "pole_heights_m": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            },
+            "attachment_below_top_m": {
+              "type": "number",
+              "minimum": 0
+            },
+            "setting_depth_fraction": {
+              "type": "number",
+              "minimum": 0
+            },
+            "setting_depth_fixed_m": {
+              "type": "number",
+              "minimum": 0
+            },
+            "min_ground_clearance_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "everyday_tension_pct": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Everyday tension, % of breaking load"
+            },
+            "max_tension_pct": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Largest tension in any state, % of breaking load"
+            },
+            "default_conductor": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "max_span_m",
+            "min_span_m",
+            "pole_heights_m",
+            "attachment_below_top_m",
+            "setting_depth_fraction",
+            "setting_depth_fixed_m",
+            "min_ground_clearance_m",
+            "everyday_tension_pct",
+            "max_tension_pct"
+          ]
+        },
+        "states": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "everyday_temp_c": {
+              "type": "number"
+            },
+            "max_temp_c": {
+              "type": "number",
+              "description": "Conductor temperature for the largest sag"
+            },
+            "min_temp_c": {
+              "type": "number"
+            },
+            "wind_pressure_pa": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Wind on the conductor's projected area, with the minimum temperature"
+            }
+          },
+          "required": [
+            "everyday_temp_c",
+            "max_temp_c",
+            "min_temp_c",
+            "wind_pressure_pa"
+          ]
+        },
+        "min_deviation_deg": {
+          "type": "number",
+          "minimum": 0,
+          "description": "A route vertex that turns less than this gets no pole of its own"
+        },
+        "stay_angle_deg": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Poles that turn the line more than this are stayed; terminal poles always are"
+        },
+        "stay_slope_deg": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 90,
+          "description": "Angle between stay and pole"
+        },
+        "pole_classes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "class": {
+                "type": "string"
+              },
+              "tip_load_kn": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Working load at the tip"
+              }
+            },
+            "required": [
+              "class",
+              "tip_load_kn"
+            ]
+          }
+        },
+        "mechanical": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "mass_kg_per_km": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "diameter_mm": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "area_mm2": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Tension-carrying area"
+              },
+              "breaking_load_kn": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "modulus_gpa": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "expansion_per_c": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            },
+            "required": [
+              "mass_kg_per_km",
+              "diameter_mm",
+              "area_mm2",
+              "breaking_load_kn",
+              "modulus_gpa",
+              "expansion_per_c"
+            ]
+          },
+          "description": "Mechanical data by conductor code"
+        }
+      },
+      "required": [
+        "lv",
+        "mv",
+        "states",
+        "min_deviation_deg",
+        "stay_angle_deg",
+        "stay_slope_deg",
+        "pole_classes",
+        "mechanical"
+      ],
+      "description": "Overhead line design (Phase 2.5): pole placement, sag and tension, ground clearance, pole class and stays"
+    },
+    "underground": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "clause": {
+          "type": "string"
+        },
+        "index": {
+          "type": "string",
+          "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)+$",
+          "description": "Id of the clause in docs/standards-index.md"
+        },
+        "standard": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "soil_resistivity_kmw": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "depth_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "ground_temp_c": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "soil_resistivity_kmw",
+            "depth_m",
+            "ground_temp_c"
+          ]
+        },
+        "design": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "soil_resistivity_kmw": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "depth_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "ground_temp_c": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "soil_resistivity_kmw",
+            "depth_m",
+            "ground_temp_c"
+          ]
+        },
+        "factors": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "soil_resistivity": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": {
+                  "type": "number"
+                }
+              },
+              "description": "[x, factor] pairs, interpolated linearly and held at the ends"
+            },
+            "depth": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": {
+                  "type": "number"
+                }
+              },
+              "description": "[x, factor] pairs, interpolated linearly and held at the ends"
+            },
+            "ground_temp": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": {
+                  "type": "number"
+                }
+              },
+              "description": "[x, factor] pairs, interpolated linearly and held at the ends"
+            },
+            "grouping": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": {
+                  "type": "number"
+                }
+              },
+              "description": "[x, factor] pairs, interpolated linearly and held at the ends"
+            }
+          },
+          "required": [
+            "soil_resistivity",
+            "depth",
+            "ground_temp",
+            "grouping"
+          ]
+        },
+        "pipe_threshold_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Above this share of a cable's length in pipe, its pipe rating applies"
+        },
+        "pipe_share_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Share of each feeder's length assumed in pipe (road crossings)"
+        },
+        "trench_shared_m": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Feeders leaving one source share a trench for this distance"
+        },
+        "kiosk": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "boxes": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "box_loads": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "spacing_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "max_service_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          },
+          "required": [
+            "boxes",
+            "box_loads",
+            "spacing_m",
+            "max_service_m"
+          ]
+        },
+        "default_conductor": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "standard",
+        "design",
+        "factors",
+        "pipe_threshold_pct",
+        "pipe_share_pct",
+        "trench_shared_m",
+        "kiosk",
+        "default_conductor"
+      ],
+      "description": "Underground cable checks (Phase 2.6): de-rating and kiosks"
+    },
+    "construction": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "clause": {
+          "type": "string"
+        },
+        "index": {
+          "type": "string",
+          "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)+$",
+          "description": "Id of the clause in docs/standards-index.md"
+        },
+        "allowed": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "overhead",
+              "underground"
+            ]
+          }
+        },
+        "default": {
+          "type": "string",
+          "enum": [
+            "overhead",
+            "underground"
+          ]
+        }
+      },
+      "required": [
+        "allowed",
+        "default"
+      ],
+      "description": "Which LV construction a design may use (Phase 2.7)"
+    },
+    "transformers": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "clause": {
+          "type": "string"
+        },
+        "index": {
+          "type": "string",
+          "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)+$",
+          "description": "Id of the clause in docs/standards-index.md"
+        },
+        "ratings_kva": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "pole_mount_ratings_kva": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "minisub_ratings_kva": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "growth_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "max_loading_pct": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "impedance_pct": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          },
+          "description": "By rating, kVA as the key"
+        },
+        "x_over_r": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          },
+          "description": "By rating, kVA as the key"
+        },
+        "no_load_loss_w": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          },
+          "description": "By rating, kVA as the key"
+        },
+        "load_loss_w": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          },
+          "description": "By rating, kVA as the key"
+        },
+        "taps_pct": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "number"
+          }
+        },
+        "underground_minisub": {
+          "type": "boolean",
+          "description": "Underground construction is fed from mini-subs only"
+        }
+      },
+      "required": [
+        "ratings_kva",
+        "pole_mount_ratings_kva",
+        "minisub_ratings_kva",
+        "growth_pct",
+        "max_loading_pct",
+        "impedance_pct",
+        "x_over_r",
+        "no_load_loss_w",
+        "load_loss_w",
+        "taps_pct",
+        "underground_minisub"
+      ],
+      "description": "Transformer sizing and selection (Phase 3.1, 3.2)"
+    },
+    "mv_network": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "clause": {
+          "type": "string"
+        },
+        "index": {
+          "type": "string",
+          "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)+$",
+          "description": "Id of the clause in docs/standards-index.md"
+        },
+        "join_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "near_miss_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "source_reach_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "tap_reach_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "default_conductor": {
+          "type": "string"
+        },
+        "default_cable": {
+          "type": "string"
+        },
+        "power_factor": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        }
+      },
+      "required": [
+        "join_m",
+        "near_miss_m",
+        "source_reach_m",
+        "tap_reach_m",
+        "default_conductor",
+        "default_cable",
+        "power_factor"
+      ],
+      "description": "MV network from the marked MV routes (Phase 3.3, 3.4)"
+    },
+    "bulk": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "clause": {
+          "type": "string"
+        },
+        "index": {
+          "type": "string",
+          "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)+$",
+          "description": "Id of the clause in docs/standards-index.md"
+        },
+        "supply_steps_kva": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "c_max_mv": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "c_min_mv": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "c_max_lv": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "c_min_lv": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "mv_switchgear_ka": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "lv_clearing_s": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "mv_clearing_s": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "zero_sequence": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "lv": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "r0_ratio": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "x0_ratio": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
+              },
+              "required": [
+                "r0_ratio",
+                "x0_ratio"
+              ]
+            },
+            "mv_overhead": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "r0_ratio": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "x0_ratio": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
+              },
+              "required": [
+                "r0_ratio",
+                "x0_ratio"
+              ]
+            },
+            "mv_cable": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "r0_ratio": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "x0_ratio": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
+              },
+              "required": [
+                "r0_ratio",
+                "x0_ratio"
+              ]
+            }
+          },
+          "required": [
+            "lv",
+            "mv_overhead",
+            "mv_cable"
+          ]
+        },
+        "transformer_vector_group": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "supply_steps_kva",
+        "c_max_mv",
+        "c_min_mv",
+        "c_max_lv",
+        "c_min_lv",
+        "mv_switchgear_ka",
+        "lv_clearing_s",
+        "mv_clearing_s",
+        "zero_sequence",
+        "transformer_vector_group"
+      ],
+      "description": "Bulk supply, load flow and fault study settings (Phase 4)"
+    },
+    "economics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "clause": {
+          "type": "string"
+        },
+        "index": {
+          "type": "string",
+          "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)+$",
+          "description": "Id of the clause in docs/standards-index.md"
+        },
+        "period_years": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "discount_rate_pct": {
+          "type": "number",
+          "minimum": 0
+        },
+        "energy_cost_zar_per_kwh": {
+          "type": "number",
+          "minimum": 0
+        },
+        "load_growth_pct": {
+          "type": "number"
+        },
+        "loss_load_factor": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "rate_uncertainty_pct": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "period_years",
+        "discount_rate_pct",
+        "energy_cost_zar_per_kwh",
+        "load_growth_pct",
+        "loss_load_factor",
+        "rate_uncertainty_pct"
+      ],
+      "description": "Default economic assumptions for lifetime cost (Phase 5.1); a design run may override them"
+    },
+    "load_classes": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Load class of a building that has not been inspected, from its stand's zoning (plans 1.3, 2.0)",
+      "required": [
+        "residential_types",
+        "by_zone"
+      ],
+      "properties": {
+        "clause": {
+          "type": "string"
+        },
+        "index": {
+          "type": "string",
+          "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)+$",
+          "description": "Id of the clause in docs/standards-index.md"
+        },
+        "residential_types": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "description": "Predicted building types that are residential loads with a load class"
+        },
+        "default": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Load class where no zoning entry matches; null leaves the building without a class"
+        },
+        "by_zone": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "zone",
+              "load_class"
+            ],
+            "properties": {
+              "zone": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Matched case-insensitively within the stand's zoning; the longest match wins"
+              },
+              "load_class": {
+                "type": "string",
+                "description": "A class code of the design load table"
+              }
+            }
+          }
         }
       }
     }

@@ -4,6 +4,7 @@ using Reticula.Api.Auth;
 using Reticula.Infrastructure.Geo;
 using Reticula.Api.Projects;
 using Reticula.Domain.Auth;
+using static Reticula.Api.Tests.TestFixtures;
 
 namespace Reticula.Api.Tests;
 
@@ -11,9 +12,6 @@ namespace Reticula.Api.Tests;
 public class ProjectTests(ReticulaApiFactory factory)
 {
     // A small square in Soshanguve, Gauteng.
-    private static PolygonDto Square(double lon = 28.10, double lat = -25.52, double d = 0.01) =>
-        new("Polygon", [[[lon, lat], [lon + d, lat], [lon + d, lat + d], [lon, lat + d], [lon, lat]]]);
-
     private static SaveProjectRequest NewRequest(string name = "Soshanguve Ext 19") =>
         new(name, "eskom/0.1.0", Square(), null);
 

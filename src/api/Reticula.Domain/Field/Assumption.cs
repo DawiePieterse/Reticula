@@ -3,7 +3,10 @@ namespace Reticula.Domain.Field;
 public enum AssumptionStatus
 {
     Open,
+    /// <summary>Resolved: the data the assumption stood in for is now there.</summary>
     Cleared,
+    /// <summary>Accepted as stated by the engineer, with a note; it stays in the register and the report.</summary>
+    Confirmed,
 }
 
 public static class AssumptionCodes
@@ -11,6 +14,8 @@ public static class AssumptionCodes
     public const string AdmdEstimated = "admd_estimated";
     public const string AdmdOverridden = "admd_overridden";
     public const string IndicatorsMissing = "indicators_missing";
+    /// <summary>A placeholder value in the rules file that the design used (one per placeholder text).</summary>
+    public const string RulesPlaceholder = "rules_placeholder";
 }
 
 /// <summary>
@@ -54,6 +59,16 @@ public sealed class Assumption
         ClearedBy = null;
         ClearedAt = null;
         ClearNote = null;
+        UpdatedAt = now;
+    }
+
+    /// <summary>The engineer accepts the assumption as stated (plan 7.1); the note says why.</summary>
+    public void Confirm(Guid by, string note, DateTimeOffset now)
+    {
+        Status = AssumptionStatus.Confirmed;
+        ClearedBy = by;
+        ClearedAt = now;
+        ClearNote = note;
         UpdatedAt = now;
     }
 

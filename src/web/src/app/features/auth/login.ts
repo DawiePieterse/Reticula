@@ -8,7 +8,7 @@ import { AuthService } from '../../core/auth/auth.service';
   selector: 'app-login',
   imports: [ReactiveFormsModule],
   template: `
-    <form class="login" [formGroup]="form" (ngSubmit)="submit()">
+    <form class="login card" [formGroup]="form" (ngSubmit)="submit()">
       <h2>Sign in</h2>
       <label>Email <input type="email" formControlName="email" autocomplete="username" /></label>
       <label>Password <input type="password" formControlName="password" autocomplete="current-password" /></label>
@@ -18,7 +18,7 @@ import { AuthService } from '../../core/auth/auth.service';
       <button type="submit" class="primary" [disabled]="form.invalid || busy()">{{ busy() ? 'Signing in…' : 'Sign in' }}</button>
     </form>
   `,
-  styles: `.login { max-width: 22rem; margin: 3rem auto; }`,
+  styles: `.login { max-width: 24rem; margin: 10vh auto; } .login button { width: 100%; }`,
 })
 export class Login {
   readonly returnUrl = input<string>();

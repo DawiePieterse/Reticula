@@ -2,11 +2,12 @@ using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using Reticula.Api.Infrastructure;
 using Reticula.Domain.Auth;
 using Reticula.Domain.Jobs;
 using Reticula.Infrastructure.Data;
-using Reticula.Infrastructure.Jobs;
 using Reticula.Infrastructure.Jobs.Handlers;
+using Reticula.Infrastructure.Jobs;
 
 namespace Reticula.Api.Jobs;
 
@@ -57,7 +58,7 @@ public static class JobEndpoints
 
     private static async Task<Accepted<JobDto>> StartDiagnostics(IJobQueue queue, ClaimsPrincipal user, CancellationToken ct)
     {
-        var userId = Guid.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var userId = user.UserId();
         var run = await queue.EnqueueAsync(DiagnosticsJob.JobKind, null, userId, null, ct);
         return TypedResults.Accepted($"/api/jobs/{run.Id}", JobDto.From(run));
     }

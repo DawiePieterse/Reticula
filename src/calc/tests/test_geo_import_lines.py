@@ -5,8 +5,10 @@ import json
 import zipfile
 
 import ezdxf
+import numpy as np
 import pytest
 import shapefile
+import tifffile
 
 from reticula_calc.geo.importers import UnreadableFileError, asset_type, import_file
 
@@ -91,6 +93,29 @@ class TestContours:
         assert any(i.code == "elevation_missing" and i.severity == "error" for i in import_file("c.geojson", fc(line(STREET)), "contours", area=AREA).issues)
         odd = import_file("c.geojson", fc(line(STREET, elevation=125000)), "contours", area=AREA)
         assert "elevation_implausible" in {i.code for i in odd.issues}
+
+    def test_geotiff_without_georeferencing_raises_error(self):
+        """GeoTIFF without georeference tags should raise UnreadableFileError."""
+        # Create a simple TIFF without georeferencing
+        raster = np.random.rand(100, 100).astype(np.float32)
+        buf = io.BytesIO()
+        with tifffile.TiffWriter(buf) as tif:
+            tif.write(raster)
+        data = buf.getvalue()
+
+        with pytest.raises(UnreadableFileError, match="georeferencing"):
+            import_file("no_geo.tif", data, "contours")
+
+    def test_geotiff_only_for_contours(self):
+        """GeoTIFF should only be imported as contours, not other kinds."""
+        raster = np.full((50, 50), 1200.0, dtype=np.float32)
+        buf = io.BytesIO()
+        with tifffile.TiffWriter(buf) as tif:
+            tif.write(raster)
+        data = buf.getvalue()
+
+        with pytest.raises(UnreadableFileError, match="only supported for contours"):
+            import_file("dem.tif", data, "stands")
 
 
 class TestNetwork:

@@ -1,0 +1,1698 @@
+{
+ "name": "Indicative rates (placeholder)",
+ "rate_date": "2026-10-01",
+ "source": "Reticula indicative placeholder rates for testing the cost model; not a supplier price list or a tender rate",
+ "currency": "ZAR",
+ "indicative": true,
+ "items": [
+  {
+   "code": "LAB-POLE",
+   "description": "Labour: dig, erect and backfill a pole",
+   "unit": "each",
+   "rate": 950,
+   "category": "labour"
+  },
+  {
+   "code": "LAB-STRING-M",
+   "description": "Labour: string conductor",
+   "unit": "m",
+   "rate": 9,
+   "category": "labour"
+  },
+  {
+   "code": "LAB-CABLE-M",
+   "description": "Labour: lay cable",
+   "unit": "m",
+   "rate": 14,
+   "category": "labour"
+  },
+  {
+   "code": "LAB-TRENCH-M",
+   "description": "Labour and plant: excavate and backfill trench",
+   "unit": "m",
+   "rate": 160,
+   "category": "labour"
+  },
+  {
+   "code": "LAB-SERVICE",
+   "description": "Labour: service connection",
+   "unit": "each",
+   "rate": 450,
+   "category": "labour"
+  },
+  {
+   "code": "LAB-TX",
+   "description": "Labour and crane: install transformer",
+   "unit": "each",
+   "rate": 6500,
+   "category": "labour"
+  },
+  {
+   "code": "LAB-MINISUB",
+   "description": "Labour and crane: install mini-sub on plinth",
+   "unit": "each",
+   "rate": 14000,
+   "category": "labour"
+  },
+  {
+   "code": "POLE-WOOD-7M",
+   "description": "Treated wood pole 7 m",
+   "unit": "each",
+   "rate": 1350,
+   "category": "material"
+  },
+  {
+   "code": "POLE-WOOD-9M",
+   "description": "Treated wood pole 9 m",
+   "unit": "each",
+   "rate": 1900,
+   "category": "material"
+  },
+  {
+   "code": "POLE-WOOD-11M",
+   "description": "Treated wood pole 11 m",
+   "unit": "each",
+   "rate": 2900,
+   "category": "material"
+  },
+  {
+   "code": "POLE-WOOD-12M",
+   "description": "Treated wood pole 12 m",
+   "unit": "each",
+   "rate": 3300,
+   "category": "material"
+  },
+  {
+   "code": "POLE-WOOD-13M",
+   "description": "Treated wood pole 13 m",
+   "unit": "each",
+   "rate": 3800,
+   "category": "material"
+  },
+  {
+   "code": "HW-LV-POLE",
+   "description": "LV pole hardware (suspension, insulators, bolts)",
+   "unit": "set",
+   "rate": 380,
+   "category": "material"
+  },
+  {
+   "code": "HW-MV-POLE",
+   "description": "MV pole hardware (crossarm, insulators, bolts)",
+   "unit": "set",
+   "rate": 1650,
+   "category": "material"
+  },
+  {
+   "code": "STAY-SET",
+   "description": "Stay set: wire, rod, anchor, insulator",
+   "unit": "set",
+   "rate": 1150,
+   "category": "material"
+  },
+  {
+   "code": "SDB",
+   "description": "Service distribution box",
+   "unit": "each",
+   "rate": 520,
+   "category": "material"
+  },
+  {
+   "code": "KIOSK-12",
+   "description": "Metering kiosk, 12 ways",
+   "unit": "each",
+   "rate": 7800,
+   "category": "material"
+  },
+  {
+   "code": "SERVICE-CONN-OH",
+   "description": "Overhead service connection kit (bracket, clamps, meter tail)",
+   "unit": "each",
+   "rate": 680,
+   "category": "material"
+  },
+  {
+   "code": "SERVICE-CONN-UG",
+   "description": "Underground service connection kit (gland, terminations)",
+   "unit": "each",
+   "rate": 820,
+   "category": "material"
+  },
+  {
+   "code": "SERVICE-CABLE-OH",
+   "description": "Service cable, 1 × 16 mm² ABC",
+   "unit": "m",
+   "rate": 22,
+   "category": "material"
+  },
+  {
+   "code": "SERVICE-CABLE-UG",
+   "description": "Service cable, 2-core 16 mm² Cu",
+   "unit": "m",
+   "rate": 95,
+   "category": "material"
+  },
+  {
+   "code": "MV-TEE",
+   "description": "MV tee-off: drop-out fuses, surge arresters, earthing",
+   "unit": "set",
+   "rate": 14500,
+   "category": "material"
+  },
+  {
+   "code": "MV-CONNECTION",
+   "description": "Connection to the authority's MV network: isolation and metering",
+   "unit": "each",
+   "rate": 95000,
+   "category": "material"
+  },
+  {
+   "code": "EARTH-TX",
+   "description": "Transformer earthing: electrodes and conductor",
+   "unit": "set",
+   "rate": 4200,
+   "category": "material"
+  },
+  {
+   "code": "CABLE-TERM-MV",
+   "description": "MV cable termination",
+   "unit": "each",
+   "rate": 6800,
+   "category": "material"
+  },
+  {
+   "code": "CABLE-TERM-LV",
+   "description": "LV cable termination",
+   "unit": "each",
+   "rate": 650,
+   "category": "material"
+  },
+  {
+   "code": "COND-ABC-3C-25",
+   "description": "3 × 25 mm² Al ABC + 25 mm² Al insulated neutral (self-supporting), XLPE, 600/1000 V",
+   "unit": "m",
+   "rate": 27.25,
+   "category": "material"
+  },
+  {
+   "code": "COND-ABC-3C-35",
+   "description": "3 × 35 mm² Al ABC + 35 mm² Al insulated neutral (self-supporting), XLPE, 600/1000 V",
+   "unit": "m",
+   "rate": 35.75,
+   "category": "material"
+  },
+  {
+   "code": "COND-ABC-3C-50",
+   "description": "3 × 50 mm² Al ABC + 50 mm² Al insulated neutral (self-supporting), XLPE, 600/1000 V",
+   "unit": "m",
+   "rate": 48.5,
+   "category": "material"
+  },
+  {
+   "code": "COND-ABC-3C-70",
+   "description": "3 × 70 mm² Al ABC + 70 mm² Al insulated neutral (self-supporting), XLPE, 600/1000 V",
+   "unit": "m",
+   "rate": 65.5,
+   "category": "material"
+  },
+  {
+   "code": "COND-ABC-3C-95",
+   "description": "3 × 95 mm² Al ABC + 95 mm² Al insulated neutral (self-supporting), XLPE, 600/1000 V",
+   "unit": "m",
+   "rate": 86.75,
+   "category": "material"
+  },
+  {
+   "code": "COND-ABC-3C-120",
+   "description": "3 × 120 mm² Al ABC + 120 mm² Al insulated neutral (self-supporting), XLPE, 600/1000 V",
+   "unit": "m",
+   "rate": 108.0,
+   "category": "material"
+  },
+  {
+   "code": "COND-ABC-3C-150",
+   "description": "3 × 150 mm² Al ABC + 150 mm² Al insulated neutral (self-supporting), XLPE, 600/1000 V",
+   "unit": "m",
+   "rate": 133.5,
+   "category": "material"
+  },
+  {
+   "code": "COND-ABC-1C-16",
+   "description": "16 mm² Al ABC, 1 phase + Al insulated neutral (self-supporting), XLPE, 600/1000 V",
+   "unit": "m",
+   "rate": 12.08,
+   "category": "material"
+  },
+  {
+   "code": "COND-ABC-1C-25",
+   "description": "25 mm² Al ABC, 1 phase + Al insulated neutral (self-supporting), XLPE, 600/1000 V",
+   "unit": "m",
+   "rate": 15.5,
+   "category": "material"
+  },
+  {
+   "code": "COND-ABC-1C-35",
+   "description": "35 mm² Al ABC, 1 phase + Al insulated neutral (self-supporting), XLPE, 600/1000 V",
+   "unit": "m",
+   "rate": 19.3,
+   "category": "material"
+  },
+  {
+   "code": "COND-ABC-1C-50",
+   "description": "50 mm² Al ABC, 1 phase + Al insulated neutral (self-supporting), XLPE, 600/1000 V",
+   "unit": "m",
+   "rate": 25.0,
+   "category": "material"
+  },
+  {
+   "code": "COND-ABC-1C-70",
+   "description": "70 mm² Al ABC, 1 phase + Al insulated neutral (self-supporting), XLPE, 600/1000 V",
+   "unit": "m",
+   "rate": 32.6,
+   "category": "material"
+  },
+  {
+   "code": "COND-ABC-1C-95",
+   "description": "95 mm² Al ABC, 1 phase + Al insulated neutral (self-supporting), XLPE, 600/1000 V",
+   "unit": "m",
+   "rate": 42.1,
+   "category": "material"
+  },
+  {
+   "code": "COND-ABC-1C-120",
+   "description": "120 mm² Al ABC, 1 phase + Al insulated neutral (self-supporting), XLPE, 600/1000 V",
+   "unit": "m",
+   "rate": 51.6,
+   "category": "material"
+  },
+  {
+   "code": "COND-ABC-1C-150",
+   "description": "150 mm² Al ABC, 1 phase + Al insulated neutral (self-supporting), XLPE, 600/1000 V",
+   "unit": "m",
+   "rate": 63.0,
+   "category": "material"
+  },
+  {
+   "code": "COND-CU-2C-16",
+   "description": "16 mm² Cu 2-core PVC/SWA/PVC 600/1000 V",
+   "unit": "m",
+   "rate": 53.68,
+   "category": "material"
+  },
+  {
+   "code": "COND-CU-4C-16",
+   "description": "16 mm² Cu 4-core PVC/SWA/PVC 600/1000 V",
+   "unit": "m",
+   "rate": 79.6,
+   "category": "material"
+  },
+  {
+   "code": "COND-CU-2C-25",
+   "description": "25 mm² Cu 2-core PVC/SWA/PVC 600/1000 V",
+   "unit": "m",
+   "rate": 71.5,
+   "category": "material"
+  },
+  {
+   "code": "COND-CU-4C-25",
+   "description": "25 mm² Cu 4-core PVC/SWA/PVC 600/1000 V",
+   "unit": "m",
+   "rate": 112.0,
+   "category": "material"
+  },
+  {
+   "code": "COND-CU-2C-35",
+   "description": "35 mm² Cu 2-core PVC/SWA/PVC 600/1000 V",
+   "unit": "m",
+   "rate": 91.3,
+   "category": "material"
+  },
+  {
+   "code": "COND-CU-4C-35",
+   "description": "35 mm² Cu 4-core PVC/SWA/PVC 600/1000 V",
+   "unit": "m",
+   "rate": 148.0,
+   "category": "material"
+  },
+  {
+   "code": "COND-CU-4C-70",
+   "description": "70 mm² Cu 4-core PVC/SWA/PVC 600/1000 V",
+   "unit": "m",
+   "rate": 274.0,
+   "category": "material"
+  },
+  {
+   "code": "COND-CU-4C-120",
+   "description": "120 mm² Cu 4-core PVC/SWA/PVC 600/1000 V",
+   "unit": "m",
+   "rate": 454.0,
+   "category": "material"
+  },
+  {
+   "code": "COND-CU-4C-150",
+   "description": "150 mm² Cu 4-core PVC/SWA/PVC 600/1000 V",
+   "unit": "m",
+   "rate": 562.0,
+   "category": "material"
+  },
+  {
+   "code": "COND-CU-4C-185",
+   "description": "185 mm² Cu 4-core PVC/SWA/PVC 600/1000 V",
+   "unit": "m",
+   "rate": 688.0,
+   "category": "material"
+  },
+  {
+   "code": "COND-CU-4C-240",
+   "description": "240 mm² Cu 4-core PVC/SWA/PVC 600/1000 V",
+   "unit": "m",
+   "rate": 886.0,
+   "category": "material"
+  },
+  {
+   "code": "COND-AL-2C-25",
+   "description": "25 mm² Al 2-core PVC/SWA/PVC 600/1000 V",
+   "unit": "m",
+   "rate": 24.13,
+   "category": "material"
+  },
+  {
+   "code": "COND-AL-4C-25",
+   "description": "25 mm² Al 4-core PVC/SWA/PVC 600/1000 V",
+   "unit": "m",
+   "rate": 36.5,
+   "category": "material"
+  },
+  {
+   "code": "COND-AL-2C-35",
+   "description": "35 mm² Al 2-core PVC/SWA/PVC 600/1000 V",
+   "unit": "m",
+   "rate": 30.18,
+   "category": "material"
+  },
+  {
+   "code": "COND-AL-4C-35",
+   "description": "35 mm² Al 4-core PVC/SWA/PVC 600/1000 V",
+   "unit": "m",
+   "rate": 47.5,
+   "category": "material"
+  },
+  {
+   "code": "COND-AL-4C-70",
+   "description": "70 mm² Al 4-core PVC/SWA/PVC 600/1000 V",
+   "unit": "m",
+   "rate": 86.0,
+   "category": "material"
+  },
+  {
+   "code": "COND-AL-4C-120",
+   "description": "120 mm² Al 4-core PVC/SWA/PVC 600/1000 V",
+   "unit": "m",
+   "rate": 141.0,
+   "category": "material"
+  },
+  {
+   "code": "COND-AL-4C-150",
+   "description": "150 mm² Al 4-core PVC/SWA/PVC 600/1000 V",
+   "unit": "m",
+   "rate": 174.0,
+   "category": "material"
+  },
+  {
+   "code": "COND-AL-4C-185",
+   "description": "185 mm² Al 4-core PVC/SWA/PVC 600/1000 V",
+   "unit": "m",
+   "rate": 212.5,
+   "category": "material"
+  },
+  {
+   "code": "COND-AL-4C-240",
+   "description": "240 mm² Al 4-core PVC/SWA/PVC 600/1000 V",
+   "unit": "m",
+   "rate": 273.0,
+   "category": "material"
+  },
+  {
+   "code": "COND-SQUIRREL",
+   "description": "ACSR 6/1/2.11 (Squirrel)",
+   "unit": "m",
+   "rate": 8.62,
+   "category": "material"
+  },
+  {
+   "code": "COND-GOPHER",
+   "description": "ACSR 6/1/2.36 (Gopher)",
+   "unit": "m",
+   "rate": 9.72,
+   "category": "material"
+  },
+  {
+   "code": "COND-FOX",
+   "description": "ACSR 6/1/2.79 (Fox)",
+   "unit": "m",
+   "rate": 12.14,
+   "category": "material"
+  },
+  {
+   "code": "COND-RABBIT",
+   "description": "ACSR 6/1/3.35 (Rabbit)",
+   "unit": "m",
+   "rate": 15.66,
+   "category": "material"
+  },
+  {
+   "code": "COND-MINK",
+   "description": "ACSR 6/1/3.66 (Mink)",
+   "unit": "m",
+   "rate": 17.86,
+   "category": "material"
+  },
+  {
+   "code": "COND-OAK",
+   "description": "AAAC 7/4.65 (Oak)",
+   "unit": "m",
+   "rate": 30.18,
+   "category": "material"
+  },
+  {
+   "code": "COND-HARE",
+   "description": "ACSR 6/1/4.72 (Hare)",
+   "unit": "m",
+   "rate": 27.1,
+   "category": "material"
+  },
+  {
+   "code": "COND-WOLF",
+   "description": "ACSR 30/7/2.59 (Wolf)",
+   "unit": "m",
+   "rate": 38.76,
+   "category": "material"
+  },
+  {
+   "code": "COND-PANTHER",
+   "description": "ACSR 30/7/3.00 (Panther)",
+   "unit": "m",
+   "rate": 50.64,
+   "category": "material"
+  },
+  {
+   "code": "COND-MV-AL-3C-35",
+   "description": "11 kV 3-core 35 mm² Al XLPE",
+   "unit": "m",
+   "rate": 204.0,
+   "category": "material"
+  },
+  {
+   "code": "COND-MV-AL-3C-70",
+   "description": "11 kV 3-core 70 mm² Al XLPE",
+   "unit": "m",
+   "rate": 288.0,
+   "category": "material"
+  },
+  {
+   "code": "COND-MV-AL-3C-95",
+   "description": "11 kV 3-core 95 mm² Al XLPE",
+   "unit": "m",
+   "rate": 348.0,
+   "category": "material"
+  },
+  {
+   "code": "COND-MV-AL-3C-185",
+   "description": "11 kV 3-core 185 mm² Al XLPE",
+   "unit": "m",
+   "rate": 564.0,
+   "category": "material"
+  },
+  {
+   "code": "COND-MV-CU-3C-95",
+   "description": "11 kV 3-core 95 mm² Cu XLPE",
+   "unit": "m",
+   "rate": 648.0,
+   "category": "material"
+  },
+  {
+   "code": "TX-POLE-16",
+   "description": "Pole-mounted transformer 16 kVA, 11/0.42 kV",
+   "unit": "each",
+   "rate": 42000,
+   "category": "material"
+  },
+  {
+   "code": "TX-POLE-25",
+   "description": "Pole-mounted transformer 25 kVA, 11/0.42 kV",
+   "unit": "each",
+   "rate": 52000,
+   "category": "material"
+  },
+  {
+   "code": "TX-POLE-50",
+   "description": "Pole-mounted transformer 50 kVA, 11/0.42 kV",
+   "unit": "each",
+   "rate": 68000,
+   "category": "material"
+  },
+  {
+   "code": "TX-POLE-100",
+   "description": "Pole-mounted transformer 100 kVA, 11/0.42 kV",
+   "unit": "each",
+   "rate": 98000,
+   "category": "material"
+  },
+  {
+   "code": "TX-POLE-200",
+   "description": "Pole-mounted transformer 200 kVA, 11/0.42 kV",
+   "unit": "each",
+   "rate": 145000,
+   "category": "material"
+  },
+  {
+   "code": "MINISUB-200",
+   "description": "Mini-substation 200 kVA, 11/0.42 kV",
+   "unit": "each",
+   "rate": 285000,
+   "category": "material"
+  },
+  {
+   "code": "MINISUB-315",
+   "description": "Mini-substation 315 kVA, 11/0.42 kV",
+   "unit": "each",
+   "rate": 345000,
+   "category": "material"
+  },
+  {
+   "code": "MINISUB-500",
+   "description": "Mini-substation 500 kVA, 11/0.42 kV",
+   "unit": "each",
+   "rate": 425000,
+   "category": "material"
+  },
+  {
+   "code": "MINISUB-1000",
+   "description": "Mini-substation 1000 kVA, 11/0.42 kV",
+   "unit": "each",
+   "rate": 610000,
+   "category": "material"
+  }
+ ],
+ "assemblies": [
+  {
+   "code": "A-TX-POLE-16",
+   "description": "Pole-mounted transformer 16 kVA, installed and earthed",
+   "unit": "each",
+   "components": [
+    {
+     "item": "TX-POLE-16",
+     "qty": 1
+    },
+    {
+     "item": "LAB-TX",
+     "qty": 1
+    },
+    {
+     "item": "EARTH-TX",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-TX-POLE-25",
+   "description": "Pole-mounted transformer 25 kVA, installed and earthed",
+   "unit": "each",
+   "components": [
+    {
+     "item": "TX-POLE-25",
+     "qty": 1
+    },
+    {
+     "item": "LAB-TX",
+     "qty": 1
+    },
+    {
+     "item": "EARTH-TX",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-TX-POLE-50",
+   "description": "Pole-mounted transformer 50 kVA, installed and earthed",
+   "unit": "each",
+   "components": [
+    {
+     "item": "TX-POLE-50",
+     "qty": 1
+    },
+    {
+     "item": "LAB-TX",
+     "qty": 1
+    },
+    {
+     "item": "EARTH-TX",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-TX-POLE-100",
+   "description": "Pole-mounted transformer 100 kVA, installed and earthed",
+   "unit": "each",
+   "components": [
+    {
+     "item": "TX-POLE-100",
+     "qty": 1
+    },
+    {
+     "item": "LAB-TX",
+     "qty": 1
+    },
+    {
+     "item": "EARTH-TX",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-TX-POLE-200",
+   "description": "Pole-mounted transformer 200 kVA, installed and earthed",
+   "unit": "each",
+   "components": [
+    {
+     "item": "TX-POLE-200",
+     "qty": 1
+    },
+    {
+     "item": "LAB-TX",
+     "qty": 1
+    },
+    {
+     "item": "EARTH-TX",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-MINISUB-200",
+   "description": "Mini-sub 200 kVA on plinth, installed and earthed",
+   "unit": "each",
+   "components": [
+    {
+     "item": "MINISUB-200",
+     "qty": 1
+    },
+    {
+     "item": "LAB-MINISUB",
+     "qty": 1
+    },
+    {
+     "item": "EARTH-TX",
+     "qty": 1
+    },
+    {
+     "item": "CABLE-TERM-MV",
+     "qty": 2
+    }
+   ]
+  },
+  {
+   "code": "A-MINISUB-315",
+   "description": "Mini-sub 315 kVA on plinth, installed and earthed",
+   "unit": "each",
+   "components": [
+    {
+     "item": "MINISUB-315",
+     "qty": 1
+    },
+    {
+     "item": "LAB-MINISUB",
+     "qty": 1
+    },
+    {
+     "item": "EARTH-TX",
+     "qty": 1
+    },
+    {
+     "item": "CABLE-TERM-MV",
+     "qty": 2
+    }
+   ]
+  },
+  {
+   "code": "A-MINISUB-500",
+   "description": "Mini-sub 500 kVA on plinth, installed and earthed",
+   "unit": "each",
+   "components": [
+    {
+     "item": "MINISUB-500",
+     "qty": 1
+    },
+    {
+     "item": "LAB-MINISUB",
+     "qty": 1
+    },
+    {
+     "item": "EARTH-TX",
+     "qty": 1
+    },
+    {
+     "item": "CABLE-TERM-MV",
+     "qty": 2
+    }
+   ]
+  },
+  {
+   "code": "A-MINISUB-1000",
+   "description": "Mini-sub 1000 kVA on plinth, installed and earthed",
+   "unit": "each",
+   "components": [
+    {
+     "item": "MINISUB-1000",
+     "qty": 1
+    },
+    {
+     "item": "LAB-MINISUB",
+     "qty": 1
+    },
+    {
+     "item": "EARTH-TX",
+     "qty": 1
+    },
+    {
+     "item": "CABLE-TERM-MV",
+     "qty": 2
+    }
+   ]
+  },
+  {
+   "code": "A-POLE-LV-7",
+   "description": "LV pole 7 m, erected with hardware",
+   "unit": "each",
+   "components": [
+    {
+     "item": "POLE-WOOD-7M",
+     "qty": 1
+    },
+    {
+     "item": "HW-LV-POLE",
+     "qty": 1
+    },
+    {
+     "item": "LAB-POLE",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-POLE-LV-9",
+   "description": "LV pole 9 m, erected with hardware",
+   "unit": "each",
+   "components": [
+    {
+     "item": "POLE-WOOD-9M",
+     "qty": 1
+    },
+    {
+     "item": "HW-LV-POLE",
+     "qty": 1
+    },
+    {
+     "item": "LAB-POLE",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-POLE-MV-11",
+   "description": "MV pole 11 m, erected with hardware",
+   "unit": "each",
+   "components": [
+    {
+     "item": "POLE-WOOD-11M",
+     "qty": 1
+    },
+    {
+     "item": "HW-MV-POLE",
+     "qty": 1
+    },
+    {
+     "item": "LAB-POLE",
+     "qty": 1.3
+    }
+   ]
+  },
+  {
+   "code": "A-POLE-MV-12",
+   "description": "MV pole 12 m, erected with hardware",
+   "unit": "each",
+   "components": [
+    {
+     "item": "POLE-WOOD-12M",
+     "qty": 1
+    },
+    {
+     "item": "HW-MV-POLE",
+     "qty": 1
+    },
+    {
+     "item": "LAB-POLE",
+     "qty": 1.3
+    }
+   ]
+  },
+  {
+   "code": "A-POLE-MV-13",
+   "description": "MV pole 13 m, erected with hardware",
+   "unit": "each",
+   "components": [
+    {
+     "item": "POLE-WOOD-13M",
+     "qty": 1
+    },
+    {
+     "item": "HW-MV-POLE",
+     "qty": 1
+    },
+    {
+     "item": "LAB-POLE",
+     "qty": 1.3
+    }
+   ]
+  },
+  {
+   "code": "A-STAY",
+   "description": "Stay, installed",
+   "unit": "each",
+   "components": [
+    {
+     "item": "STAY-SET",
+     "qty": 1
+    },
+    {
+     "item": "LAB-POLE",
+     "qty": 0.4
+    }
+   ]
+  },
+  {
+   "code": "A-SDB",
+   "description": "Service distribution box on pole",
+   "unit": "each",
+   "components": [
+    {
+     "item": "SDB",
+     "qty": 1
+    },
+    {
+     "item": "LAB-SERVICE",
+     "qty": 0.5
+    }
+   ]
+  },
+  {
+   "code": "A-KIOSK",
+   "description": "Metering kiosk, installed",
+   "unit": "each",
+   "components": [
+    {
+     "item": "KIOSK-12",
+     "qty": 1
+    },
+    {
+     "item": "CABLE-TERM-LV",
+     "qty": 2
+    },
+    {
+     "item": "LAB-SERVICE",
+     "qty": 2
+    }
+   ]
+  },
+  {
+   "code": "A-SERVICE-OH",
+   "description": "Overhead service connection",
+   "unit": "each",
+   "components": [
+    {
+     "item": "SERVICE-CONN-OH",
+     "qty": 1
+    },
+    {
+     "item": "LAB-SERVICE",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-SERVICE-UG",
+   "description": "Underground service connection",
+   "unit": "each",
+   "components": [
+    {
+     "item": "SERVICE-CONN-UG",
+     "qty": 1
+    },
+    {
+     "item": "LAB-SERVICE",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-SERVICE-CABLE-OH",
+   "description": "Overhead service cable, strung",
+   "unit": "m",
+   "components": [
+    {
+     "item": "SERVICE-CABLE-OH",
+     "qty": 1
+    },
+    {
+     "item": "LAB-STRING-M",
+     "qty": 0.5
+    }
+   ]
+  },
+  {
+   "code": "A-SERVICE-CABLE-UG",
+   "description": "Underground service cable, laid in trench",
+   "unit": "m",
+   "components": [
+    {
+     "item": "SERVICE-CABLE-UG",
+     "qty": 1
+    },
+    {
+     "item": "LAB-CABLE-M",
+     "qty": 1
+    },
+    {
+     "item": "LAB-TRENCH-M",
+     "qty": 0.6
+    }
+   ]
+  },
+  {
+   "code": "A-TRENCH-LV",
+   "description": "LV trench, excavate, bed and backfill",
+   "unit": "m",
+   "components": [
+    {
+     "item": "LAB-TRENCH-M",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-TRENCH-MV",
+   "description": "MV trench, excavate, bed and backfill",
+   "unit": "m",
+   "components": [
+    {
+     "item": "LAB-TRENCH-M",
+     "qty": 1.2
+    }
+   ]
+  },
+  {
+   "code": "A-MV-TEE",
+   "description": "MV tee-off to a transformer",
+   "unit": "each",
+   "components": [
+    {
+     "item": "MV-TEE",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-MV-CONNECTION",
+   "description": "Connection to the authority's MV network",
+   "unit": "each",
+   "components": [
+    {
+     "item": "MV-CONNECTION",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-COND-ABC-3C-25",
+   "description": "ABC-3C-25, installed",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-ABC-3C-25",
+     "qty": 1.03
+    },
+    {
+     "item": "LAB-STRING-M",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-COND-ABC-3C-35",
+   "description": "ABC-3C-35, installed",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-ABC-3C-35",
+     "qty": 1.03
+    },
+    {
+     "item": "LAB-STRING-M",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-COND-ABC-3C-50",
+   "description": "ABC-3C-50, installed",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-ABC-3C-50",
+     "qty": 1.03
+    },
+    {
+     "item": "LAB-STRING-M",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-COND-ABC-3C-70",
+   "description": "ABC-3C-70, installed",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-ABC-3C-70",
+     "qty": 1.03
+    },
+    {
+     "item": "LAB-STRING-M",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-COND-ABC-3C-95",
+   "description": "ABC-3C-95, installed",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-ABC-3C-95",
+     "qty": 1.03
+    },
+    {
+     "item": "LAB-STRING-M",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-COND-ABC-3C-120",
+   "description": "ABC-3C-120, installed",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-ABC-3C-120",
+     "qty": 1.03
+    },
+    {
+     "item": "LAB-STRING-M",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-COND-ABC-3C-150",
+   "description": "ABC-3C-150, installed",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-ABC-3C-150",
+     "qty": 1.03
+    },
+    {
+     "item": "LAB-STRING-M",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-COND-ABC-1C-16",
+   "description": "ABC-1C-16, installed",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-ABC-1C-16",
+     "qty": 1.03
+    },
+    {
+     "item": "LAB-STRING-M",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-COND-ABC-1C-25",
+   "description": "ABC-1C-25, installed",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-ABC-1C-25",
+     "qty": 1.03
+    },
+    {
+     "item": "LAB-STRING-M",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-COND-ABC-1C-35",
+   "description": "ABC-1C-35, installed",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-ABC-1C-35",
+     "qty": 1.03
+    },
+    {
+     "item": "LAB-STRING-M",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-COND-ABC-1C-50",
+   "description": "ABC-1C-50, installed",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-ABC-1C-50",
+     "qty": 1.03
+    },
+    {
+     "item": "LAB-STRING-M",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-COND-ABC-1C-70",
+   "description": "ABC-1C-70, installed",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-ABC-1C-70",
+     "qty": 1.03
+    },
+    {
+     "item": "LAB-STRING-M",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-COND-ABC-1C-95",
+   "description": "ABC-1C-95, installed",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-ABC-1C-95",
+     "qty": 1.03
+    },
+    {
+     "item": "LAB-STRING-M",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-COND-ABC-1C-120",
+   "description": "ABC-1C-120, installed",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-ABC-1C-120",
+     "qty": 1.03
+    },
+    {
+     "item": "LAB-STRING-M",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-COND-ABC-1C-150",
+   "description": "ABC-1C-150, installed",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-ABC-1C-150",
+     "qty": 1.03
+    },
+    {
+     "item": "LAB-STRING-M",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-COND-CU-4C-16",
+   "description": "CU-4C-16, installed",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-CU-4C-16",
+     "qty": 1.03
+    },
+    {
+     "item": "LAB-CABLE-M",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-COND-CU-4C-25",
+   "description": "CU-4C-25, installed",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-CU-4C-25",
+     "qty": 1.03
+    },
+    {
+     "item": "LAB-CABLE-M",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-COND-CU-4C-35",
+   "description": "CU-4C-35, installed",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-CU-4C-35",
+     "qty": 1.03
+    },
+    {
+     "item": "LAB-CABLE-M",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-COND-CU-4C-70",
+   "description": "CU-4C-70, installed",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-CU-4C-70",
+     "qty": 1.03
+    },
+    {
+     "item": "LAB-CABLE-M",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-COND-CU-4C-120",
+   "description": "CU-4C-120, installed",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-CU-4C-120",
+     "qty": 1.03
+    },
+    {
+     "item": "LAB-CABLE-M",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-COND-CU-4C-150",
+   "description": "CU-4C-150, installed",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-CU-4C-150",
+     "qty": 1.03
+    },
+    {
+     "item": "LAB-CABLE-M",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-COND-CU-4C-185",
+   "description": "CU-4C-185, installed",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-CU-4C-185",
+     "qty": 1.03
+    },
+    {
+     "item": "LAB-CABLE-M",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-COND-CU-4C-240",
+   "description": "CU-4C-240, installed",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-CU-4C-240",
+     "qty": 1.03
+    },
+    {
+     "item": "LAB-CABLE-M",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-COND-AL-4C-25",
+   "description": "AL-4C-25, installed",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-AL-4C-25",
+     "qty": 1.03
+    },
+    {
+     "item": "LAB-CABLE-M",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-COND-AL-4C-35",
+   "description": "AL-4C-35, installed",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-AL-4C-35",
+     "qty": 1.03
+    },
+    {
+     "item": "LAB-CABLE-M",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-COND-AL-4C-70",
+   "description": "AL-4C-70, installed",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-AL-4C-70",
+     "qty": 1.03
+    },
+    {
+     "item": "LAB-CABLE-M",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-COND-AL-4C-120",
+   "description": "AL-4C-120, installed",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-AL-4C-120",
+     "qty": 1.03
+    },
+    {
+     "item": "LAB-CABLE-M",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-COND-AL-4C-150",
+   "description": "AL-4C-150, installed",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-AL-4C-150",
+     "qty": 1.03
+    },
+    {
+     "item": "LAB-CABLE-M",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-COND-AL-4C-185",
+   "description": "AL-4C-185, installed",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-AL-4C-185",
+     "qty": 1.03
+    },
+    {
+     "item": "LAB-CABLE-M",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-COND-AL-4C-240",
+   "description": "AL-4C-240, installed",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-AL-4C-240",
+     "qty": 1.03
+    },
+    {
+     "item": "LAB-CABLE-M",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-COND-SQUIRREL",
+   "description": "MV line, 3 × SQUIRREL, strung",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-SQUIRREL",
+     "qty": 3.09
+    },
+    {
+     "item": "LAB-STRING-M",
+     "qty": 3
+    }
+   ]
+  },
+  {
+   "code": "A-COND-GOPHER",
+   "description": "MV line, 3 × GOPHER, strung",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-GOPHER",
+     "qty": 3.09
+    },
+    {
+     "item": "LAB-STRING-M",
+     "qty": 3
+    }
+   ]
+  },
+  {
+   "code": "A-COND-FOX",
+   "description": "MV line, 3 × FOX, strung",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-FOX",
+     "qty": 3.09
+    },
+    {
+     "item": "LAB-STRING-M",
+     "qty": 3
+    }
+   ]
+  },
+  {
+   "code": "A-COND-RABBIT",
+   "description": "MV line, 3 × RABBIT, strung",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-RABBIT",
+     "qty": 3.09
+    },
+    {
+     "item": "LAB-STRING-M",
+     "qty": 3
+    }
+   ]
+  },
+  {
+   "code": "A-COND-MINK",
+   "description": "MV line, 3 × MINK, strung",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-MINK",
+     "qty": 3.09
+    },
+    {
+     "item": "LAB-STRING-M",
+     "qty": 3
+    }
+   ]
+  },
+  {
+   "code": "A-COND-OAK",
+   "description": "MV line, 3 × OAK, strung",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-OAK",
+     "qty": 3.09
+    },
+    {
+     "item": "LAB-STRING-M",
+     "qty": 3
+    }
+   ]
+  },
+  {
+   "code": "A-COND-HARE",
+   "description": "MV line, 3 × HARE, strung",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-HARE",
+     "qty": 3.09
+    },
+    {
+     "item": "LAB-STRING-M",
+     "qty": 3
+    }
+   ]
+  },
+  {
+   "code": "A-COND-WOLF",
+   "description": "MV line, 3 × WOLF, strung",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-WOLF",
+     "qty": 3.09
+    },
+    {
+     "item": "LAB-STRING-M",
+     "qty": 3
+    }
+   ]
+  },
+  {
+   "code": "A-COND-PANTHER",
+   "description": "MV line, 3 × PANTHER, strung",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-PANTHER",
+     "qty": 3.09
+    },
+    {
+     "item": "LAB-STRING-M",
+     "qty": 3
+    }
+   ]
+  },
+  {
+   "code": "A-COND-MV-AL-3C-35",
+   "description": "MV-AL-3C-35, laid",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-MV-AL-3C-35",
+     "qty": 1.03
+    },
+    {
+     "item": "LAB-CABLE-M",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-COND-MV-AL-3C-70",
+   "description": "MV-AL-3C-70, laid",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-MV-AL-3C-70",
+     "qty": 1.03
+    },
+    {
+     "item": "LAB-CABLE-M",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-COND-MV-AL-3C-95",
+   "description": "MV-AL-3C-95, laid",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-MV-AL-3C-95",
+     "qty": 1.03
+    },
+    {
+     "item": "LAB-CABLE-M",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-COND-MV-AL-3C-185",
+   "description": "MV-AL-3C-185, laid",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-MV-AL-3C-185",
+     "qty": 1.03
+    },
+    {
+     "item": "LAB-CABLE-M",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-COND-MV-CU-3C-95",
+   "description": "MV-CU-3C-95, laid",
+   "unit": "m",
+   "components": [
+    {
+     "item": "COND-MV-CU-3C-95",
+     "qty": 1.03
+    },
+    {
+     "item": "LAB-CABLE-M",
+     "qty": 1
+    }
+   ]
+  }
+ ]
+}

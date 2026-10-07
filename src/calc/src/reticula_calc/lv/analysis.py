@@ -30,11 +30,13 @@ from pydantic import BaseModel
 from scipy.stats import beta as beta_dist
 from scipy.stats import norm
 
-from ..calcs.admd import AdmdInputError, _cfg, _load_class
+from ..calcs.admd import AdmdInputError, LoadClassInfo, _cfg, _load_class, _moments
+from ..issues import Issue, issue
 from ..rules import RulesError, RuleSet
 from ..rules.loader import Conductor
 from ..trace import Traced, traced
-from .network import EPS_M, MAX_SAMPLES, Issue, LvNetwork
+from .conductors import _source
+from .network import EPS_M, LvNetwork
 
 PHASES: tuple[str, ...] = ("R", "W", "B")
 VDROP_ID = "lv.vdrop.herman-beta.v1"
@@ -60,12 +62,24 @@ class LoadAt(BaseModel):
     label: str | None = None
 
 
+class SourceIn(BaseModel):
+    """A sized transformer feeding the LV network (Phase 3.1)."""
+
+    rating_kva: float
+    impedance_pct: float
+    x_over_r: float
+
+
 class AnalyseRequest(BaseModel):
     rules: str
     network: LvNetwork
     loads: list[LoadAt]
     conductors: dict[str, str] = {}
     """Conductor per branch id; branches not listed use the rules file's default."""
+    sources: dict[str, SourceIn] = {}
+    """The transformer at each source, by source node id or label; sources not listed use the rules file's placeholder."""
+    ratings: dict[str, float] = {}
+    """Rating per branch id where it differs from the conductor's as normally installed (de-rated, plan 2.6), A."""
 
 
 class PointResult(BaseModel):
@@ -160,6 +174,7 @@ class _Vertex:
     branch: str | None  # network branch of the edge from the parent
     length_m: float
     feeder: str | None
+    root: int = 0  # the source vertex this one is fed from
     zs: float = 0.0  # Σ ℓ·(z_ph + z_n), Ω
     zo: float = 0.0  # Σ ℓ·(−½·z_n), Ω
     loop: complex = 0j  # Σ ℓ·(Z_ph + Z_n), hot, Ω
@@ -195,16 +210,15 @@ def analyse(req: AnalyseRequest, rules: RuleSet) -> Analysis:
     pf = float(sec["power_factor"])
     sin_phi = math.sqrt(max(0.0, 1 - pf * pf))
     src = sec["source"]
-    z_base = v_ll**2 / (float(src["rating_kva"]) * 1000)
-    z_src_mag = float(src["impedance_pct"]) / 100 * z_base
-    xr = float(src["x_over_r"])
-    z_src = complex(z_src_mag / math.sqrt(1 + xr * xr), z_src_mag * xr / math.sqrt(1 + xr * xr))
+    z_src = source_impedance(v_ll, float(src["rating_kva"]), float(src["impedance_pct"]), float(src["x_over_r"]))
     temp = float(sec["conductor_temp_c"])
     alpha = sec["temperature_coefficients"]
     net = req.network
     issues: list[Issue] = []
-    placeholders: list[str] = ["the LV source transformer (sized in Phase 3)", f"power factor {pf:g}",
-                               f"the voltage drop limit of {limit:g} % (Eskom 240-70465489 not held)"]
+    placeholders: list[str] = [f"power factor {pf:g}", f"the voltage drop limit of {limit:g} % (Eskom 240-70465489 not held)"]
+    root_z: dict[int, complex] = {}
+    root_src: dict[int, tuple[complex, dict, bool]] = {}  # impedance, settings, sized
+    unsized: list[str] = []
 
     conductors: dict[str, Conductor] = {}
 
@@ -228,19 +242,23 @@ def analyse(req: AnalyseRequest, rules: RuleSet) -> Analysis:
             continue  # not on a feeder: plan 2.2 already reported it
         loads_on.setdefault(ld.branch, []).append(ld)
 
+    classes: dict[str, LoadClassInfo | None] = {}
+
+    def load_class(code: str) -> LoadClassInfo | None:
+        if code not in classes:
+            try:
+                classes[code] = _load_class(cfg, rules, code, "score")
+            except AdmdInputError:
+                classes[code] = None  # not a class of the design table (older rules, or a class marked unverified)
+        return classes[code]
+
     def as_current(ld: LoadAt) -> _Load:
         if ld.phase == "RWB":
             return _Load("RWB", det=ld.kva * 1000 / (3 * v_ph))
-        lc = None
-        if ld.kind == "residential" and ld.load_class:
-            try:
-                lc = _load_class(cfg, rules, ld.load_class, "score")
-            except AdmdInputError:
-                lc = None  # not a class of the design table (older rules, or a class marked unverified)
+        lc = load_class(ld.load_class) if ld.kind == "residential" and ld.load_class else None
         if lc is not None:
-            mu = lc.c_amps * lc.alpha / (lc.alpha + lc.beta)
-            var = lc.c_amps**2 * lc.alpha * lc.beta / ((lc.alpha + lc.beta) ** 2 * (lc.alpha + lc.beta + 1))
-            return _Load(ld.phase, mu=mu, var=var, c=lc.c_amps)
+            mu, sd = _moments(lc.alpha, lc.beta, lc.c_amps)
+            return _Load(ld.phase, mu=mu, var=sd * sd, c=lc.c_amps)
         if ld.kind == "residential":
             no_class.append(ld.label or ld.load_id)
         return _Load(ld.phase, det=ld.kva * 1000 / v_ph)
@@ -264,6 +282,12 @@ def analyse(req: AnalyseRequest, rules: RuleSet) -> Analysis:
 
     for s in sources:
         index[s.id] = add(_Vertex(s.id, "node", None, None, 0.0, None))
+        vertices[index[s.id]].root = index[s.id]
+        given = req.sources.get(s.id) or (req.sources.get(s.label) if s.label else None)
+        if given is None:
+            unsized.append(s.label or s.id)
+        root_z[index[s.id]] = source_impedance(v_ll, given.rating_kva, given.impedance_pct, given.x_over_r) if given else z_src
+        root_src[index[s.id]] = (root_z[index[s.id]], given.model_dump() if given else src, given is not None)
         stack = [s.id]
         while stack:
             nid = stack.pop()
@@ -301,9 +325,9 @@ def analyse(req: AnalyseRequest, rules: RuleSet) -> Analysis:
             vertices[v.parent].sub.add(v.sub)
 
     if no_class:
-        issues.append(Issue(severity="warning", code="no_load_class",
-                            message="Residential loads without a load class of the design table are taken at their ADMD, without Herman-Beta diversity.",
-                            count=len(no_class), samples=no_class[:MAX_SAMPLES]))
+        issues.append(issue("warning", "no_load_class",
+                            "Residential loads without a load class of the design table are taken at their ADMD, without Herman-Beta diversity.",
+                            no_class))
 
     # ---- voltage drop and fault level at every vertex ----
     point_results: list[PointResult] = []
@@ -335,7 +359,7 @@ def analyse(req: AnalyseRequest, rules: RuleSet) -> Analysis:
             drops[p] = (stoch + det) / v_ph * 100
             parts[p] = (mean, var, lo, hi, det, stoch)
         worst_p = max(PHASES, key=lambda p: drops[p])
-        fault = v_ph / abs(z_src + v.loop)
+        fault = v_ph / abs(root_z[v.root] + v.loop)
         if drops[worst_p] > worst[0]:
             worst = (drops[worst_p], i, worst_p, parts[worst_p])
         if fault < lowest[0]:
@@ -358,15 +382,17 @@ def analyse(req: AnalyseRequest, rules: RuleSet) -> Analysis:
         for p in PHASES:
             stoch = _quantile(v.sub.mu[p], v.sub.var[p], 0.0, v.sub.c[p], conf)
             currents[p] = stoch + v.sub.det[p]
-        util = max(currents.values()) / c.rating_a * 100
+        rating = req.ratings.get(v.branch, c.rating_a)
+        util = max(currents.values()) / rating * 100
         prev = branch_results.get(v.branch)
         if prev is None or util > prev.utilisation_pct:
             branch_results[v.branch] = BranchResult(
-                id=v.branch, feeder=v.feeder, conductor=c.code, rating_a=c.rating_a,
+                id=v.branch, feeder=v.feeder, conductor=c.code, rating_a=round(rating, 1),
                 current_a={p: round(x, 2) for p, x in currents.items()}, utilisation_pct=round(util, 1), passes=util <= 100)
         if util > worst_current[0]:
             p = max(PHASES, key=lambda q: currents[q])
-            worst_current = (util, v.branch, p, (v.sub.mu[p], v.sub.var[p], v.sub.c[p], v.sub.det[p], currents[p], c))
+            worst_current = (util, v.branch, p, (v.sub.mu[p], v.sub.var[p], v.sub.c[p], v.sub.det[p], currents[p], c, rating,
+                                                 v.branch in req.ratings))
 
     # ---- per feeder ----
     feeders: list[FeederResult] = []
@@ -383,17 +409,19 @@ def analyse(req: AnalyseRequest, rules: RuleSet) -> Analysis:
 
     over = [r for r in point_results if r.worst_pct > limit]
     if over:
-        issues.append(Issue(severity="error", code="drop_over_limit",
-                            message=f"Voltage drop is over {limit:g} % at these points. Use a larger conductor, shorten the feeder or add a source.",
-                            count=len(over), samples=[r.id for r in sorted(over, key=lambda r: -r.worst_pct)[:MAX_SAMPLES]]))
+        issues.append(issue("error", "drop_over_limit",
+                            f"Voltage drop is over {limit:g} % at these points. Use a larger conductor, shorten the feeder or add a source.",
+                            [r.id for r in sorted(over, key=lambda r: -r.worst_pct)]))
     hot = [b for b in branch_results.values() if not b.passes]
     if hot:
-        issues.append(Issue(severity="error", code="overload",
-                            message="Branches carry more than their conductor's rating. Use a larger conductor or split the feeder.",
-                            count=len(hot), samples=[b.id for b in sorted(hot, key=lambda b: -b.utilisation_pct)[:MAX_SAMPLES]]))
-    if sec.get("min_end_fault_a") is None:
+        issues.append(issue("error", "overload",
+                            "Branches carry more than their conductor's rating. Use a larger conductor or split the feeder.",
+                            [b.id for b in sorted(hot, key=lambda b: -b.utilisation_pct)]))
+    if min_fault is None:
         issues.append(Issue(severity="warning", code="fault_not_checked",
                             message="Fault levels are reported but not checked: the rules file sets no minimum (LV protection settings not held)."))
+    if unsized:
+        placeholders.insert(0, "the LV source transformer of " + ", ".join(unsized) + " (not sized: the rules file's placeholder)")
     for c in conductors.values():
         if c.placeholder:
             placeholders.append(f"{c.code} {', '.join(c.placeholder)}")
@@ -406,7 +434,7 @@ def analyse(req: AnalyseRequest, rules: RuleSet) -> Analysis:
         confidence_pct=conf * 100, points=point_results, branches=list(branch_results.values()), feeders=feeders, issues=issues,
         worst_drop=_drop_trace(rules, vertices, worst, v_ph, conf, pf, limit, clause) if worst[1] is not None else None,
         worst_current=_current_trace(rules, worst_current, conf) if worst_current[1] is not None else None,
-        lowest_fault=_fault_trace(rules, vertices, lowest, z_src, src, v_ph) if lowest[1] is not None else None,
+        lowest_fault=_fault_trace(rules, vertices, lowest, root_src[vertices[lowest[1]].root], v_ph, clause) if lowest[1] is not None else None,
         placeholders=placeholders,
     )
 
@@ -415,7 +443,7 @@ def _edge(vertices: list[_Vertex], add, parent: int, vid: str, kind, branch: str
           z_drop: float, z_loop: complex) -> int:
     p = vertices[parent]
     km = max(length_m, 0.0) / 1000
-    return add(_Vertex(vid, kind, parent, branch, length_m, feeder, zs=p.zs + 2 * z_drop * km, zo=p.zo - 0.5 * z_drop * km,
+    return add(_Vertex(vid, kind, parent, branch, length_m, feeder, root=p.root, zs=p.zs + 2 * z_drop * km, zo=p.zo - 0.5 * z_drop * km,
                        loop=p.loop + z_loop * km, distance=p.distance + max(length_m, 0.0)))
 
 
@@ -440,20 +468,28 @@ def _drop_trace(rules: RuleSet, vertices, worst, v_ph: float, conf: float, pf: f
 
 
 def _current_trace(rules: RuleSet, worst, conf: float) -> Traced:
-    util, branch, phase, (mu, var, c_sum, det, current, cond) = worst
-    flag = " (placeholder)" if "rating_a" in cond.placeholder else ""
+    util, branch, phase, (mu, var, c_sum, det, current, cond, rating, derated) = worst
     return traced(current, "A", formula_id=CURRENT_ID, formula=CURRENT_FORMULA, clause=cond.rating_clause or cond.clause, rules_hash=rules.hash,
                   inputs={"branch": (branch, "", "most loaded"), "phase": (phase, "", "most loaded phase"),
                           "mean": (round(mu, 4), "A", "Σ μ"), "sd": (round(math.sqrt(var), 4), "A", "√Σ σ²"), "C": (c_sum, "A", "Σ c"),
                           "special": (round(det, 4), "A", "special and three-phase loads"),
-                          "rating": (cond.rating_a, "A", f"rules {rules.ref} conductor {cond.code}{flag}"),
+                          "rating": (round(rating, 1), "A", f"de-rated for installation (plan 2.6) from {cond.rating_a:g} A" if derated
+                                     else _source(rules, cond, "rating_a")),
                           "utilisation": (round(util, 2), "%", "I / rating"), "confidence": (conf * 100, "%", f"rules {rules.ref} diversity")})
 
 
-def _fault_trace(rules: RuleSet, vertices, lowest, z_src: complex, src: dict, v_ph: float) -> Traced:
+def source_impedance(v_ll: float, rating_kva: float, impedance_pct: float, x_over_r: float) -> complex:
+    """A transformer's impedance referred to the LV side, Ω: z% · V_LL² / S, split by X/R."""
+    z = impedance_pct / 100 * v_ll**2 / (rating_kva * 1000)
+    return complex(z / math.sqrt(1 + x_over_r * x_over_r), z * x_over_r / math.sqrt(1 + x_over_r * x_over_r))
+
+
+def _fault_trace(rules: RuleSet, vertices, lowest, source: tuple[complex, dict, bool], v_ph: float, clause: str) -> Traced:
     fault, vi, loop = lowest
-    return traced(fault, "A", formula_id=FAULT_ID, formula=FAULT_FORMULA, clause=rules.data["lv_design"].get("clause", ""), rules_hash=rules.hash,
+    z_src, src, sized = source
+    how = "sized transformer (plan 3.1)" if sized else f"rules {rules.ref} lv_design.source (placeholder)"
+    return traced(fault, "A", formula_id=FAULT_ID, formula=FAULT_FORMULA, clause=clause, rules_hash=rules.hash,
                   inputs={"point": (vertices[vi].id, "", "lowest fault level"), "V_phase": (round(v_ph, 2), "V", f"rules {rules.ref} voltage"),
-                          "R_source": (round(z_src.real, 5), "Ω", f"rules {rules.ref} lv_design.source (placeholder)"),
+                          "R_source": (round(z_src.real, 5), "Ω", how),
                           "X_source": (round(z_src.imag, 5), "Ω", f"{src['rating_kva']} kVA, {src['impedance_pct']} %, X/R {src['x_over_r']}"),
                           "R_loop": (round(loop.real, 5), "Ω", "phase + neutral, hot"), "X_loop": (round(loop.imag, 5), "Ω", "phase + neutral")})
