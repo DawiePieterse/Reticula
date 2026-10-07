@@ -79,6 +79,11 @@ import { CHECK_NAMES, Check, CheckCategory, Design } from './design.api';
           {{ d.summary.stays }} stays
         </li>
       }
+      @if (d.summary.service_poles) {
+        <li>
+          {{ d.summary.service_poles }} service pole{{ d.summary.service_poles === 1 ? '' : 's' }}
+        </li>
+      }
       @if (d.summary.kiosks) {
         <li>{{ d.summary.kiosks }} kiosks</li>
       }

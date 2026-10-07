@@ -1,0 +1,7 @@
+{
+  "rules": "eskom/0.9.0",
+  "construction": "overhead",
+  "kind": "special",
+  "kva": 5,
+  "length_m": 40
+}

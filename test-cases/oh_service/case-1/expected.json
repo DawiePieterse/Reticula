@@ -1,0 +1,8 @@
+{
+  "service_poles": 1,
+  "clearance_m": 3.5,
+  "span_m": 25.0,
+  "sag_m": 0.27250,
+  "first_low_m": 4.74493,
+  "clears": true
+}

@@ -39,7 +39,10 @@ export type CheckCategory =
   | 'lv_drop'
   | 'lv_loading'
   | 'lv_fault'
+  | 'lv_fuse'
+  | 'lv_service_drop'
   | 'oh_clearance'
+  | 'oh_service'
   | 'oh_tension'
   | 'oh_pole'
   | 'tx_loading'
@@ -55,7 +58,10 @@ export const CHECK_NAMES: Record<CheckCategory, string> = {
   lv_drop: 'LV voltage drop',
   lv_loading: 'LV loading',
   lv_fault: 'LV fault level',
+  lv_fuse: 'LV feeder fuse',
+  lv_service_drop: 'Service cable drop',
   oh_clearance: 'Ground clearance',
+  oh_service: 'Service clearance',
   oh_tension: 'Conductor tension',
   oh_pole: 'Pole and stays',
   tx_loading: 'Transformer loading',
@@ -125,6 +131,8 @@ export interface LvPoint {
   worst_pct: number;
   fault_a: number;
   passes: boolean;
+  /** At a connection, the drop in the service cable, included in worst_pct. */
+  service_pct?: number | null;
 }
 export interface LvBranchResult {
   id: string;
@@ -189,6 +197,22 @@ export interface Pole {
   passes: boolean;
 }
 
+/** A customer's service cable (design/services.py); poles are the service poles the design adds along it. */
+export interface ServiceDesign {
+  load_id: string;
+  label: string | null;
+  feeder: string | null;
+  phases: 1 | 3;
+  conductor: string;
+  length_m: number;
+  current_a: number;
+  drop_pct: number;
+  passes: boolean;
+  poles: Position[];
+  clearance_m: number | null;
+  clears: boolean | null;
+}
+
 export interface BoqLine {
   code: string;
   description: string;
@@ -225,6 +249,7 @@ export interface DesignSummary {
   poles: number;
   stays: number;
   kiosks: number;
+  service_poles?: number;
   lv_km: number;
   mv_km: number;
   worst_lv_drop_pct: number | null;
@@ -250,6 +275,12 @@ export interface Design {
     generated: number;
   };
   overhead?: { poles: Pole[] } | null;
+  services?: {
+    limit_pct: number;
+    service_poles: number;
+    pole_height_m: number | null;
+    services: ServiceDesign[];
+  } | null;
   underground?: {
     ratings: {
       branch: string;

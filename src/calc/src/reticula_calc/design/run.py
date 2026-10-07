@@ -3,11 +3,12 @@
 1. **LV network** from the LV routes and sites (plan 2.1), then poles placed along it (overhead, plan 2.5) or kiosks
    (underground, plan 2.6), and the network built again with them, so every span is a branch and every load has a pole
    box or kiosk within reach.
-2. **Loads** connected and phased (plan 2.2).
+2. **Loads** connected and phased (plan 2.2), and each service cable chosen by its current and drop (design/services.py).
 3. **Transformers** sized from the loads each feeds (plans 3.1, 3.2).
 4. **LV conductors** sized per feeder against voltage drop and loading, with the sized transformers as sources and,
    underground, the de-rated ratings (plans 2.3, 2.4, 2.6).
-5. **Overhead checks** on the spans and poles, or the underground de-rating record (plans 2.5, 2.6).
+5. **Overhead checks** on the spans and poles, and the service spans with any service poles they need; or the
+   underground de-rating record (plans 2.5, 2.6).
 6. **MV network** from the MV routes, the connection point and the transformers; sized, with drops and taps; and its
    overhead line checked (plans 3.3, 3.4).
 7. **Bulk supply**: load flow, fault study and supply size, or a hard stop without the connection point's data (Phase 4).
@@ -32,12 +33,13 @@ from pydantic import BaseModel
 from .. import bulk as bulk_mod
 from .. import cost as cost_mod
 from ..issues import Issue, issue
-from ..lv.analysis import Analysis, LoadAt, SourceIn
+from ..lv.analysis import CUSTOMER_ID, FAULT_ID, FUSE_ID, Analysis, LoadAt, SourceIn
 from ..lv.loads import AllocateRequest, LoadAllocation, LoadIn, allocate
 from ..lv.network import BuildRequest, CandidateIn, LvNetwork, build_network
 from ..mv import network as mv_mod
 from ..rules import RuleSet
 from . import overhead as oh_mod
+from . import services as svc_mod
 from . import sizing as sizing_mod
 from . import transformers as tx_mod
 from . import underground as ug_mod
@@ -135,6 +137,7 @@ class DesignSummary(BaseModel):
     poles: int
     stays: int
     kiosks: int
+    service_poles: int = 0
     lv_km: float
     mv_km: float
     worst_lv_drop_pct: float | None
@@ -155,6 +158,7 @@ class Design(BaseModel):
     lv: LvDesign
     overhead: oh_mod.OverheadResult | None = None
     underground: ug_mod.UndergroundResult | None = None
+    services: svc_mod.ServiceResult | None = None
     transformers: tx_mod.TransformerResult
     mv_network: LvNetwork | None = None
     mv: mv_mod.MvAnalysis | None = None
@@ -234,6 +238,8 @@ def _run(req: DesignRequest, rules: RuleSet, construction: Construction) -> Desi
     alloc = allocate(AllocateRequest(rules=rules.ref, network=net, loads=req.loads), rules,
                      None if construction == "overhead" else ug_mod.kiosk_params(rules))
     issues += alloc.issues
+    services = svc_mod.size_services(alloc, req.classes, rules, construction)
+    service_pct = {s.load_id: s.drop_pct for s in services.services} if services else {}
 
     # 3. Transformers.
     source_kind = {n.id: marked_kind.get(n.candidate_id or "", "transformer") for n in net.nodes if n.kind == "source"}
@@ -243,7 +249,8 @@ def _run(req: DesignRequest, rules: RuleSet, construction: Construction) -> Desi
 
     # 4. LV conductors.
     loads_at = [LoadAt(load_id=a.load_id, branch=a.branch, offset_m=a.offset_m, phase=a.phase, kva=a.kva, kind=a.kind,
-                       load_class=req.classes.get(a.load_id), label=a.label) for a in alloc.allocations]
+                       load_class=req.classes.get(a.load_id), label=a.label, service_pct=service_pct.get(a.load_id, 0.0))
+                for a in alloc.allocations]
     default_lv = sizing_mod.default_conductor(rules, construction)
     derating = None
     if construction == "underground":
@@ -262,9 +269,13 @@ def _run(req: DesignRequest, rules: RuleSet, construction: Construction) -> Desi
     if construction == "overhead":
         oh = oh_mod.check(net, rules, "lv", sizing.conductors, default_lv, gen_nodes, ground)
         issues += oh.issues
+        if services:
+            services = svc_mod.string_services(services, alloc, oh, rules)
     else:
         ug = ug_mod.derate(net, rules, sizing.conductors, default_lv, opts.underground_conditions)
         issues += ug.issues
+    if services:
+        issues += services.issues
 
     # 6. MV.
     model = DemandModel(rules)
@@ -305,13 +316,13 @@ def _run(req: DesignRequest, rules: RuleSet, construction: Construction) -> Desi
 
     # 8. Cost.
     econ = cost_mod.economics(rules, opts.economics)
-    q = _quantities(construction, opts.mv_construction, net, alloc, sizing, oh, tx, mv_net, mv_res, mv_oh, cp)
+    q = _quantities(construction, opts.mv_construction, net, alloc, sizing, oh, services, tx, mv_net, mv_res, mv_oh, cp)
     losses = _losses(rules, net, analysis, sizing, tx, mv_net, mv_res, econ)
     cost = cost_mod.price(q, req.rates or cost_mod.default_library(), econ, losses, rules)
     issues += cost.issues
 
     # Checks, uninspected proposals, placeholders.
-    checks = _checks(rules, analysis, oh, tx, mv_res, mv_oh, bulk)
+    checks = _checks(rules, analysis, oh, services, tx, mv_res, mv_oh, bulk)
     proposed = {c.id: c for c in req.candidates if c.source == "proposed"}
     uninspected: list[NotInspected] = []
     for cid, c in proposed.items():
@@ -325,7 +336,7 @@ def _run(req: DesignRequest, rules: RuleSet, construction: Construction) -> Desi
         checks += [Check(id=f"inspect:{u.candidate_id}", category="not_inspected", element=u.candidate_id, label=u.label or u.kind,
                          passes=False, clause="Plan 2.8: every element must be inspected or marked in the field") for u in uninspected]
     placeholders = list(dict.fromkeys(analysis.placeholders + (oh.placeholders if oh else []) + (ug.placeholders if ug else [])
-                                      + tx.placeholders + (mv_res.placeholders if mv_res else []) + (mv_oh.placeholders if mv_oh else [])
+                                      + (services.placeholders if services else []) + tx.placeholders + (mv_res.placeholders if mv_res else []) + (mv_oh.placeholders if mv_oh else [])
                                       + bulk.placeholders))
     issues.append(Issue(severity="warning", code="placeholders",
                         message="This design uses placeholder values and is not fit to submit: " + "; ".join(placeholders) + "."))
@@ -339,6 +350,7 @@ def _run(req: DesignRequest, rules: RuleSet, construction: Construction) -> Desi
     summary = DesignSummary(
         construction=construction, loads=len(req.loads), connected=alloc.summary.allocated, transformers=len(tx.transformers), transformer_kva=t_kva,
         poles=len(oh.poles) if oh else 0, stays=sum(p.stays for p in oh.poles) if oh else 0, kiosks=ug.kiosks if ug else 0,
+        service_poles=services.service_poles if services else 0,
         lv_km=round(lv_km, 3), mv_km=round(mv_km, 3),
         worst_lv_drop_pct=max((f.max_drop_pct for f in analysis.feeders), default=None),
         worst_mv_drop_pct=max((t.drop_pct for t in mv_res.taps), default=None) if mv_res else None,
@@ -347,7 +359,7 @@ def _run(req: DesignRequest, rules: RuleSet, construction: Construction) -> Desi
     return Design(
         rules_ref=rules.ref, rules_hash=rules.hash, inputs_hash=inputs_hash(req), construction=construction,
         lv=LvDesign(network=net, allocation=alloc, analysis=analysis, sizing=sizing, generated=len(gen_nodes)),
-        overhead=oh, underground=ug, transformers=tx, mv_network=mv_net, mv=mv_res, mv_overhead=mv_oh, bulk=bulk, cost=cost,
+        overhead=oh, underground=ug, services=services, transformers=tx, mv_network=mv_net, mv=mv_res, mv_overhead=mv_oh, bulk=bulk, cost=cost,
         checks=checks, not_inspected=uninspected, issues=issues, placeholders=placeholders, fit_to_submit=fit, summary=summary)
 
 
@@ -357,7 +369,7 @@ def _coords(g: dict) -> list[list[float]]:
 
 
 def _quantities(construction: Construction, mv_construction: Construction, net: LvNetwork, alloc: LoadAllocation, sizing: sizing_mod.Sizing,
-                oh: oh_mod.OverheadResult | None, tx: tx_mod.TransformerResult, mv_net: LvNetwork | None, mv: mv_mod.MvAnalysis | None,
+                oh: oh_mod.OverheadResult | None, services: svc_mod.ServiceResult | None, tx: tx_mod.TransformerResult, mv_net: LvNetwork | None, mv: mv_mod.MvAnalysis | None,
                 mv_oh: oh_mod.OverheadResult | None, cp) -> cost_mod.Quantities:
     q = cost_mod.Quantities()
     for b in net.branches:
@@ -378,6 +390,8 @@ def _quantities(construction: Construction, mv_construction: Construction, net: 
     service = "OH" if construction == "overhead" else "UG"
     q.add("Services", f"A-SERVICE-{service}", len(alloc.allocations))
     q.add("Services", f"A-SERVICE-CABLE-{service}", sum(a.service_m for a in alloc.allocations))
+    if services and services.service_poles:
+        q.add("Services", f"A-POLE-SERVICE-{services.pole_height_m:g}", services.service_poles)
     for t in tx.transformers:
         if t.mounting == "pole":
             q.add("Transformers", f"A-TX-POLE-{t.rating_kva:g}", 1)
@@ -420,8 +434,8 @@ def _losses(rules: RuleSet, net: LvNetwork, analysis: Analysis, sizing: sizing_m
     return cost_mod.losses(lv_w / 1000, mv_w / 1000, tx_load / 1000, tx_nl / 1000, econ)
 
 
-def _checks(rules: RuleSet, a: Analysis, oh: oh_mod.OverheadResult | None, tx: tx_mod.TransformerResult, mv: mv_mod.MvAnalysis | None,
-            mv_oh: oh_mod.OverheadResult | None, bulk: bulk_mod.BulkResult) -> list[Check]:
+def _checks(rules: RuleSet, a: Analysis, oh: oh_mod.OverheadResult | None, services: svc_mod.ServiceResult | None, tx: tx_mod.TransformerResult,
+            mv: mv_mod.MvAnalysis | None, mv_oh: oh_mod.OverheadResult | None, bulk: bulk_mod.BulkResult) -> list[Check]:
     lvd = rules.data.get("lv_design", {})
     v_clause, v_index = rules.data["voltage"].get("clause", ""), rules.data["voltage"].get("index")
     out: list[Check] = []
@@ -433,17 +447,49 @@ def _checks(rules: RuleSet, a: Analysis, oh: oh_mod.OverheadResult | None, tx: t
         elif p.feeder and (p.feeder not in worst_conn or p.worst_pct > worst_conn[p.feeder].worst_pct):
             worst_conn[p.feeder] = p
     for f, p in sorted(worst_conn.items()):
-        out.append(Check(id=f"lv_drop_service:{f}", category="lv_drop", element=p.id, label=f"worst service on {f}", value=p.worst_pct,
+        out.append(Check(id=f"lv_drop_service:{f}", category="lv_drop", element=p.id, label=f"worst customer on {f}", value=p.worst_pct,
                          limit=a.limit_pct, unit="%", passes=p.worst_pct <= a.limit_pct + 1e-9, clause=v_clause, index=v_index,
-                         formula_id="lv.vdrop.herman-beta.v1"))
+                         formula_id=CUSTOMER_ID))
+    if services:
+        by_feeder: dict[str, list[svc_mod.Service]] = {}
+        for sv in services.services:
+            if sv.feeder:
+                by_feeder.setdefault(sv.feeder, []).append(sv)
+        for f, svs in sorted(by_feeder.items()):
+            w = max(svs, key=lambda x: x.drop_pct)
+            out.append(Check(id=f"lv_service_drop:{f}", category="lv_service_drop", element=w.load_id, label=f"worst service on {f}",
+                             value=w.drop_pct, limit=services.limit_pct, unit="%", passes=all(x.passes for x in svs), clause=v_clause,
+                             index=v_index, formula_id=svc_mod.DROP_ID))
+            strung = [x for x in svs if x.clearance_m is not None]
+            if strung:
+                lo = min(strung, key=lambda x: x.clearance_m)
+                poles = sum(len(x.poles) for x in svs)
+                out.append(Check(id=f"oh_service:{f}", category="oh_service", element=lo.load_id,
+                                 label=f"lowest service on {f}" + (f", {poles} service pole{'s' if poles != 1 else ''}" if poles else ""),
+                                 value=lo.clearance_m, limit=services.min_clearance_m, unit="m", passes=all(x.clears for x in strung),
+                                 clause=services.clause, index=services.index, formula_id=svc_mod.SPAN_ID))
     for b in a.branches:
         out.append(Check(id=f"lv_loading:{b.id}", category="lv_loading", element=b.id, label=b.conductor, value=b.utilisation_pct, limit=100,
                          unit="%", passes=b.passes, clause=lvd.get("clause", ""), index=lvd.get("index"), formula_id="lv.current.herman-beta.v1"))
-    if lvd.get("min_end_fault_a") is not None:
+    prot = lvd.get("protection")
+    if prot:
+        for f in a.feeders:
+            if f.design_current_a is None:
+                continue
+            out.append(Check(id=f"lv_fuse:{f.feeder}", category="lv_fuse", element=f.feeder,
+                             label=f"{f.feeder}: {f.fuse_a:g} A gG for {f.design_current_a:g} A" if f.fuse_a else f"{f.feeder}: no fuse fits",
+                             value=f.fuse_a, limit=f.conductor_rating_a, unit="A",
+                             passes=f.fuse_a is not None and f.fuse_a <= (f.conductor_rating_a or 0) + 1e-9,
+                             clause=prot.get("clause", ""), index=prot.get("index"), formula_id=FUSE_ID))
+            if f.min_fault_required_a is not None:
+                out.append(Check(id=f"lv_fault:{f.feeder}", category="lv_fault", element=f.min_fault_at, label=f.feeder, value=f.min_fault_a,
+                                 limit=f.min_fault_required_a, unit="A", passes=f.min_fault_a >= f.min_fault_required_a,
+                                 clause=prot.get("clause", ""), index=prot.get("index"), formula_id=FAULT_ID))
+    elif lvd.get("min_end_fault_a") is not None:
         for f in a.feeders:
             out.append(Check(id=f"lv_fault:{f.feeder}", category="lv_fault", element=f.min_fault_at, label=f.feeder, value=f.min_fault_a,
                              limit=float(lvd["min_end_fault_a"]), unit="A", passes=f.min_fault_a >= float(lvd["min_end_fault_a"]),
-                             clause=lvd.get("clause", ""), index=lvd.get("index"), formula_id="lv.fault.phase-neutral.v1"))
+                             clause=lvd.get("clause", ""), index=lvd.get("index"), formula_id=FAULT_ID))
     for res, net in ((oh, "lv"), (mv_oh, "mv")):
         if res is None:
             continue

@@ -10,9 +10,10 @@ import {
 import { Design } from './design.api';
 
 /**
- * A design on the project map: the LV network as the LV model is drawn (branches by feeder, drop rings, services by phase), the MV
- * line and its poles in the drawing standard's MV style, and a ring at every element of a proposed site or route the field has not
- * inspected (plan 2.8). Nothing is computed: bands compare the calc service's drop with its own limit.
+ * A design on the project map: the LV network as the LV model is drawn (branches by feeder, drop rings, services by phase, and
+ * the service poles the design adds), the MV line and its poles in the drawing standard's MV style, and a ring at every element
+ * of a proposed site or route the field has not inspected (plan 2.8). Nothing is computed: bands compare the calc service's drop
+ * with its own limit.
  */
 export function designLayers(d: Design): { lv: LvLayers; mv: AnyCollection } {
   const net = d.lv.network;
@@ -79,12 +80,29 @@ export function designLayers(d: Design): { lv: LvLayers; mv: AnyCollection } {
     },
     nodes: {
       type: 'FeatureCollection',
-      features: net.nodes.map((n) => ({
-        type: 'Feature',
-        id: n.id,
-        geometry: { type: 'Point', coordinates: n.coordinates },
-        properties: { kind: n.kind as never, label: n.label, feeder: n.feeder, ...band(n.id) },
-      })),
+      features: [
+        ...net.nodes.map((n) => ({
+          type: 'Feature' as const,
+          id: n.id,
+          geometry: { type: 'Point' as const, coordinates: n.coordinates },
+          properties: { kind: n.kind as never, label: n.label, feeder: n.feeder, ...band(n.id) },
+        })),
+        // Service poles the design adds where a service's sag would be too low, drawn as LV poles.
+        ...(d.services?.services ?? []).flatMap((s) =>
+          s.poles.map((p, k) => ({
+            type: 'Feature' as const,
+            id: `${s.load_id}:SP${k + 1}`,
+            geometry: { type: 'Point' as const, coordinates: p },
+            properties: {
+              kind: 'pole' as never,
+              label: `SP${k + 1}`,
+              feeder: s.feeder,
+              band: null,
+              dropColour: null,
+            },
+          })),
+        ),
+      ],
     },
     issues: { type: 'FeatureCollection', features: unseen },
     services: {

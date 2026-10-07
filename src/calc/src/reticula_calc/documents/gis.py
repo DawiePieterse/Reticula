@@ -20,7 +20,7 @@ from .common import stamp
 # kind: KML colour (aabbggrr) and width; after the drawing colours of 240-87658920.
 STYLES = {
     "mv_line": ("ff1b00e3", 3), "mv_cable": ("ffc700c7", 3), "lv_line": ("ff2e9600", 2), "lv_cable": ("ffd94500", 2),
-    "service": ("ff3d3d3d", 1), "pole": ("ff111111", 1), "kiosk": ("ffd94500", 1), "transformer": ("ff1b00e3", 1),
+    "service": ("ff3d3d3d", 1), "pole": ("ff111111", 1), "service_pole": ("ff555555", 1), "kiosk": ("ffd94500", 1), "transformer": ("ff1b00e3", 1),
     "minisub": ("ff1b00e3", 1), "connection_point": ("ff1b00e3", 1),
 }
 WGS84_PRJ = ('GEOGCS["GCS_WGS_1984",DATUM["D_WGS_1984",SPHEROID["WGS_1984",6378137.0,298.257223563]],'
@@ -52,10 +52,17 @@ def features(d: Design) -> list[dict]:
     for t in d.transformers.transformers:
         out.append(_f("Point", t.coordinates, kind="minisub" if t.mounting == "minisub" else "transformer", id=t.id, label=t.label,
                       rating_kva=t.rating_kva, demand_kva=t.demand_kva, loading_pct=t.loading_pct, passes=t.passes))
+    services = {sv.load_id: sv for sv in d.services.services} if d.services else {}
     for a in d.lv.allocation.allocations:
         if a.location:
+            sv = services.get(a.load_id)
             out.append(_f("LineString", [a.location, a.at], kind="service", id=a.load_id, label=a.label, kva=a.kva, phase=a.phase,
-                          box=a.box, feeder=a.feeder, service_m=a.service_m))
+                          box=a.box, feeder=a.feeder, service_m=a.service_m, conductor=sv.conductor if sv else None,
+                          drop_pct=sv.drop_pct if sv else None, clearance_m=sv.clearance_m if sv else None,
+                          service_poles=len(sv.poles) if sv else 0, passes=(sv.passes and sv.clears is not False) if sv else None))
+        for i, pole in enumerate(services[a.load_id].poles if a.load_id in services else [], 1):
+            out.append(_f("Point", pole, kind="service_pole", id=f"{a.load_id}:SP{i}", label=f"SP{i}", network="lv",
+                          height_m=d.services.pole_height_m, service=a.load_id))
     if d.mv_network is not None:
         mv_kind = "mv_cable" if d.mv and d.mv.construction == "underground" else "mv_line"
         mvb = {b.id: b for b in d.mv.branches} if d.mv else {}

@@ -57,20 +57,29 @@ public sealed record CalcConductorLibrary(string RulesRef, string RulesHash, IRe
 
 /// <summary>A connected load as the LV checks take it (plan 2.4).</summary>
 /// <param name="LoadClass">The Herman-Beta load class of a residential load; null takes it at its ADMD.</param>
-public sealed record LvLoadAt(string LoadId, string Branch, double OffsetM, string? Phase, double Kva, string Kind, string? LoadClass, string? Label);
+/// <param name="ServicePct">The drop in the load's service cable, added to the drop at its connection (the design run sets it).</param>
+public sealed record LvLoadAt(string LoadId, string Branch, double OffsetM, string? Phase, double Kva, string Kind, string? LoadClass, string? Label,
+    double ServicePct = 0);
 
 /// <param name="Id">A network node id, or the load point id at a service connection.</param>
+/// <param name="WorstPct">At a node, the worst phase; at a connection, the drop at the customer on its own phase, service included.</param>
+/// <param name="ServicePct">At a connection, the drop in the service cable.</param>
 public sealed record LvPointResult(string Id, string Kind, string? Feeder, double DistanceM, IReadOnlyDictionary<string, double> DropPct,
-    double WorstPct, double FaultA, bool Passes);
+    double WorstPct, double FaultA, bool Passes, double? ServicePct = null);
 
 public sealed record LvBranchResult(string Id, string? Feeder, string Conductor, double RatingA, IReadOnlyDictionary<string, double> CurrentA,
     double UtilisationPct, bool Passes);
 
+/// <param name="FuseA">The feeder's fuse: the smallest standard rating at or above DesignCurrentA, where the rules set LV protection.</param>
+/// <param name="MinFaultRequiredA">The least fault current every point of the feeder must see for the fuse to operate.</param>
+/// <param name="Protected">The fuse fits between the design current and the conductor rating, and the least fault clears it.</param>
 public sealed record LvFeederResult(string Feeder, double MaxDropPct, string MaxDropAt, double MaxUtilisationPct, string MaxUtilisationBranch,
-    double MinFaultA, string MinFaultAt, bool Passes);
+    double MinFaultA, string MinFaultAt, bool Passes, double? DesignCurrentA = null, double? ConductorRatingA = null, double? FuseA = null,
+    double? MinFaultRequiredA = null, bool? Protected = null);
 
 /// <summary>Voltage drop, thermal loading and fault level of the connected LV network (plan 2.4).</summary>
 /// <param name="Placeholders">Inputs that are placeholders, in words; results that use them are not fit to submit.</param>
 public sealed record CalcLvAnalysis(string RulesRef, string RulesHash, string Clause, double LimitPct, double PhaseVoltageV, double ConfidencePct,
     IReadOnlyList<LvPointResult> Points, IReadOnlyList<LvBranchResult> Branches, IReadOnlyList<LvFeederResult> Feeders, IReadOnlyList<LvIssue> Issues,
-    TracedValue? WorstDrop, TracedValue? WorstCurrent, TracedValue? LowestFault, IReadOnlyList<string> Placeholders);
+    TracedValue? WorstDrop, TracedValue? WorstCurrent, TracedValue? LowestFault, IReadOnlyList<string> Placeholders,
+    TracedValue? WorstCustomer = null, TracedValue? Protection = null);

@@ -25,6 +25,9 @@ CHECKLIST = [
     ("LV voltage drop within the limit at every node and service", ("lv_drop",), "always"),
     ("LV conductor loading within rating", ("lv_loading",), "always"),
     ("LV fault current at feeder ends", ("lv_fault",), "always"),
+    ("LV feeder fuse between the design current and the conductor rating", ("lv_fuse",), "always"),
+    ("Service cable drop within the service limit", ("lv_service_drop",), "always"),
+    ("Overhead service clearance, with service poles where needed", ("oh_service",), "lv_overhead"),
     ("Overhead ground clearance at mid-span", ("oh_clearance",), "overhead"),
     ("Overhead conductor tension within limit", ("oh_tension",), "overhead"),
     ("Pole class and stays", ("oh_pole",), "overhead"),
@@ -44,14 +47,16 @@ def checklist(d: Design, meta: DocumentMeta) -> list[tuple[str, str, str]]:
     has_oh = d.overhead is not None or d.mv_overhead is not None
     for item, cats, when in CHECKLIST:
         cs = [c for c in d.checks if c.category in cats]
-        if when == "overhead" and not has_oh:
+        if (when == "overhead" and not has_oh) or (when == "lv_overhead" and d.overhead is None):
             out.append((item, "not applicable", "underground construction"))
         elif d.bulk.stopped and cats[0] in ("bulk_fault", "bulk_withstand", "bulk_voltage"):
             out.append((item, "not run", d.bulk.stopped))
         elif not cs:
             note = "the bulk studies did not run" if cats[0].startswith("bulk") and d.bulk.stopped else "no check of this kind in the design"
-            if cats == ("lv_fault",):
-                note = "fault levels reported only: no minimum end fault current in the rules (LV protection settings not held)"
+            if cats in (("lv_fault",), ("lv_fuse",)):
+                note = "fault levels reported only: no LV protection in the rules (eskom/0.9.0 or later sets the feeder fuses)"
+            elif cats in (("lv_service_drop",), ("oh_service",)):
+                note = "services not designed: no services section in the rules (eskom/0.9.0 or later)"
             out.append((item, "not run", note))
         else:
             failed = [c for c in cs if not c.passes]

@@ -16,6 +16,32 @@ describe('designLayers', () => {
     ]);
   });
 
+  it('draws the service poles the design adds as LV poles', () => {
+    const d = design();
+    const service = {
+      load_id: 'L1',
+      label: 'erf 1',
+      feeder: 'TX1-F1',
+      phases: 1 as const,
+      conductor: 'AIRDAC-SNE-10',
+      length_m: 50,
+      current_a: 21.7,
+      drop_pct: 1.2,
+      passes: true,
+      poles: [[28.1015, -25.51995] as [number, number]],
+      clearance_m: 3.5,
+      clears: true,
+    };
+    const { lv } = designLayers({
+      ...d,
+      services: { limit_pct: 2, service_poles: 1, pole_height_m: 7, services: [service] },
+    });
+    const sp = lv.nodes.features.find((f) => f.id === 'L1:SP1')!;
+    expect(sp.properties.kind).toBe('pole');
+    expect(sp.properties.label).toBe('SP1');
+    expect(sp.geometry.coordinates).toEqual([28.1015, -25.51995]);
+  });
+
   it('rings every element of a proposed site the field has not inspected', () => {
     const { lv } = designLayers(design());
     expect(lv.issues.features).toHaveLength(1);

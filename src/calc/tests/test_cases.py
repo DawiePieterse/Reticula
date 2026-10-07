@@ -10,6 +10,7 @@ from reticula_calc.calcs.admd import EstimateRequest, GroupRequest, estimate, gr
 from reticula_calc.calcs.voltage_drop import VoltageDropRequest, voltage_drop
 from reticula_calc.design import overhead, underground
 from reticula_calc.design.run import DesignRequest, run
+from reticula_calc.design.services import ServiceSizer, span_service
 from reticula_calc.lv import placement
 from reticula_calc.lv.analysis import AnalyseRequest, LoadAt, analyse
 from reticula_calc.rules import load_rules
@@ -89,8 +90,25 @@ def _run_lv_reach(inp: dict) -> dict:
     return {"reach_m": placement._derived_reach(rs, placement._params(rs)).value}
 
 
+def _run_oh_service(inp: dict) -> dict:
+    """One overhead service from a feeder pole to a house: spans, sag, clearance and service poles."""
+    r = span_service(load_rules(inp["rules"]), inp["conductor"], inp["length_m"], inp["feeder_pole_m"])
+    return {"service_poles": r.poles, "clearance_m": r.clearance_m, "span_m": r.spans[0].length_m, "sag_m": r.spans[0].sag_m,
+            "first_low_m": r.spans[0].low_m, "clears": r.clears}
+
+
+def _run_lv_service(inp: dict) -> dict:
+    """The service conductor a customer gets, and its drop."""
+    z = ServiceSizer(load_rules(inp["rules"]), inp["construction"])
+    three = inp.get("three_phase", False)
+    current = z.current(inp["kind"], inp["kva"], inp.get("load_class"), three)
+    c, pct, ok = z.choose(current, inp["length_m"], three)
+    return {"current_a": current, "conductor": c.code, "drop_pct": pct, "passes": ok}
+
+
 RUNNERS = {"voltage_drop": _run_voltage_drop, "admd": _run_admd, "admd_group": _run_admd_group, "hb_group": _run_hb_group,
-           "oh_span": _run_oh_span, "ug_derate": _run_ug_derate, "lv_drop": _run_lv_drop, "design": _run_design, "lv_reach": _run_lv_reach}
+           "oh_span": _run_oh_span, "ug_derate": _run_ug_derate, "lv_drop": _run_lv_drop, "design": _run_design, "lv_reach": _run_lv_reach,
+           "oh_service": _run_oh_service, "lv_service": _run_lv_service}
 
 
 def _cases():
