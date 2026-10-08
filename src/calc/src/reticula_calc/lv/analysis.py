@@ -14,8 +14,15 @@ Special loads, and three-phase loads split equally over the phases, add their cu
 **Thermal loading.** The current in each section, per phase, is the Herman-Beta design current of the consumers beyond
 it, plus their special loads. It is compared with the conductor's rating as normally installed (de-rating is plan 2.6).
 
+**Service cables.** A load may carry the drop in its own service cable (plan 2.2, design/services.py). The drop at the
+customer is then the drop at its connection, on its phase (the worst phase for a three-phase load), plus that.
+
 **Fault level.** The minimum phase-to-neutral fault current at each point is V_phase / |Z_source + Z_phase + Z_neutral|,
 with conductors at their hot resistance. The source is the rules file's transformer until Phase 3 sizes it.
+
+**Protection.** Where the rules file sets `lv_design.protection`, each feeder gets a fuse: the smallest standard rating
+I_n at or above its design current I_B (the most loaded section's worst phase), which must not be above the lowest
+rating I_z of its conductors. Every point of the feeder must then see a fault current of at least k·I_n.
 
 Every input comes from the rules file. Placeholder values are listed in a warning, and in the traces of the results.
 """
@@ -47,6 +54,10 @@ CURRENT_ID = "lv.current.herman-beta.v1"
 CURRENT_FORMULA = "I_p = Herman-Beta design current of the consumers beyond the section on phase p + Σ special-load current"
 FAULT_ID = "lv.fault.phase-neutral.v1"
 FAULT_FORMULA = "I_f = V_phase / |Z_source + Σ ℓ·(R_hot + jX)_phase + Σ ℓ·(R_hot + jX)_neutral|; Z_source = z% · V_LL² / S"
+CUSTOMER_ID = "lv.vdrop.customer.v1"
+CUSTOMER_FORMULA = "ΔV_customer = ΔV_p(connection), p the customer's phase (worst for three-phase) + ΔV_service"
+FUSE_ID = "lv.protection.fuse.v1"
+FUSE_FORMULA = "I_n = min{standard ratings ≥ I_B}; I_n ≤ I_z = min conductor rating on the feeder; I_f,min ≥ k·I_n"
 
 
 class LoadAt(BaseModel):
@@ -60,6 +71,8 @@ class LoadAt(BaseModel):
     kind: Literal["residential", "special"] = "residential"
     load_class: str | None = None
     label: str | None = None
+    service_pct: float = 0.0
+    """The drop in the load's service cable at its own demand, %; added to the drop at its connection."""
 
 
 class SourceIn(BaseModel):
@@ -90,8 +103,11 @@ class PointResult(BaseModel):
     distance_m: float
     drop_pct: dict[str, float]
     worst_pct: float
+    """At a node, the worst phase; at a connection, the drop at the customer: its phase's drop plus service_pct."""
     fault_a: float
     passes: bool
+    service_pct: float | None = None
+    """At a connection, the drop in the service cable."""
 
 
 class BranchResult(BaseModel):
@@ -113,6 +129,16 @@ class FeederResult(BaseModel):
     min_fault_a: float
     min_fault_at: str
     passes: bool
+    design_current_a: float | None = None
+    """I_B: the most loaded section's worst phase current, with protection set."""
+    conductor_rating_a: float | None = None
+    """I_z: the lowest rating of the feeder's conductors."""
+    fuse_a: float | None = None
+    """I_n: the smallest standard fuse rating at or above I_B; None when none is."""
+    min_fault_required_a: float | None = None
+    """k·I_n, the least fault current every point of the feeder must see."""
+    protected: bool | None = None
+    """I_B ≤ I_n ≤ I_z and the least fault at least k·I_n; None when the rules set no protection."""
 
 
 class Analysis(BaseModel):
@@ -129,6 +155,10 @@ class Analysis(BaseModel):
     worst_drop: Traced | None = None
     worst_current: Traced | None = None
     lowest_fault: Traced | None = None
+    worst_customer: Traced | None = None
+    """The drop at the customer, service cable included, where it is largest."""
+    protection: Traced | None = None
+    """The feeder whose fuse is least well covered: the lowest ratio of its least fault to k·I_n."""
     placeholders: list[str] = []
     """Inputs that are placeholders, in words; any result that uses them is not fit to submit."""
 
@@ -215,7 +245,11 @@ def analyse(req: AnalyseRequest, rules: RuleSet) -> Analysis:
     alpha = sec["temperature_coefficients"]
     net = req.network
     issues: list[Issue] = []
-    placeholders: list[str] = [f"power factor {pf:g}", f"the voltage drop limit of {limit:g} % (Eskom 240-70465489 not held)"]
+    volt = rules.data["voltage"]
+    limit_placeholder = "lv_max_drop_pct" in volt.get("placeholder", ["lv_max_drop_pct"])
+    placeholders: list[str] = [f"power factor {pf:g}"]
+    if limit_placeholder:
+        placeholders.append(f"the voltage drop limit of {limit:g} % (Eskom 240-70465489 not held)")
     root_z: dict[int, complex] = {}
     root_src: dict[int, tuple[complex, dict, bool]] = {}  # impedance, settings, sized
     unsized: list[str] = []
@@ -334,6 +368,8 @@ def analyse(req: AnalyseRequest, rules: RuleSet) -> Analysis:
     worst = (-1.0, None, None, None)  # (pct, vertex, phase, parts)
     lowest = (math.inf, None, None)
     min_fault = sec.get("min_end_fault_a")
+    load_by_id = {ld.load_id: ld for ld in req.loads}
+    worst_customer: tuple = (-1.0, None, None, 0.0)  # (pct, vertex, load, drop at the connection)
     for i, v in enumerate(vertices):
         if v.parent is None:
             continue  # the source itself
@@ -364,12 +400,19 @@ def analyse(req: AnalyseRequest, rules: RuleSet) -> Analysis:
             worst = (drops[worst_p], i, worst_p, parts[worst_p])
         if fault < lowest[0]:
             lowest = (fault, i, v.loop)
-        ok = drops[worst_p] <= limit and (min_fault is None or fault >= float(min_fault))
+        fault_ok = min_fault is None or fault >= float(min_fault)
         result = {"feeder": v.feeder, "distance_m": round(v.distance, 2), "drop_pct": {p: round(d, 3) for p, d in drops.items()},
-                  "worst_pct": round(drops[worst_p], 3), "fault_a": round(fault, 1), "passes": ok}
+                  "fault_a": round(fault, 1)}
         if v.kind == "node":
-            point_results.append(PointResult(id=v.id, kind="node", **result))
-        point_results += [PointResult(id=load_id, kind="connection", **result) for load_id in v.loads]
+            point_results.append(PointResult(id=v.id, kind="node", worst_pct=round(drops[worst_p], 3), passes=drops[worst_p] <= limit and fault_ok,
+                                             **result))
+        for load_id in v.loads:
+            ld = load_by_id[load_id]
+            at_customer = (drops[worst_p] if ld.phase == "RWB" else drops[ld.phase]) + ld.service_pct
+            point_results.append(PointResult(id=load_id, kind="connection", worst_pct=round(at_customer, 3), passes=at_customer <= limit and fault_ok,
+                                             service_pct=round(ld.service_pct, 3), **result))
+            if at_customer > worst_customer[0]:
+                worst_customer = (at_customer, i, ld, drops[worst_p] if ld.phase == "RWB" else drops[ld.phase])
 
     # ---- thermal loading per network branch, the worst section of it ----
     branch_results: dict[str, BranchResult] = {}
@@ -394,18 +437,39 @@ def analyse(req: AnalyseRequest, rules: RuleSet) -> Analysis:
             worst_current = (util, v.branch, p, (v.sub.mu[p], v.sub.var[p], v.sub.c[p], v.sub.det[p], currents[p], c, rating,
                                                  v.branch in req.ratings))
 
-    # ---- per feeder ----
+    # ---- per feeder, with its fuse ----
+    prot = sec.get("protection")
+    fuse_ratings = sorted(float(x) for x in prot["fuse_ratings_a"]) if prot else []
+    k_fault = float(prot["min_fault_multiple"]) if prot else 0.0
     feeders: list[FeederResult] = []
+    least_covered: tuple = (math.inf, None)  # (least fault / required, feeder)
     for f in sorted({r.feeder for r in point_results if r.feeder}):
         pts = [r for r in point_results if r.feeder == f]
         brs = [b for b in branch_results.values() if b.feeder == f]
         d = max(pts, key=lambda r: r.worst_pct)
         lo_f = min(pts, key=lambda r: r.fault_a)
         u = max(brs, key=lambda b: b.utilisation_pct) if brs else None
-        feeders.append(FeederResult(
+        fr = FeederResult(
             feeder=f, max_drop_pct=d.worst_pct, max_drop_at=d.id, max_utilisation_pct=u.utilisation_pct if u else 0.0,
             max_utilisation_branch=u.id if u else "", min_fault_a=lo_f.fault_a, min_fault_at=lo_f.id,
-            passes=all(r.passes for r in pts) and all(b.passes for b in brs)))
+            passes=all(r.passes for r in pts) and all(b.passes for b in brs))
+        if prot and brs:
+            i_b = max(max(b.current_a.values()) for b in brs)
+            i_z = min(b.rating_a for b in brs)
+            i_n = next((r for r in fuse_ratings if r >= i_b - 1e-9), None)
+            fr.design_current_a, fr.conductor_rating_a, fr.fuse_a = round(i_b, 2), i_z, i_n
+            covered = 0.0  # no fuse carries the feeder: the least covered of all
+            if i_n is not None:
+                fr.min_fault_required_a = round(k_fault * i_n, 1)
+                for r in pts:
+                    if r.fault_a < fr.min_fault_required_a:
+                        r.passes = False
+                covered = lo_f.fault_a / fr.min_fault_required_a
+            fr.protected = i_n is not None and i_n <= i_z + 1e-9 and covered >= 1.0
+            fr.passes = fr.passes and fr.protected
+            if covered < least_covered[0]:
+                least_covered = (covered, fr)
+        feeders.append(fr)
 
     over = [r for r in point_results if r.worst_pct > limit]
     if over:
@@ -417,7 +481,18 @@ def analyse(req: AnalyseRequest, rules: RuleSet) -> Analysis:
         issues.append(issue("error", "overload",
                             "Branches carry more than their conductor's rating. Use a larger conductor or split the feeder.",
                             [b.id for b in sorted(hot, key=lambda b: -b.utilisation_pct)]))
-    if min_fault is None:
+    if prot:
+        unfused = [f.feeder for f in feeders if f.design_current_a is not None and (f.fuse_a is None or f.fuse_a > f.conductor_rating_a + 1e-9)]
+        if unfused:
+            issues.append(issue("error", "no_fuse", "No standard fuse rating carries these feeders' design current without exceeding their "
+                                "conductor's rating. Use a larger conductor or split the feeder.", unfused))
+        uncovered = [f.feeder for f in feeders if f.min_fault_required_a is not None and f.min_fault_a < f.min_fault_required_a]
+        if uncovered:
+            issues.append(issue("error", "fault_below_fuse", f"The far end of these feeders sees less than {k_fault:g} times the fuse "
+                                "rating, so the fuse may not clear a fault there. Use a larger conductor or shorten the feeder.", uncovered))
+        if prot.get("placeholder"):
+            placeholders.append(f"LV feeder fuses: {', '.join(prot['placeholder'])} (engineering assumptions; Eskom 240-57649065 not held)")
+    elif min_fault is None:
         issues.append(Issue(severity="warning", code="fault_not_checked",
                             message="Fault levels are reported but not checked: the rules file sets no minimum (LV protection settings not held)."))
     if unsized:
@@ -432,9 +507,11 @@ def analyse(req: AnalyseRequest, rules: RuleSet) -> Analysis:
     return Analysis(
         rules_ref=rules.ref, rules_hash=rules.hash, clause=clause, limit_pct=limit, phase_voltage_v=round(v_ph, 2),
         confidence_pct=conf * 100, points=point_results, branches=list(branch_results.values()), feeders=feeders, issues=issues,
-        worst_drop=_drop_trace(rules, vertices, worst, v_ph, conf, pf, limit, clause) if worst[1] is not None else None,
+        worst_drop=_drop_trace(rules, vertices, worst, v_ph, conf, pf, limit, limit_placeholder, clause) if worst[1] is not None else None,
         worst_current=_current_trace(rules, worst_current, conf) if worst_current[1] is not None else None,
         lowest_fault=_fault_trace(rules, vertices, lowest, root_src[vertices[lowest[1]].root], v_ph, clause) if lowest[1] is not None else None,
+        worst_customer=_customer_trace(rules, vertices, worst_customer, limit, limit_placeholder, clause) if worst_customer[1] is not None else None,
+        protection=_fuse_trace(rules, least_covered[1], prot, k_fault) if least_covered[1] is not None else None,
         placeholders=placeholders,
     )
 
@@ -455,7 +532,12 @@ def _path(vertices: list[_Vertex], i: int) -> list[int]:
     return out[::-1]
 
 
-def _drop_trace(rules: RuleSet, vertices, worst, v_ph: float, conf: float, pf: float, limit: float, clause: str) -> Traced:
+def _limit_source(rules: RuleSet, placeholder: bool) -> str:
+    return f"rules {rules.ref} voltage" + (" (placeholder)" if placeholder else "")
+
+
+def _drop_trace(rules: RuleSet, vertices, worst, v_ph: float, conf: float, pf: float, limit: float, limit_placeholder: bool,
+                clause: str) -> Traced:
     pct, vi, phase, (mean, var, lo, hi, det, stoch) = worst
     return traced(pct, "%", formula_id=VDROP_ID, formula=VDROP_FORMULA, clause=clause, rules_hash=rules.hash, inputs={
         "point": (vertices[vi].id, "", "worst point"), "phase": (phase, "", "worst phase"),
@@ -463,8 +545,27 @@ def _drop_trace(rules: RuleSet, vertices, worst, v_ph: float, conf: float, pf: f
         "lower": (round(lo, 4), "V", "Σ m⁻·c"), "upper": (round(hi, 4), "V", "Σ m⁺·c"),
         "at_confidence": (round(stoch, 4), "V", f"beta at {conf * 100:g} %"), "special": (round(det, 4), "V", "special and three-phase loads"),
         "V_phase": (round(v_ph, 2), "V", f"rules {rules.ref} voltage"), "cos_phi": (pf, "", f"rules {rules.ref} lv_design (placeholder)"),
-        "limit": (limit, "%", f"rules {rules.ref} voltage (placeholder)"),
+        "limit": (limit, "%", _limit_source(rules, limit_placeholder)),
     })
+
+
+def _customer_trace(rules: RuleSet, vertices, worst, limit: float, limit_placeholder: bool, clause: str) -> Traced:
+    pct, vi, ld, at_connection = worst
+    return traced(pct, "%", formula_id=CUSTOMER_ID, formula=CUSTOMER_FORMULA, clause=clause, rules_hash=rules.hash, inputs={
+        "load": (ld.label or ld.load_id, "", "worst customer"), "connection": (vertices[vi].id, "", "service connection"),
+        "phase": (ld.phase, "", "the customer's phase"), "drop_connection": (round(at_connection, 3), "%", VDROP_ID),
+        "drop_service": (round(ld.service_pct, 3), "%", "service cable at the customer's own demand (design/services.py)"),
+        "limit": (limit, "%", _limit_source(rules, limit_placeholder))})
+
+
+def _fuse_trace(rules: RuleSet, f: FeederResult, prot: dict, k: float) -> Traced:
+    src = f"rules {rules.ref} lv_design.protection" + (" (placeholder)" if prot.get("placeholder") else "")
+    return traced(f.fuse_a or 0.0, "A", formula_id=FUSE_ID, formula=FUSE_FORMULA, clause=prot.get("clause", ""), rules_hash=rules.hash, inputs={
+        "feeder": (f.feeder, "", "least covered"), "I_B": (f.design_current_a, "A", CURRENT_ID),
+        "I_z": (f.conductor_rating_a, "A", "lowest conductor rating on the feeder"),
+        "ratings": (", ".join(f"{float(x):g}" for x in sorted(prot["fuse_ratings_a"])), "A", src),
+        "k": (k, "", src), "I_f_min": (f.min_fault_a, "A", f"{FAULT_ID} at {f.min_fault_at}"),
+        "required": (f.min_fault_required_a if f.min_fault_required_a is not None else "no fuse", "A", "k·I_n")})
 
 
 def _current_trace(rules: RuleSet, worst, conf: float) -> Traced:

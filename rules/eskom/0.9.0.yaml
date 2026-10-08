@@ -1,0 +1,725 @@
+# Eskom residential distribution rules: 0.8.1 plus the LV drop limits, LV feeder fuses, overhead Airdac services and
+# supplier impedances for the LV cables. Only the keys below differ from the base file (the conductor list is replaced
+# whole). Every value must be checked before use in a design.
+base: eskom/0.8.1
+authority: eskom
+version: 0.9.0
+effective_date: 2026-10-07
+notes: >-
+  As 0.8.1, with the engineer's answers of 2026-10-07. The LV voltage drop limit is 8 % from the LV board to the
+  customer, service cable included (CSIR Red Book ch. 12.1; the engineer gives 8 to 10 % from Eskom tenders; Eskom
+  240-70465489 is still not held), with under 2 % in the service cable. Each LV feeder has an NH gG fuse chosen by an
+  engineering assumption, and its far end must see a fault current of at least three times the fuse rating. Overhead
+  houses are served by Airdac SNE 10 or 16 mm² in spans of at most 50 m, with a 7 m service pole where the sag would
+  break the clearance. Underground LV cables get manufacturer impedances at 70 °C (CBi, with Voltex/Aberdare where it
+  publishes them, averaged). Three-phase ABC ratings are the mean of three SANS 1418 suppliers, still placeholders.
+
+standards:
+  ENERGEX3064638: "Release 5 (2024-12-19)"   # Energex Standard for Pole Transformer Fusing: the 3 × fuse rating rule
+  IEC60269-2: "2013"                          # TODO confirm edition: NH fuse links (gG)
+
+# LV voltage drop (plans 2.4, 2.2). The limit is on the drop from the LV board to the customer's meter: the Herman-Beta
+# drop at the service connection on the customer's phase, plus the service cable's drop at the customer's own
+# (undiversified) demand.
+voltage:
+  lv_max_drop_pct: 8               # engineer 2026-10-07 (8–10 % in Eskom tenders); Red Book "approximately 8 %"
+  lv_service_max_drop_pct: 2       # PLACEHOLDER: Red Book "less than 2 %" in services near the feeder end, at undiversified ADMD
+  clause: "CSIR Red Book ch. 12.1, Voltage drop: about 8 % on the LV distributor including service connections (9 % or a little more where the regulated busbar is close and the LDC follows the area's feeder), services under 2 % at the undiversified ADMD; engineer 2026-10-07: 8 to 10 % in Eskom tenders; Eskom 240-70465489 not held"
+  index: ESKOM-VDROP
+  placeholder: [lv_service_max_drop_pct, mv_max_drop_pct, lv_max_rise_pct]
+
+# Overhead service reach (plan 2.2): a house connects to an LV pole within one 50 m span (engineer 2026-10-07).
+lv_loads:
+  clause: "Eskom LV service practice as described by the engineer 2026-10-05; overhead services in spans of at most 50 m (engineer 2026-10-07); three-phase limit a placeholder"
+  max_service_m: 50
+
+# LV feeder protection (plan 2.4). Engineering assumption, as the Eskom protection settings (240-57649065) are not
+# held: one NH gG fuse link per feeder in the transformer's LV fuse box or the kiosk. The fuse is the smallest standard
+# rating that carries the feeder's design current and is not above the rating of any conductor in the feeder
+# (I_B ≤ I_n ≤ I_z), and the least phase-to-neutral fault on the feeder must be at least min_fault_multiple × I_n so
+# that the fuse operates (Energex 3064638 §4: "greater than 3 times the LV fuse rating").
+lv_design:
+  protection:
+    clause: "Engineering assumption (engineer 2026-10-07): NH gG fuse per LV feeder to IEC 60269-2, I_B ≤ I_n ≤ I_z; end-of-feeder fault at least 3 × I_n after Energex 3064638 Release 5 §4; Eskom 240-57649065 not held"
+    index: RETICULA-LVPROT
+    fuse_ratings_a: [63, 80, 100, 125, 160, 200, 250, 315, 400]   # IEC 60269-2 NH preferred ratings (NH00 to NH2)
+    min_fault_multiple: 3
+    placeholder: [fuse_ratings_a, min_fault_multiple]
+
+# Services (plans 2.2, 2.5). Each service gets the smallest conductor of its list that carries the customer's own
+# demand and keeps the service drop within voltage.lv_service_max_drop_pct. Overhead services are strung at the
+# supplier's maximum working tension, so the sag is w·L²/(8·T) as in the supplier's installation table; where the low
+# point of a span would be below min_clearance_m, or a span longer than max_span_m, 7 m service poles are added along
+# the service at equal spacing until every span clears.
+services:
+  clause: "Overhead services in Airdac SNE, spans at most 50 m, a 7 m service pole where the sag is a problem (engineer 2026-10-07); attachment heights, clearance and three-phase and underground service conductors are engineering assumptions"
+  index: RETICULA-SERVICE
+  overhead:
+    single_phase: [AIRDAC-SNE-10, AIRDAC-SNE-16]
+    three_phase: [ABC-3C-25, ABC-3C-35]     # PLACEHOLDER
+    max_span_m: 50
+    pole_height_m: 7
+    below_line_m: 0.6                        # PLACEHOLDER: service clamp below the LV line attachment on the feeder pole
+    house_attachment_m: 3.5                  # PLACEHOLDER: service bracket on the house wall or fascia
+    min_clearance_m: 3.0                     # PLACEHOLDER: over the stand, pedestrians only (SANS 10280-1 not held)
+    tension_pct: 25                          # Aberdare Airdac: maximum working tension 25 % of the breaking load
+  underground:
+    single_phase: [CU-2C-16, CU-2C-25, CU-2C-35]   # PLACEHOLDER
+    three_phase: [CU-4C-16, CU-4C-25, CU-4C-35]    # PLACEHOLDER
+  placeholder: [overhead.three_phase, overhead.below_line_m, overhead.house_attachment_m, overhead.min_clearance_m,
+                underground.single_phase, underground.three_phase]
+
+# Airdac mechanical data (merged into the base file's table). Mass and diameter: Aberdare and Alvern agree; breaking
+# load (UTS) and maximum working tension: Aberdare only. Area, modulus and expansion are for copper and are not used
+# for services, which are strung to the supplier's table rather than by the state-change equation.
+overhead:
+  mechanical:
+    AIRDAC-SNE-10: { mass_kg_per_km: 320, diameter_mm: 12.8, area_mm2: 27.5, breaking_load_kn: 3.6,  modulus_gpa: 110, expansion_per_c: 0.000017 }
+    AIRDAC-SNE-16: { mass_kg_per_km: 485, diameter_mm: 14.5, area_mm2: 42,   breaking_load_kn: 5.76, modulus_gpa: 110, expansion_per_c: 0.000017 }
+
+# The LV library of 0.5.0, with supplier impedances at 70 °C for the underground cables, three-phase ABC ratings
+# averaged over three suppliers, and the Airdac service cables. r_ohm_per_km is DC at 20 °C; r_ac_ohm_per_km is AC at
+# r_ac_temp_c. Underground ratings stay those of Eskom 240-56030637 Rev 2.
+conductors:
+  - code: ABC-3C-25
+    description: 3 × 25 mm² Al ABC + 25 mm² Al insulated neutral (self-supporting), XLPE, 600/1000 V
+    kind: overhead
+    material: al
+    size_mm2: 25
+    cores: 4
+    uses: [feeder]
+    r_ohm_per_km: 1.2
+    r_ac_ohm_per_km: 1.535
+    r_ac_temp_c: 90
+    x_ohm_per_km: 0.091
+    rating_a: 107
+    ratings_a: { air: 107 }
+    fault_k: 0.092
+    placeholder: [rating_a, ratings_a]
+    rating_clause: "Mean of three SANS 1418 suppliers, 105 A M-TEC AS3x R06, 105 A Voltex/Aberdare 3C on supporting core (35 °C ambient, 80 °C conductor), 111 A CBi 3C+N (still air in shade, 35 °C); the basis (still air or wind, sun or shade) is still to confirm; 1 s symmetrical short circuit 2.3 kA (M-TEC)"
+    clause: "M-TEC data sheet AS3x (R06, 2022-01-19), SANS 1418; manufacturer data, to confirm against Eskom 240-84758170"
+    index: MTEC-ABC-3C
+  - code: ABC-3C-35
+    description: 3 × 35 mm² Al ABC + 35 mm² Al insulated neutral (self-supporting), XLPE, 600/1000 V
+    kind: overhead
+    material: al
+    size_mm2: 35
+    cores: 4
+    uses: [feeder]
+    r_ohm_per_km: 0.868
+    r_ac_ohm_per_km: 1.113
+    r_ac_temp_c: 90
+    x_ohm_per_km: 0.09
+    rating_a: 142
+    ratings_a: { air: 142 }
+    fault_k: 0.09143
+    placeholder: [rating_a, ratings_a]
+    rating_clause: "Mean of three SANS 1418 suppliers, 144 A M-TEC AS3x R06, 144 A Voltex/Aberdare 3C on supporting core (35 °C ambient, 80 °C conductor), 138 A CBi 3C+N (still air in shade, 35 °C); the basis (still air or wind, sun or shade) is still to confirm; 1 s symmetrical short circuit 3.2 kA (M-TEC)"
+    clause: "M-TEC data sheet AS3x (R06, 2022-01-19), SANS 1418; manufacturer data, to confirm against Eskom 240-84758170"
+    index: MTEC-ABC-3C
+  - code: ABC-3C-50
+    description: 3 × 50 mm² Al ABC + 50 mm² Al insulated neutral (self-supporting), XLPE, 600/1000 V
+    kind: overhead
+    material: al
+    size_mm2: 50
+    cores: 4
+    uses: [feeder]
+    r_ohm_per_km: 0.641
+    r_ac_ohm_per_km: 0.822
+    r_ac_temp_c: 90
+    x_ohm_per_km: 0.084
+    rating_a: 178
+    ratings_a: { air: 178 }
+    fault_k: 0.092
+    placeholder: [rating_a, ratings_a]
+    rating_clause: "Mean of three SANS 1418 suppliers, 183 A M-TEC AS3x R06, 183 A Voltex/Aberdare 3C on supporting core (35 °C ambient, 80 °C conductor), 168 A CBi 3C+N (still air in shade, 35 °C); the basis (still air or wind, sun or shade) is still to confirm; 1 s symmetrical short circuit 4.6 kA (M-TEC)"
+    clause: "M-TEC data sheet AS3x (R06, 2022-01-19), SANS 1418; manufacturer data, to confirm against Eskom 240-84758170"
+    index: MTEC-ABC-3C
+  - code: ABC-3C-70
+    description: 3 × 70 mm² Al ABC + 70 mm² Al insulated neutral (self-supporting), XLPE, 600/1000 V
+    kind: overhead
+    material: al
+    size_mm2: 70
+    cores: 4
+    uses: [feeder]
+    r_ohm_per_km: 0.443
+    r_ac_ohm_per_km: 0.568
+    r_ac_temp_c: 90
+    x_ohm_per_km: 0.083
+    rating_a: 223
+    ratings_a: { air: 223 }
+    fault_k: 0.09143
+    placeholder: [rating_a, ratings_a]
+    rating_clause: "Mean of three SANS 1418 suppliers, 228 A M-TEC AS3x R06, 228 A Voltex/Aberdare 3C on supporting core (35 °C ambient, 80 °C conductor), 213 A CBi 3C+N (still air in shade, 35 °C); the basis (still air or wind, sun or shade) is still to confirm; 1 s symmetrical short circuit 6.4 kA (M-TEC)"
+    clause: "M-TEC data sheet AS3x (R06, 2022-01-19), SANS 1418; manufacturer data, to confirm against Eskom 240-84758170"
+    index: MTEC-ABC-3C
+  - code: ABC-3C-95
+    description: 3 × 95 mm² Al ABC + 95 mm² Al insulated neutral (self-supporting), XLPE, 600/1000 V
+    kind: overhead
+    material: al
+    size_mm2: 95
+    cores: 4
+    uses: [feeder]
+    r_ohm_per_km: 0.32
+    r_ac_ohm_per_km: 0.411
+    r_ac_temp_c: 90
+    x_ohm_per_km: 0.08
+    rating_a: 271
+    ratings_a: { air: 271 }
+    fault_k: 0.09158
+    placeholder: [rating_a, ratings_a]
+    rating_clause: "Mean of three SANS 1418 suppliers, 277 A M-TEC AS3x R06, 277 A Voltex/Aberdare 3C on supporting core (35 °C ambient, 80 °C conductor), 258 A CBi 3C+N (still air in shade, 35 °C); the basis (still air or wind, sun or shade) is still to confirm; 1 s symmetrical short circuit 8.7 kA (M-TEC)"
+    clause: "M-TEC data sheet AS3x (R06, 2022-01-19), SANS 1418; manufacturer data, to confirm against Eskom 240-84758170"
+    index: MTEC-ABC-3C
+  - code: ABC-3C-120
+    description: 3 × 120 mm² Al ABC + 120 mm² Al insulated neutral (self-supporting), XLPE, 600/1000 V
+    kind: overhead
+    material: al
+    size_mm2: 120
+    cores: 4
+    uses: [feeder]
+    r_ohm_per_km: 0.253
+    r_ac_ohm_per_km: 0.325
+    r_ac_temp_c: 90
+    x_ohm_per_km: 0.078
+    rating_a: 315
+    ratings_a: { air: 315 }
+    fault_k: 0.09167
+    placeholder: [rating_a, ratings_a]
+    rating_clause: "Mean of three SANS 1418 suppliers, 322 A M-TEC AS3x R06, 322 A Voltex/Aberdare 3C on supporting core (35 °C ambient, 80 °C conductor), 300 A CBi 3C+N (still air in shade, 35 °C); the basis (still air or wind, sun or shade) is still to confirm; 1 s symmetrical short circuit 11.0 kA (M-TEC)"
+    clause: "M-TEC data sheet AS3x (R06, 2022-01-19), SANS 1418; manufacturer data, to confirm against Eskom 240-84758170"
+    index: MTEC-ABC-3C
+  - code: ABC-3C-150
+    description: 3 × 150 mm² Al ABC + 150 mm² Al insulated neutral (self-supporting), XLPE, 600/1000 V
+    kind: overhead
+    material: al
+    size_mm2: 150
+    cores: 4
+    uses: [feeder]
+    r_ohm_per_km: 0.206
+    r_ac_ohm_per_km: 0.265
+    r_ac_temp_c: 90
+    x_ohm_per_km: 0.077
+    rating_a: 343
+    ratings_a: { air: 343 }
+    fault_k: 0.08467
+    placeholder: [rating_a, ratings_a]
+    rating_clause: "Mean of three SANS 1418 suppliers, 340 A M-TEC AS3x R06, 350 A Voltex/Aberdare 3C on supporting core (35 °C ambient, 80 °C conductor), 339 A CBi 3C+N (still air in shade, 35 °C); the basis (still air or wind, sun or shade) is still to confirm; 1 s symmetrical short circuit 12.7 kA (M-TEC)"
+    clause: "M-TEC data sheet AS3x (R06, 2022-01-19), SANS 1418; manufacturer data, to confirm against Eskom 240-84758170"
+    index: MTEC-ABC-3C
+  - code: ABC-1C-16
+    description: 16 mm² Al ABC, 1 phase + Al insulated neutral (self-supporting), XLPE, 600/1000 V
+    kind: overhead
+    material: al
+    size_mm2: 16
+    cores: 2
+    uses: [feeder, service]
+    r_ohm_per_km: 1.910
+    r_ac_ohm_per_km: 2.372
+    r_ac_temp_c: 90
+    x_ohm_per_km: 0.091
+    rating_a: 87
+    ratings_a: { air: 87 }
+    fault_k: 0.0875
+    placeholder: [fault_k]
+    rating_clause: "CBi-electric african cables data sheet F7CA 2nnn (May 2006; 16 mm² is not on the 2026 sheet): in air; 1 s short circuit 1.4 kA, end temperature not stated (the 2006 ratings are about 10 % below the 2026 ones at 250 °C)"
+    clause: "CBi-electric african cables data sheet F7CA 2nnn (May 2006), SANS 1418; manufacturer data, to confirm against Eskom 240-84758170"
+    index: CBI-ABC-1C
+  - code: ABC-1C-25
+    description: 25 mm² Al ABC, 1 phase + Al insulated neutral (self-supporting), XLPE, 600/1000 V
+    kind: overhead
+    material: al
+    size_mm2: 25
+    cores: 2
+    uses: [feeder, service]
+    r_ohm_per_km: 1.2
+    r_ac_ohm_per_km: 1.539
+    r_ac_temp_c: 90
+    x_ohm_per_km: 0.09
+    rating_a: 111
+    ratings_a: { air: 111 }
+    fault_k: 0.096
+    placeholder: []
+    rating_clause: "CBi-electric african cables data sheet F7CA 2nnn (Feb 2026): in air in shade, still air, 35 °C (SANS 10198-14); 1 s short circuit 2.4 kA at 250 °C"
+    clause: "CBi-electric african cables data sheet F7CA 2nnn (Feb 2026), SANS 1418; manufacturer data, to confirm against Eskom 240-84758170"
+    index: CBI-ABC-1C
+  - code: ABC-1C-35
+    description: 35 mm² Al ABC, 1 phase + Al insulated neutral (self-supporting), XLPE, 600/1000 V
+    kind: overhead
+    material: al
+    size_mm2: 35
+    cores: 2
+    uses: [feeder, service]
+    r_ohm_per_km: 0.868
+    r_ac_ohm_per_km: 1.113
+    r_ac_temp_c: 90
+    x_ohm_per_km: 0.09
+    rating_a: 138
+    ratings_a: { air: 138 }
+    fault_k: 0.09429
+    placeholder: []
+    rating_clause: "CBi-electric african cables data sheet F7CA 2nnn (Feb 2026): in air in shade, still air, 35 °C (SANS 10198-14); 1 s short circuit 3.3 kA at 250 °C"
+    clause: "CBi-electric african cables data sheet F7CA 2nnn (Feb 2026), SANS 1418; manufacturer data, to confirm against Eskom 240-84758170"
+    index: CBI-ABC-1C
+  - code: ABC-1C-50
+    description: 50 mm² Al ABC, 1 phase + Al insulated neutral (self-supporting), XLPE, 600/1000 V
+    kind: overhead
+    material: al
+    size_mm2: 50
+    cores: 2
+    uses: [feeder, service]
+    r_ohm_per_km: 0.641
+    r_ac_ohm_per_km: 0.822
+    r_ac_temp_c: 90
+    x_ohm_per_km: 0.084
+    rating_a: 168
+    ratings_a: { air: 168 }
+    fault_k: 0.094
+    placeholder: []
+    rating_clause: "CBi-electric african cables data sheet F7CA 2nnn (Feb 2026): in air in shade, still air, 35 °C (SANS 10198-14); 1 s short circuit 4.7 kA at 250 °C"
+    clause: "CBi-electric african cables data sheet F7CA 2nnn (Feb 2026), SANS 1418; manufacturer data, to confirm against Eskom 240-84758170"
+    index: CBI-ABC-1C
+  - code: ABC-1C-70
+    description: 70 mm² Al ABC, 1 phase + Al insulated neutral (self-supporting), XLPE, 600/1000 V
+    kind: overhead
+    material: al
+    size_mm2: 70
+    cores: 2
+    uses: [feeder, service]
+    r_ohm_per_km: 0.443
+    r_ac_ohm_per_km: 0.568
+    r_ac_temp_c: 90
+    x_ohm_per_km: 0.083
+    rating_a: 213
+    ratings_a: { air: 213 }
+    fault_k: 0.09429
+    placeholder: []
+    rating_clause: "CBi-electric african cables data sheet F7CA 2nnn (Feb 2026): in air in shade, still air, 35 °C (SANS 10198-14); 1 s short circuit 6.6 kA at 250 °C"
+    clause: "CBi-electric african cables data sheet F7CA 2nnn (Feb 2026), SANS 1418; manufacturer data, to confirm against Eskom 240-84758170"
+    index: CBI-ABC-1C
+  - code: ABC-1C-95
+    description: 95 mm² Al ABC, 1 phase + Al insulated neutral (self-supporting), XLPE, 600/1000 V
+    kind: overhead
+    material: al
+    size_mm2: 95
+    cores: 2
+    uses: [feeder, service]
+    r_ohm_per_km: 0.32
+    r_ac_ohm_per_km: 0.411
+    r_ac_temp_c: 90
+    x_ohm_per_km: 0.08
+    rating_a: 258
+    ratings_a: { air: 258 }
+    fault_k: 0.09474
+    placeholder: []
+    rating_clause: "CBi-electric african cables data sheet F7CA 2nnn (Feb 2026): in air in shade, still air, 35 °C (SANS 10198-14); 1 s short circuit 9.0 kA at 250 °C"
+    clause: "CBi-electric african cables data sheet F7CA 2nnn (Feb 2026), SANS 1418; manufacturer data, to confirm against Eskom 240-84758170"
+    index: CBI-ABC-1C
+  - code: ABC-1C-120
+    description: 120 mm² Al ABC, 1 phase + Al insulated neutral (self-supporting), XLPE, 600/1000 V
+    kind: overhead
+    material: al
+    size_mm2: 120
+    cores: 2
+    uses: [feeder, service]
+    r_ohm_per_km: 0.253
+    r_ac_ohm_per_km: 0.325
+    r_ac_temp_c: 90
+    x_ohm_per_km: 0.078
+    rating_a: 300
+    ratings_a: { air: 300 }
+    fault_k: 0.09417
+    placeholder: []
+    rating_clause: "CBi-electric african cables data sheet F7CA 2nnn (Feb 2026): in air in shade, still air, 35 °C (SANS 10198-14); 1 s short circuit 11.3 kA at 250 °C"
+    clause: "CBi-electric african cables data sheet F7CA 2nnn (Feb 2026), SANS 1418; manufacturer data, to confirm against Eskom 240-84758170"
+    index: CBI-ABC-1C
+  - code: ABC-1C-150
+    description: 150 mm² Al ABC, 1 phase + Al insulated neutral (self-supporting), XLPE, 600/1000 V
+    kind: overhead
+    material: al
+    size_mm2: 150
+    cores: 2
+    uses: [feeder, service]
+    r_ohm_per_km: 0.206
+    r_ac_ohm_per_km: 0.265
+    r_ac_temp_c: 90
+    x_ohm_per_km: 0.077
+    rating_a: 339
+    ratings_a: { air: 339 }
+    fault_k: 0.09467
+    placeholder: []
+    rating_clause: "CBi-electric african cables data sheet F7CA 2nnn (Feb 2026): in air in shade, still air, 35 °C (SANS 10198-14); 1 s short circuit 14.2 kA at 250 °C"
+    clause: "CBi-electric african cables data sheet F7CA 2nnn (Feb 2026), SANS 1418; manufacturer data, to confirm against Eskom 240-84758170"
+    index: CBI-ABC-1C
+  - code: CU-2C-16
+    description: 16 mm² Cu 2-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: cu
+    size_mm2: 16
+    cores: 2
+    uses: [service]
+    r_ohm_per_km: 1.15
+    r_ac_ohm_per_km: 1.38
+    r_ac_temp_c: 70
+    x_ohm_per_km: 0.087
+    rating_a: 107
+    ratings_a: { ground: 107, pipe: 88, air: 96 }
+    fault_k: 0.115
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 6, 2-core; fault K §3.9.1 m)"
+    clause: "R: AC at 70 °C, X: CBi-electric African Cables 2-core sheet (May 2006; one supplier); manufacturer data for SANS 1507-3, to confirm"
+    index: LV-CABLE-IMPEDANCE
+  - code: CU-4C-16
+    description: 16 mm² Cu 4-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: cu
+    size_mm2: 16
+    cores: 4
+    uses: [feeder, service]
+    r_ohm_per_km: 1.15
+    r_ac_ohm_per_km: 1.3786
+    r_ac_temp_c: 70
+    x_ohm_per_km: 0.087
+    rating_a: 91
+    ratings_a: { ground: 91, pipe: 75, air: 82 }
+    fault_k: 0.115
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 6, 3- or 4-core; fault K §3.9.1 m)"
+    clause: "R: AC at 70 °C, the mean of CBi-electric African Cables (May 2006, F4CC) and Voltex/Aberdare (impedance less the CBi reactance); X: CBi; manufacturer data for SANS 1507-3, to confirm"
+    index: LV-CABLE-IMPEDANCE
+  - code: CU-2C-25
+    description: 25 mm² Cu 2-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: cu
+    size_mm2: 25
+    cores: 2
+    uses: [service]
+    r_ohm_per_km: 0.727
+    r_ac_ohm_per_km: 0.87
+    r_ac_temp_c: 70
+    x_ohm_per_km: 0.065
+    rating_a: 142
+    ratings_a: { ground: 142, pipe: 116, air: 128 }
+    fault_k: 0.115
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 6, 2-core; fault K §3.9.1 m)"
+    clause: "R: AC at 70 °C, X: CBi-electric African Cables 2-core sheet (May 2006; one supplier); manufacturer data for SANS 1507-3, to confirm"
+    index: LV-CABLE-IMPEDANCE
+  - code: CU-4C-25
+    description: 25 mm² Cu 4-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: cu
+    size_mm2: 25
+    cores: 4
+    uses: [feeder, service]
+    r_ohm_per_km: 0.727
+    r_ac_ohm_per_km: 0.8706
+    r_ac_temp_c: 70
+    x_ohm_per_km: 0.08
+    rating_a: 119
+    ratings_a: { ground: 119, pipe: 96, air: 109 }
+    fault_k: 0.115
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 6, 3- or 4-core; fault K §3.9.1 m)"
+    clause: "R: AC at 70 °C, the mean of CBi-electric African Cables (May 2006, F4CC) and Voltex/Aberdare (impedance less the CBi reactance); X: CBi; manufacturer data for SANS 1507-3, to confirm"
+    index: LV-CABLE-IMPEDANCE
+  - code: CU-2C-35
+    description: 35 mm² Cu 2-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: cu
+    size_mm2: 35
+    cores: 2
+    uses: [service]
+    r_ohm_per_km: 0.524
+    r_ac_ohm_per_km: 0.63
+    r_ac_temp_c: 70
+    x_ohm_per_km: 0.061
+    rating_a: 171
+    ratings_a: { ground: 171, pipe: 139, air: 156 }
+    fault_k: 0.115
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 6, 2-core; fault K §3.9.1 m)"
+    clause: "R: AC at 70 °C, X: CBi-electric African Cables 2-core sheet (May 2006; one supplier); manufacturer data for SANS 1507-3, to confirm"
+    index: LV-CABLE-IMPEDANCE
+  - code: CU-4C-35
+    description: 35 mm² Cu 4-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: cu
+    size_mm2: 35
+    cores: 4
+    uses: [feeder, service]
+    r_ohm_per_km: 0.524
+    r_ac_ohm_per_km: 0.6294
+    r_ac_temp_c: 70
+    x_ohm_per_km: 0.077
+    rating_a: 143
+    ratings_a: { ground: 143, pipe: 116, air: 133 }
+    fault_k: 0.115
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 6, 3- or 4-core; fault K §3.9.1 m)"
+    clause: "R: AC at 70 °C, the mean of CBi-electric African Cables (May 2006, F4CC) and Voltex/Aberdare (impedance less the CBi reactance); X: CBi; manufacturer data for SANS 1507-3, to confirm"
+    index: LV-CABLE-IMPEDANCE
+  - code: CU-4C-70
+    description: 70 mm² Cu 4-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: cu
+    size_mm2: 70
+    cores: 4
+    uses: [feeder]
+    r_ohm_per_km: 0.268
+    r_ac_ohm_per_km: 0.3223
+    r_ac_temp_c: 70
+    x_ohm_per_km: 0.072
+    rating_a: 210
+    ratings_a: { ground: 210, pipe: 171, air: 205 }
+    fault_k: 0.115
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 6, 3- or 4-core; fault K §3.9.1 m)"
+    clause: "R: AC at 70 °C, the mean of CBi-electric African Cables (May 2006, F4CC) and Voltex/Aberdare (impedance less the CBi reactance); X: CBi; manufacturer data for SANS 1507-3, to confirm"
+    index: LV-CABLE-IMPEDANCE
+  - code: CU-4C-120
+    description: 120 mm² Cu 4-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: cu
+    size_mm2: 120
+    cores: 4
+    uses: [feeder]
+    r_ohm_per_km: 0.153
+    r_ac_ohm_per_km: 0.1845
+    r_ac_temp_c: 70
+    x_ohm_per_km: 0.069
+    rating_a: 285
+    ratings_a: { ground: 285, pipe: 234, air: 291 }
+    fault_k: 0.115
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 6, 3- or 4-core; fault K §3.9.1 m)"
+    clause: "R: AC at 70 °C, the mean of CBi-electric African Cables (May 2006, F4CC) and Voltex/Aberdare (impedance less the CBi reactance); X: CBi; manufacturer data for SANS 1507-3, to confirm"
+    index: LV-CABLE-IMPEDANCE
+  - code: CU-4C-150
+    description: 150 mm² Cu 4-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: cu
+    size_mm2: 150
+    cores: 4
+    uses: [feeder]
+    r_ohm_per_km: 0.124
+    r_ac_ohm_per_km: 0.1523
+    r_ac_temp_c: 70
+    x_ohm_per_km: 0.07
+    rating_a: 320
+    ratings_a: { ground: 320, pipe: 263, air: 334 }
+    fault_k: 0.115
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 6, 3- or 4-core; fault K §3.9.1 m)"
+    clause: "R: AC at 70 °C, the mean of CBi-electric African Cables (May 2006, F4CC) and Voltex/Aberdare (impedance less the CBi reactance); X: CBi; manufacturer data for SANS 1507-3, to confirm"
+    index: LV-CABLE-IMPEDANCE
+  - code: CU-4C-185
+    description: 185 mm² Cu 4-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: cu
+    size_mm2: 185
+    cores: 4
+    uses: [feeder]
+    r_ohm_per_km: 0.0991
+    r_ac_ohm_per_km: 0.1235
+    r_ac_temp_c: 70
+    x_ohm_per_km: 0.069
+    rating_a: 361
+    ratings_a: { ground: 361, pipe: 298, air: 383 }
+    fault_k: 0.115
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 6, 3- or 4-core; fault K §3.9.1 m)"
+    clause: "R: AC at 70 °C, the mean of CBi-electric African Cables (May 2006, F4CC) and Voltex/Aberdare (impedance less the CBi reactance); X: CBi; manufacturer data for SANS 1507-3, to confirm"
+    index: LV-CABLE-IMPEDANCE
+  - code: CU-4C-240
+    description: 240 mm² Cu 4-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: cu
+    size_mm2: 240
+    cores: 4
+    uses: [feeder]
+    r_ohm_per_km: 0.0754
+    r_ac_ohm_per_km: 0.0953
+    r_ac_temp_c: 70
+    x_ohm_per_km: 0.069
+    rating_a: 416
+    ratings_a: { ground: 416, pipe: 344, air: 451 }
+    fault_k: 0.115
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 6, 3- or 4-core; fault K §3.9.1 m)"
+    clause: "R: AC at 70 °C, the mean of CBi-electric African Cables (May 2006, F4CC) and Voltex/Aberdare (impedance less the CBi reactance); X: CBi; manufacturer data for SANS 1507-3, to confirm"
+    index: LV-CABLE-IMPEDANCE
+  - code: AL-2C-25
+    description: 25 mm² Al 2-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: al
+    size_mm2: 25
+    cores: 2
+    uses: [service]
+    r_ohm_per_km: 1.2
+    r_ac_ohm_per_km: 1.442
+    r_ac_temp_c: 70
+    x_ohm_per_km: 0.065
+    rating_a: 106
+    ratings_a: { ground: 106, pipe: 86, air: 92 }
+    fault_k: 0.076
+    placeholder: [r_ac_ohm_per_km, x_ohm_per_km]
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 7, 2-core; fault K §3.9.1 m)"
+    clause: "No 2-core aluminium sheet found: R is the CBi aluminium 4-core value at 70 °C (same conductor), X the CBi copper 2-core value (same shaped-core geometry); placeholders"
+    index: LV-CABLE-IMPEDANCE
+  - code: AL-4C-25
+    description: 25 mm² Al 4-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: al
+    size_mm2: 25
+    cores: 4
+    uses: [feeder, service]
+    r_ohm_per_km: 1.2
+    r_ac_ohm_per_km: 1.442
+    r_ac_temp_c: 70
+    x_ohm_per_km: 0.08
+    rating_a: 90
+    ratings_a: { ground: 90, pipe: 73, air: 80 }
+    fault_k: 0.076
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 7, 3- or 4-core; fault K §3.9.1 m)"
+    clause: "R: AC at 70 °C, X: CBi-electric African Cables aluminium 4-core ECC sheet (May 2006; one supplier); manufacturer data for SANS 1507-3, to confirm"
+    index: LV-CABLE-IMPEDANCE
+  - code: AL-2C-35
+    description: 35 mm² Al 2-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: al
+    size_mm2: 35
+    cores: 2
+    uses: [service]
+    r_ohm_per_km: 0.868
+    r_ac_ohm_per_km: 1.043
+    r_ac_temp_c: 70
+    x_ohm_per_km: 0.061
+    rating_a: 128
+    ratings_a: { ground: 128, pipe: 104, air: 113 }
+    fault_k: 0.076
+    placeholder: [r_ac_ohm_per_km, x_ohm_per_km]
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 7, 2-core; fault K §3.9.1 m)"
+    clause: "No 2-core aluminium sheet found: R is the CBi aluminium 4-core value at 70 °C (same conductor), X the CBi copper 2-core value (same shaped-core geometry); placeholders"
+    index: LV-CABLE-IMPEDANCE
+  - code: AL-4C-35
+    description: 35 mm² Al 4-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: al
+    size_mm2: 35
+    cores: 4
+    uses: [feeder, service]
+    r_ohm_per_km: 0.868
+    r_ac_ohm_per_km: 1.043
+    r_ac_temp_c: 70
+    x_ohm_per_km: 0.077
+    rating_a: 108
+    ratings_a: { ground: 108, pipe: 87, air: 99 }
+    fault_k: 0.076
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 7, 3- or 4-core; fault K §3.9.1 m)"
+    clause: "R: AC at 70 °C, X: CBi-electric African Cables aluminium 4-core ECC sheet (May 2006; one supplier); manufacturer data for SANS 1507-3, to confirm"
+    index: LV-CABLE-IMPEDANCE
+  - code: AL-4C-70
+    description: 70 mm² Al 4-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: al
+    size_mm2: 70
+    cores: 4
+    uses: [feeder]
+    r_ohm_per_km: 0.443
+    r_ac_ohm_per_km: 0.533
+    r_ac_temp_c: 70
+    x_ohm_per_km: 0.072
+    rating_a: 158
+    ratings_a: { ground: 158, pipe: 130, air: 151 }
+    fault_k: 0.076
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 7, 3- or 4-core; fault K §3.9.1 m)"
+    clause: "R: AC at 70 °C, X: CBi-electric African Cables aluminium 4-core ECC sheet (May 2006; one supplier); manufacturer data for SANS 1507-3, to confirm"
+    index: LV-CABLE-IMPEDANCE
+  - code: AL-4C-120
+    description: 120 mm² Al 4-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: al
+    size_mm2: 120
+    cores: 4
+    uses: [feeder]
+    r_ohm_per_km: 0.253
+    r_ac_ohm_per_km: 0.305
+    r_ac_temp_c: 70
+    x_ohm_per_km: 0.069
+    rating_a: 219
+    ratings_a: { ground: 219, pipe: 179, air: 216 }
+    fault_k: 0.076
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 7, 3- or 4-core; fault K §3.9.1 m)"
+    clause: "R: AC at 70 °C, X: CBi-electric African Cables aluminium 4-core ECC sheet (May 2006; one supplier); manufacturer data for SANS 1507-3, to confirm"
+    index: LV-CABLE-IMPEDANCE
+  - code: AL-4C-150
+    description: 150 mm² Al 4-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: al
+    size_mm2: 150
+    cores: 4
+    uses: [feeder]
+    r_ohm_per_km: 0.206
+    r_ac_ohm_per_km: 0.249
+    r_ac_temp_c: 70
+    x_ohm_per_km: 0.07
+    rating_a: 245
+    ratings_a: { ground: 245, pipe: 201, air: 250 }
+    fault_k: 0.076
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 7, 3- or 4-core; fault K §3.9.1 m)"
+    clause: "R: AC at 70 °C, X: CBi-electric African Cables aluminium 4-core ECC sheet (May 2006; one supplier); manufacturer data for SANS 1507-3, to confirm"
+    index: LV-CABLE-IMPEDANCE
+  - code: AL-4C-185
+    description: 185 mm² Al 4-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: al
+    size_mm2: 185
+    cores: 4
+    uses: [feeder]
+    r_ohm_per_km: 0.164
+    r_ac_ohm_per_km: 0.199
+    r_ac_temp_c: 70
+    x_ohm_per_km: 0.069
+    rating_a: 278
+    ratings_a: { ground: 278, pipe: 229, air: 287 }
+    fault_k: 0.076
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 7, 3- or 4-core; fault K §3.9.1 m)"
+    clause: "R: AC at 70 °C, X: CBi-electric African Cables aluminium 4-core ECC sheet (May 2006; one supplier); manufacturer data for SANS 1507-3, to confirm"
+    index: LV-CABLE-IMPEDANCE
+  - code: AL-4C-240
+    description: 240 mm² Al 4-core PVC/SWA/PVC 600/1000 V
+    kind: underground
+    material: al
+    size_mm2: 240
+    cores: 4
+    uses: [feeder]
+    r_ohm_per_km: 0.125
+    r_ac_ohm_per_km: 0.152
+    r_ac_temp_c: 70
+    x_ohm_per_km: 0.069
+    rating_a: 324
+    ratings_a: { ground: 324, pipe: 268, air: 342 }
+    fault_k: 0.076
+    rating_clause: "Eskom 240-56030637 Rev 2 Table 7, 3- or 4-core; fault K §3.9.1 m)"
+    clause: "R: AC at 70 °C, X: CBi-electric African Cables aluminium 4-core ECC sheet (May 2006; one supplier); manufacturer data for SANS 1507-3, to confirm"
+    index: LV-CABLE-IMPEDANCE
+  - code: AIRDAC-SNE-10
+    description: 10 mm² Cu Airdac SNE house service cable (phase, split neutral, earth and two pilots), XLPE/PE, 600 V
+    kind: overhead
+    material: cu
+    size_mm2: 10
+    cores: 2
+    uses: [service]
+    r_ohm_per_km: 1.90
+    x_ohm_per_km: 0.08
+    rating_a: 50
+    ratings_a: { air: 50 }
+    placeholder: [x_ohm_per_km]
+    rating_clause: "Aberdare Airdac SNE and Alvern Airdac SNE10 agree: 50 A in air (Aberdare: 30 °C ambient, 90 °C conductor); JYTOP's 67 A states no basis and is not averaged in"
+    clause: "Aberdare Cables Airdac SNE (LV cable range) and Alvern Cables Airdac data sheet, SANS 1507-6; R: Aberdare DC at 20 °C; X not published, 0.08 Ω/km assumed for the concentric construction"
+    index: AIRDAC-SNE
+  - code: AIRDAC-SNE-16
+    description: 16 mm² Cu Airdac SNE house service cable (phase, split neutral, earth and two pilots), XLPE/PE, 600 V
+    kind: overhead
+    material: cu
+    size_mm2: 16
+    cores: 2
+    uses: [service]
+    r_ohm_per_km: 1.20
+    x_ohm_per_km: 0.08
+    rating_a: 70
+    ratings_a: { air: 70 }
+    placeholder: [x_ohm_per_km]
+    rating_clause: "Aberdare Airdac SNE and Alvern Airdac SNE16 agree: 70 A in air (Aberdare: 30 °C ambient, 90 °C conductor); JYTOP's 89 A states no basis and is not averaged in"
+    clause: "Aberdare Cables Airdac SNE (LV cable range) and Alvern Cables Airdac data sheet, SANS 1507-6; R: Aberdare DC at 20 °C; X not published, 0.08 Ω/km assumed for the concentric construction"
+    index: AIRDAC-SNE

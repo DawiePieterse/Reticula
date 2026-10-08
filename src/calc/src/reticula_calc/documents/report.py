@@ -116,14 +116,18 @@ def _lv(d: Design, st: dict) -> list:
     a = d.lv.analysis
     out.append(Paragraph(esc(f"Voltage drop limit {num(a.limit_pct)} % of {num(a.phase_voltage_v)} V; Herman-Beta at "
                              f"{num(a.confidence_pct)} % confidence. {d.lv.generated} poles or kiosks placed by the design."), st["body"]))
-    rows = [["Feeder", "Conductor", "Max drop %", "At", "Max loading %", "Branch", "Min fault A", "At", "Pass"]]
+    rows = [["Feeder", "Conductor", "Max drop %", "At", "Max loading %", "Branch", "Min fault A", "At", "Fuse A", "Pass"]]
     fails = []
     for i, f in enumerate(a.feeders):
+        fuse = "–" if f.design_current_a is None else f"{num(f.fuse_a, 0)}, needs {num(f.min_fault_required_a, 0)}" if f.fuse_a else "none fits"
         rows.append([f.feeder, d.lv.sizing.feeders.get(f.feeder, "–"), num(f.max_drop_pct, 3), f.max_drop_at, num(f.max_utilisation_pct, 1),
-                     f.max_utilisation_branch, num(f.min_fault_a, 0), f.min_fault_at, num(f.passes)])
+                     f.max_utilisation_branch, num(f.min_fault_a, 0), f.min_fault_at, fuse, num(f.passes)])
         if not f.passes:
             fails.append(i)
     out.append(table(rows, st, fails=fails))
+    if a.protection:
+        out.append(Paragraph(esc(f"Each feeder has the smallest gG fuse at or above its design current and not above its conductor's "
+                                 f"rating; the least fault on the feeder must be at least the current it needs. {a.protection.clause}"), st["small"]))
     if d.lv.sizing.steps:
         out.append(Paragraph("Conductor sizing steps", st["h3"]))
         out.append(table([["Group", "Conductor", "Reason"]] + [[x.group, x.conductor, x.reason] for x in d.lv.sizing.steps], st))
@@ -132,6 +136,28 @@ def _lv(d: Design, st: dict) -> list:
     out.append(kv([("Loads", al.loads), ("Connected", al.allocated), ("Not connected", al.unallocated), ("Without an estimate", al.unestimated),
                    ("Three-phase", al.three_phase), ("Boxes", al.boxes), ("Connected kVA", al.allocated_kva),
                    ("Longest service, m", al.longest_service_m)], st))
+    if d.services:
+        out += _services(d, st)
+    return out
+
+
+def _services(d: Design, st: dict) -> list:
+    sv = d.services
+    out = [Paragraph("Services", st["h3"]), Paragraph(esc(sv.clause), st["small"])]
+    by = Counter(x.conductor for x in sv.services)
+    rows = [["Conductor", "Services", "Length m", "Worst drop %", "Over limit"]]
+    for code, n in sorted(by.items()):
+        xs = [x for x in sv.services if x.conductor == code]
+        rows.append([code, n, num(sum(x.length_m for x in xs), 1), num(max(x.drop_pct for x in xs), 3), sum(1 for x in xs if not x.passes)])
+    out.append(table(rows, st, fails=[i for i, r in enumerate(rows[1:], 1) if r[4]]))
+    strung = [x for x in sv.services if x.clearance_m is not None]
+    pairs = [("Service drop limit, %", sv.limit_pct), ("Worst service drop, %", sv.worst_drop.value if sv.worst_drop else None)]
+    if strung:
+        pairs += [("Service poles added", f"{sv.service_poles} × {num(sv.pole_height_m)} m"),
+                  ("Services with service poles", sum(1 for x in strung if x.poles)),
+                  ("Lowest service clearance, m", f"{num(min(x.clearance_m for x in strung), 2)} (at least {num(sv.min_clearance_m)})"),
+                  ("Services that do not clear", ", ".join(x.label or x.load_id for x in strung if x.clears is False) or "none")]
+    out.append(kv(pairs, st))
     return out
 
 

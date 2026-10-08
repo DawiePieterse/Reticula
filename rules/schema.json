@@ -76,6 +76,19 @@
           "type": "number",
           "exclusiveMinimum": 0,
           "description": "Highest LV voltage above nominal at light load, %, which limits the transformer tap boost"
+        },
+        "lv_service_max_drop_pct": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Largest drop in a service cable at the customer's own (undiversified) demand, % of nominal"
+        },
+        "placeholder": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          },
+          "description": "Keys of this section whose values are placeholders; without it, the LV drop limit is taken as one"
         }
       }
     },
@@ -885,6 +898,51 @@
           "type": "number",
           "exclusiveMinimum": 0,
           "description": "Smallest phase-to-neutral fault current allowed anywhere on a feeder; unset: reported only"
+        },
+        "protection": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "LV feeder protection (plan 2.4): one fuse per feeder, I_B ≤ I_n ≤ I_z, and the least fault on the feeder at least min_fault_multiple × I_n",
+          "required": [
+            "fuse_ratings_a",
+            "min_fault_multiple"
+          ],
+          "properties": {
+            "clause": {
+              "type": "string"
+            },
+            "index": {
+              "type": "string",
+              "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)+$",
+              "description": "Id of the clause in docs/standards-index.md"
+            },
+            "fuse_ratings_a": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "description": "Standard fuse ratings available, A"
+            },
+            "min_fault_multiple": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Least phase-to-neutral fault current on a feeder, as a multiple of its fuse rating"
+            },
+            "placeholder": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "enum": [
+                  "fuse_ratings_a",
+                  "min_fault_multiple"
+                ]
+              }
+            }
+          }
         }
       }
     },
@@ -1975,6 +2033,118 @@
               }
             }
           }
+        }
+      }
+    },
+    "services": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Service cables (plans 2.2, 2.5): conductor choice by current and drop, and overhead service spans, sag and service poles",
+      "properties": {
+        "clause": {
+          "type": "string"
+        },
+        "index": {
+          "type": "string",
+          "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)+$",
+          "description": "Id of the clause in docs/standards-index.md"
+        },
+        "overhead": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "single_phase",
+            "three_phase",
+            "max_span_m",
+            "pole_height_m",
+            "below_line_m",
+            "house_attachment_m",
+            "min_clearance_m",
+            "tension_pct"
+          ],
+          "properties": {
+            "single_phase": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string"
+              },
+              "description": "Conductor codes, tried smallest first"
+            },
+            "three_phase": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string"
+              },
+              "description": "Conductor codes, tried smallest first"
+            },
+            "max_span_m": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Longest span of a service"
+            },
+            "pole_height_m": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Length of a service pole, set as an LV pole"
+            },
+            "below_line_m": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Service clamp below the LV line attachment on a feeder pole"
+            },
+            "house_attachment_m": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Height of the service attachment on the building"
+            },
+            "min_clearance_m": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Least height of a service above ground"
+            },
+            "tension_pct": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 100,
+              "description": "Stringing tension, % of breaking load"
+            }
+          }
+        },
+        "underground": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "single_phase",
+            "three_phase"
+          ],
+          "properties": {
+            "single_phase": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string"
+              },
+              "description": "Conductor codes, tried smallest first"
+            },
+            "three_phase": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string"
+              },
+              "description": "Conductor codes, tried smallest first"
+            }
+          }
+        },
+        "placeholder": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          },
+          "description": "Dotted keys of this section whose values are placeholders"
         }
       }
     }

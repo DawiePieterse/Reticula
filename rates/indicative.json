@@ -97,6 +97,13 @@
    "category": "material"
   },
   {
+   "code": "HW-SERVICE-POLE",
+   "description": "Service pole hardware (service clamp, bolts)",
+   "unit": "set",
+   "rate": 160,
+   "category": "material"
+  },
+  {
    "code": "HW-MV-POLE",
    "description": "MV pole hardware (crossarm, insulators, bolts)",
    "unit": "set",
@@ -812,6 +819,25 @@
     },
     {
      "item": "HW-LV-POLE",
+     "qty": 1
+    },
+    {
+     "item": "LAB-POLE",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "code": "A-POLE-SERVICE-7",
+   "description": "Service pole 7 m, erected with hardware",
+   "unit": "each",
+   "components": [
+    {
+     "item": "POLE-WOOD-7M",
+     "qty": 1
+    },
+    {
+     "item": "HW-SERVICE-POLE",
      "qty": 1
     },
     {

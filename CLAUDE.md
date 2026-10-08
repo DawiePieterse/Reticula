@@ -65,6 +65,29 @@ Angular 22 PWA ──> .NET 10 API ──HTTP──> Python calc service (FastAP
 
 **Design assistant (ADR 0014).** Claude tool-use through the API, calling the same endpoints as the UI. It is behind a feature flag (`Assistant:Enabled`), and the full suite must pass with it off.
 
+**Design runs (ADR 0011).** Job `design.run` gathers every project input (`DesignInputsBuilder`), sends it to `/calc/design/run` or `/calc/design/optimise`, and stores the exact request JSON and the calc's result JSON as returned (snake_case); the API reads facts off it (`DesignRuns.Design`) and never recomputes. Modes: run, optimise, adopted (an option copied out, no calc call), reproduce. Hashes are canonical JSON (`CanonicalJson`); the inputs hash excludes run options, and per-part hashes give the stale reason. Each rules placeholder a run used becomes a project assumption `rules_placeholder:<sha16>`. The optimiser ranks options by `run.unsound` (unsupplied loads or transformers, a stopped bulk study) before failed checks, because a part nothing feeds fails no check.
+
+**Pre-design placement (ADR 0010).** `lv/placement.py` proposes transformer sites, LV routes and an MV route; `PlacementJob` stores them as candidates with `Source = proposed`, while tablet-marked ones are `field`. Filter on source when a step must see only one.
+
+**Documents (ADR 0012).** Job `documents.generate` renders the nine kinds in the calc service (`documents/`), stores them stamped, supersedes earlier unlocked sets and locks a signed revision's set. Sign-off blockers live in `ReviewService.SignOffBlockersAsync`.
+
+**Auth (ADR 0002).** Identity bearer tokens, no cookies. Roles `engineer` (creates projects, signs off, manages users on the Users page) and `inspector`. No self-registration; the first start bootstraps the engineer from `Bootstrap:*`.
+
+**API conventions.** Look projects up only through `db.Projects.ActiveAsync` / `AnyActiveAsync` (archived projects are invisible) and read the caller with `user.UserId()`. Errors are Problem Details; a calc outage surfaces via `CalcUnavailableExceptionHandler`. API tests share `TestFixtures` (square polygon, `factory.NewProjectAsync`, `WaitFinishedAsync`).
+
+**Web layout.** Standalone lazy-loaded components under `src/web/src/app/features/<area>`, cross-cutting services in `core/`. `shared/symbols.ts` holds the Eskom drawing-practice symbol set (SVG art, colours, dash patterns, MapLibre icon registration) that maps, tool buttons and legends all draw from, so add a new asset kind there rather than picking a colour in a map. Prettier config is in `src/web/.prettierrc`.
+
 ## Release gate
 
 `.github/workflows/release.yml` runs on `v*` tags: full CI, plus named gates (all test cases, document stamps, bit-for-bit design reproduction, API suite with assistant disabled, revision reproduction, field offline-sync specs).
+
+## Conventions
+
+- Work lands on `main` via PR from a `phase-N-*` or `claude/*` branch. Commit subjects name the plan item or area ("Phase 2.4: …", "Conductor library: …").
+- Ruff line length is 120, Python 3.12. Pydantic models define every calc request/response; keep `Reticula.Infrastructure/Calc/*Contracts.cs` in step.
+- Rules files `0.1.0` are starter placeholders; the current Eskom file is the highest version under `rules/eskom/`. Fields marked `PLACEHOLDER` make results "Not fit to submit".
+- `docs/standards-index.md` is the clause index: every rules value and check points to an entry that names the standard, edition and whether the engineer has verified it. Keep that status honest. `docs/field.md`, `docs/imports.md`, `docs/load-data.md`, `docs/design.md` and `docs/operations.md` describe field work, imports, load data, design to sign-off and ops.
+
+Local notes:
+- A Homebrew Postgres without the `reticula` role can run the API tests with `RETICULA_TEST_DB="Host=localhost;Username=<your user>"` if that role is superuser or has CREATEDB and postgis is installed.
+- macOS: if `uv run` in `src/calc` cannot import `reticula_calc`, the `.venv` picked up the hidden flag and Python skips its `.pth` file. Run `chflags -R nohidden .venv`, or use `PYTHONPATH=src uv run --no-sync ...`.

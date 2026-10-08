@@ -178,6 +178,12 @@ def _model(msp, p: Projector, d: Design) -> None:
     for a in d.lv.allocation.allocations:
         if a.location:
             msp.add_line(p.xy(a.location), p.xy(a.at), dxfattribs={"layer": service_layer})
+    if d.services:
+        for sv in d.services.services:
+            for i, pole in enumerate(sv.poles, 1):
+                at = p.xy(pole)
+                msp.add_blockref("RET_POLE_LV", at, dxfattribs={"layer": "RET-SERVICE", "xscale": 0.7, "yscale": 0.7})
+                _label(msp, f"SP{i} {d.services.pole_height_m:g}m", (at[0] + 1.8, at[1] + 1.8), TEXT_M * 0.6)
     if d.overhead:
         for pole in d.overhead.poles:
             if pole.kind == "source":
@@ -259,6 +265,7 @@ def _sheet(doc, req: DocumentRequest, extents) -> None:
                                            ("RET-SERVICE", "line", "Service connection"), ("RET-ZONE", "line", "Transformer zone"),
                                            ("RET-TX", "RET_TX", "Pole-mounted transformer"), ("RET-TX", "RET_MINISUB", "Mini-substation"),
                                            ("RET-POLE", "RET_POLE_LV", "LV pole: tag, height/class"), ("RET-POLE", "RET_POLE_MV", "MV pole"),
+                                           ("RET-SERVICE", "RET_POLE_LV", "Service pole (SP), on the service"),
                                            ("RET-KIOSK", "RET_KIOSK", "Metering kiosk"), ("RET-CP", "RET_CP", "Connection point")]
     for layer, what, text in entries:
         if what == "line":

@@ -4,8 +4,33 @@
     {
       "name": "web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "src/web", "start", "--", "--port", "4300"],
+      "runtimeArgs": [
+        "--prefix",
+        "src/web",
+        "start",
+        "--",
+        "--port",
+        "4300"
+      ],
       "port": 4300
+    },
+    {
+      "name": "calc",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd src/calc && PYTHONPATH=src exec uv run --no-sync reticula-calc"
+      ],
+      "port": 8001
+    },
+    {
+      "name": "api",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "ASPNETCORE_ENVIRONMENT=Development ConnectionStrings__Default=\"Host=localhost;Database=reticula_e2e;Username=dewan\" exec dotnet run --project src/api/Reticula.Api --urls http://localhost:5000"
+      ],
+      "port": 5000
     }
   ]
 }

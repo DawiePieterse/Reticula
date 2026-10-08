@@ -190,3 +190,29 @@ def test_endpoints(client, design):
     assert p.status_code == 200 and p.headers["content-type"] == "application/zip"
     assert "documents/a.pdf" in zipfile.ZipFile(io.BytesIO(p.content)).namelist()
     assert ezdxf  # imported for recover
+
+
+def test_services_and_fuses_reach_every_document():
+    cands, loads, classes = layout()
+    d = run(DesignRequest(rules="eskom/0.9.0", candidates=cands, loads=loads, classes=classes, connection_point=cp(),
+                          options={"construction": "overhead"}), load_rules("eskom/0.9.0"))
+    # One service pole halfway along the first service, as the design places it where the sag is too low.
+    sv = d.services.services[0]
+    a = next(x for x in d.lv.allocation.allocations if x.load_id == sv.load_id)
+    sv.poles = [((a.at[0] + a.location[0]) / 2, (a.at[1] + a.location[1]) / 2)]
+    d.services.service_poles = 1
+    doc, _ = recover.read(io.BytesIO(render("drawing_dxf", req(d))))
+    msp = doc.modelspace()
+    assert len([e for e in msp.query("INSERT") if e.dxf.layer == "RET-SERVICE"]) == 1
+    assert "SP1 7m" in " ".join(e.dxf.text for e in msp.query("TEXT"))
+    fc = json.loads(render("geojson", req(d)))
+    assert [f["properties"]["label"] for f in fc["features"] if f["properties"]["kind"] == "service_pole"] == ["SP1"]
+    assert {f["properties"]["conductor"] for f in fc["features"] if f["properties"]["kind"] == "service"} == {"AIRDAC-SNE-10"}
+    text = pdf_strings(render("report_pdf", req(d)))
+    for needle in ("Services", "AIRDAC-SNE-10", "Fuse A", "Service poles added", "lv.protection.fuse.v1", "oh.service.span.v1"):
+        assert needle in text, needle
+    items = {i: s for i, s, _ in pack_mod.checklist(d, META)}
+    assert items["LV feeder fuse between the design current and the conductor rating"].startswith("pass")
+    assert items["Service cable drop within the service limit"].startswith("pass")
+    assert items["Overhead service clearance, with service poles where needed"].startswith("pass")
+    assert items["LV fault current at feeder ends"].startswith("pass")
