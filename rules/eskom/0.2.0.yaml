@@ -1,0 +1,177 @@
+# Eskom residential distribution rules – STARTER FILE.
+# Every value must be checked against the current edition before use in a design.
+authority: eskom
+version: 0.2.0
+effective_date: 2026-10-03
+notes: >-
+  Load data from NRS 034 and SANS 507-1 as published in the ReticMaster help (Calculations, Load Category Tables),
+  transcribed 2026-10-04 and checked against the beta-distribution formulas. Voltage, conductor and prediction
+  values are still placeholders. Not for design use until checked against the original standards.
+
+standards:
+  NRS034-1: "2024"      # TODO confirm edition
+  NRS048-2: "2024"      # TODO confirm edition
+  SANS1507: "2024"      # TODO confirm edition
+  IEC60909: "2016"      # TODO confirm edition
+
+voltage:
+  lv_nominal_v: 400
+  lv_max_drop_pct: 7.5  # TODO confirm against NRS 048-2 / NRS 034-1
+  mv_nominal_kv: 11
+  clause: "NRS034-1 §TBD"
+
+conductors:
+  - code: ABC-70
+    description: 70 mm² ABC (placeholder impedance)
+    kind: overhead
+    r_ohm_per_km: 0.443
+    x_ohm_per_km: 0.085
+    rating_a: 200
+    clause: "SANS1418 / NRS034-1 §TBD"
+  - code: CU-PVC-35
+    description: 35 mm² Cu PVC SWA (placeholder impedance)
+    kind: underground
+    r_ohm_per_km: 0.524
+    x_ohm_per_km: 0.080
+    rating_a: 150
+    clause: "SANS1507 §TBD"
+
+# Building-type prediction before the field visit. A Reticula heuristic, not a published standard:
+# tune per authority. Confidence is 0..1; buildings below low_confidence_below are visited first.
+building_prediction:
+  clause: "Reticula building-type heuristic v1 (not a standard)"
+  osm_tags:
+    - { match: "amenity=school", type: school, confidence: 0.95 }
+    - { match: "building=school", type: school, confidence: 0.9 }
+    - { match: "shop=*", type: shop, confidence: 0.85 }
+    - { match: "building=retail", type: shop, confidence: 0.85 }
+    - { match: "building=commercial", type: shop, confidence: 0.6 }
+    - { match: "building=kiosk", type: shop, confidence: 0.8 }
+    - { match: "building=house", type: house, confidence: 0.9 }
+    - { match: "building=detached", type: house, confidence: 0.9 }
+    - { match: "building=semidetached_house", type: house, confidence: 0.9 }
+    - { match: "building=terrace", type: house, confidence: 0.85 }
+    - { match: "building=residential", type: house, confidence: 0.7 }
+    - { match: "building=hut", type: house, confidence: 0.6 }
+    - { match: "amenity=place_of_worship", type: other, confidence: 0.9 }
+    - { match: "building=church", type: other, confidence: 0.9 }
+    - { match: "amenity=clinic", type: other, confidence: 0.9 }
+    - { match: "building=garage", type: other, confidence: 0.7 }
+    - { match: "building=shed", type: other, confidence: 0.6 }
+    - { match: "building=yes", type: house, confidence: 0.3 }
+  zoning:
+    - { match: "residential", type: house, confidence: 0.6 }
+    - { match: "business", type: shop, confidence: 0.6 }
+    - { match: "commercial", type: shop, confidence: 0.6 }
+    - { match: "education", type: school, confidence: 0.7 }
+    - { match: "institutional", type: other, confidence: 0.5 }
+    - { match: "community", type: other, confidence: 0.5 }
+  footprint_m2:
+    - { min: 0, max: 6, type: other, confidence: 0.5 }
+    - { min: 6, max: 400, type: house, confidence: 0.45 }
+    - { min: 400, max: 1500, type: other, confidence: 0.3 }
+    - { min: 1500, max: null, type: other, confidence: 0.4 }
+  agreement_boost: 0.1
+  low_confidence_below: 0.6
+
+# Income and ADMD from what the inspector can see. PLACEHOLDER VALUES for pipeline development:
+# the scoring, bands, ADMD and diversity constant must be replaced with the authority's accepted
+# NRS 034-1 method before any design is submitted.
+income_admd:
+  clause: "NRS 034 consumer classes (15-year load parameters); Reticula income-indicator scoring v1 (placeholder thresholds)"
+  indicators:
+    dwelling:
+      label: Dwelling type
+      options: { informal: 0, rdp: 2, brick_small: 4, flat: 4, brick_large: 7 }
+    roof:
+      label: Roof
+      options: { sheeting: 0, asbestos: 1, tiles: 2, concrete: 2 }
+    walls:
+      label: Walls
+      options: { informal: 0, block_unplastered: 1, plastered: 2, face_brick: 3 }
+    vehicles:
+      label: Vehicles on the stand
+      options: { "0": 0, "1": 2, "2+": 4 }
+  multi_indicators:
+    appliances:
+      label: Visible appliances
+      options: { fridge: 1, tv: 1, electric_stove: 1, geyser: 2, aircon: 2, pool_pump: 3 }
+  band_indicators:
+    stand_size_m2:
+      label: Stand size
+      unit: m²
+      bands: [ { max: 300, points: 0 }, { max: 600, points: 1 }, { max: 1000, points: 2 }, { max: null, points: 4 } ]
+    occupants:
+      label: Occupants
+      bands: [ { max: 4, points: 0 }, { max: 7, points: 1 }, { max: null, points: 2 } ]
+  design_table: nrs034_15y
+  # Indicator score -> NRS 034 consumer class. The score thresholds are a Reticula heuristic (placeholder);
+  # the class parameters come from the standard. The engineer can also choose the class directly.
+  income_bands:
+    - { band: very low, max_points: 2, class: informal_settlement }
+    - { band: low, max_points: 6, class: township_area }
+    - { band: lower middle, max_points: 10, class: urban_residential_1 }
+    - { band: middle, max_points: 14, class: urban_residential_2 }
+    - { band: upper middle, max_points: 18, class: urban_township_complex }
+    - { band: upper, max_points: null, class: urban_multistorey_estate }
+  diversity:
+    method: herman_beta
+    confidence_pct: 90
+    phases: 3
+    clause: "NRS 034-1 / SANS 507-1 Herman-Beta method, 90 % confidence"
+  special_loads:
+    school: 25
+    clinic: 15
+    shop: 5
+    borehole_pump: 7.5
+    church: 3
+    other: 2
+
+# Herman-Beta load parameters. alpha, beta: beta-distribution shape; c_amps: scaling current (circuit breaker);
+# admd_kva, mean_a, sd_a: as published. Source: ReticMaster help, Calculations > Load Category Tables.
+load_tables:
+  nrs034_15y:
+    source: "NRS 034 load parameters, 15 years (via ReticMaster help)"
+    horizon_years: 15
+    phase_voltage_v: 230
+    classes:
+      - { code: rural_settlement, description: Rural settlement, lsm: "LSM 1 (low end)", income_min_zar: 0, income_max_zar: 600, alpha: 0.35, beta: 2.88, c_amps: 20, admd_kva: 0.50, mean_a: 2.17, sd_a: 3.03 }
+      - { code: rural_village, description: Rural village, lsm: "LSM 1 and 2", income_min_zar: 400, income_max_zar: 900, alpha: 0.48, beta: 2.13, c_amps: 20, admd_kva: 0.84, mean_a: 3.65, sd_a: 4.07 }
+      - { code: informal_settlement, description: Informal settlement, lsm: "LSM 3 and 4", income_min_zar: 800, income_max_zar: 1500, alpha: 0.91, beta: 8.80, c_amps: 60, admd_kva: 1.30, mean_a: 5.56, sd_a: 5.36 }
+      - { code: township_area, description: Township area, lsm: "LSM 5 and 6", income_min_zar: 1500, income_max_zar: 3000, alpha: 1.22, beta: 5.86, c_amps: 60, admd_kva: 2.37, mean_a: 10.30, sd_a: 7.96 }
+      - { code: urban_residential_1, description: Urban residential I, lsm: "LSM 7", income_min_zar: 3000, income_max_zar: 5500, alpha: 1.25, beta: 3.55, c_amps: 60, admd_kva: 3.59, mean_a: 15.61, sd_a: 10.93 }
+      - { code: urban_residential_2, description: Urban residential II, lsm: "LSM 7 and 8", income_min_zar: 5500, income_max_zar: 8500, alpha: 1.42, beta: 4.10, c_amps: 80, admd_kva: 4.72, mean_a: 20.52, sd_a: 13.68 }
+      - { code: urban_township_complex, description: Urban township complex, lsm: "LSM 8", income_min_zar: 8500, income_max_zar: 12000, alpha: 1.42, beta: 4.13, c_amps: 80, admd_kva: 4.70, mean_a: 20.43, sd_a: 13.63 }
+      - { code: urban_multistorey_estate, description: Urban multi-storey/estate, lsm: "LSM 8 (high end)", income_min_zar: 12000, income_max_zar: 24000, alpha: 1.37, beta: 3.39, c_amps: 80, admd_kva: 5.30, mean_a: 23.04, sd_a: 15.09 }
+  nrs034_7y:
+    source: "NRS 034 load parameters, 7 years (via ReticMaster help)"
+    horizon_years: 7
+    phase_voltage_v: 230
+    classes:
+      - { code: rural_settlement, description: Rural settlement, lsm: "LSM 1 (low end)", income_min_zar: 0, income_max_zar: 600, alpha: 0.30, beta: 2.98, c_amps: 20, admd_kva: 0.42, mean_a: 1.83, sd_a: 2.78 }
+      - { code: rural_village, description: Rural village, lsm: "LSM 1 and 2", income_min_zar: 400, income_max_zar: 900, alpha: 0.43, beta: 2.52, c_amps: 20, admd_kva: 0.67, mean_a: 2.91, sd_a: 3.55 }
+      - { code: informal_settlement, description: Informal settlement, lsm: "LSM 3 and 4", income_min_zar: 800, income_max_zar: 1500, alpha: 0.77, beta: 9.88, c_amps: 60, admd_kva: 1.00, mean_a: 4.35, sd_a: 4.56 }
+      - { code: township_area, description: Township area, lsm: "LSM 5 and 6", income_min_zar: 1500, income_max_zar: 3000, alpha: 1.05, beta: 7.81, c_amps: 60, admd_kva: 1.64, mean_a: 7.13, sd_a: 6.18 }
+      - { code: urban_residential_1, description: Urban residential I, lsm: "LSM 7", income_min_zar: 3000, income_max_zar: 5500, alpha: 1.23, beta: 5.56, c_amps: 60, admd_kva: 2.50, mean_a: 10.87, sd_a: 8.28 }
+      - { code: urban_residential_2, description: Urban residential II, lsm: "LSM 7 and 8", income_min_zar: 5500, income_max_zar: 8500, alpha: 1.45, beta: 6.07, c_amps: 80, admd_kva: 3.54, mean_a: 15.39, sd_a: 10.81 }
+      - { code: urban_township_complex, description: Urban township complex, lsm: "LSM 8", income_min_zar: 8500, income_max_zar: 12000, alpha: 1.45, beta: 5.75, c_amps: 80, admd_kva: 3.70, mean_a: 16.09, sd_a: 11.20 }
+      - { code: urban_multistorey_estate, description: Urban multi-storey/estate, lsm: "LSM 8 (high end)", income_min_zar: 12000, income_max_zar: 24000, alpha: 1.43, beta: 4.41, c_amps: 80, admd_kva: 4.50, mean_a: 19.57, sd_a: 13.15 }
+  sans507_15y:
+    source: "SANS 507-1 load parameters, 15 years (via ReticMaster help)"
+    horizon_years: 15
+    phase_voltage_v: 230
+    confidence_pct: 90
+    classes:
+      - { code: c1, standard_class: SANS 507 C1, description: "Rural settlement, non-urban, scattered", alpha: 0.190, beta: 1.581, c_amps: 20, admd_kva: 0.490 }
+      - { code: c2, standard_class: SANS 507 C2, description: Rural villages, alpha: 0.190, beta: 1.581, c_amps: 20, admd_kva: 0.490 }
+      - { code: c3, standard_class: SANS 507 C3, description: Informal settlement, alpha: 0.522, beta: 6.085, c_amps: 60, admd_kva: 1.090 }
+      - { code: c4, standard_class: SANS 507 C4, description: Township area, alpha: 0.793, beta: 5.085, c_amps: 60, admd_kva: 1.860 }
+      - { code: c5, standard_class: SANS 507 C5, description: Urban residential I, alpha: 0.997, beta: 4.394, c_amps: 60, admd_kva: 2.550 }
+      - { code: c6, standard_class: SANS 507 C6, description: Urban residential II, alpha: 1.167, beta: 3.77, c_amps: 60, admd_kva: 3.260 }
+      - { code: c7, standard_class: SANS 507 C7, description: Urban town house I, alpha: 1.096, beta: 4.04, c_amps: 60, admd_kva: 2.950 }
+      - { code: c8, standard_class: SANS 507 C8, description: Urban town house II, alpha: 1.448, beta: 2.92, c_amps: 60, admd_kva: 5.640, status: unverified,
+          note: "Published ADMD 5.64 kVA does not match alpha, beta and c (4.58 kVA). Check the original SANS 507-1 table." }
+      - { code: c9, standard_class: SANS 507 C9, description: Urban estate, alpha: 2.013, beta: 1.827, c_amps: 80, admd_kva: 9.640 }
+      - { code: c10, standard_class: SANS 507 C10, description: High rise (small), alpha: 0.755, beta: 5.215, c_amps: 60, admd_kva: 1.750 }
+      - { code: c11, standard_class: SANS 507 C11, description: High rise (medium), alpha: 0.896, beta: 4.74, c_amps: 60, admd_kva: 2.190 }
+      - { code: c12, standard_class: SANS 507 C12, description: Hostel, alpha: 0.627, beta: 5.671, c_amps: 60, admd_kva: 1.370 }

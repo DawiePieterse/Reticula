@@ -1,0 +1,83 @@
+namespace Reticula.Domain.Field;
+
+public enum AssumptionStatus
+{
+    Open,
+    /// <summary>Resolved: the data the assumption stood in for is now there.</summary>
+    Cleared,
+    /// <summary>Accepted as stated by the engineer, with a note; it stays in the register and the report.</summary>
+    Confirmed,
+}
+
+public static class AssumptionCodes
+{
+    public const string AdmdEstimated = "admd_estimated";
+    public const string AdmdOverridden = "admd_overridden";
+    public const string IndicatorsMissing = "indicators_missing";
+    /// <summary>A placeholder value in the rules file that the design used (one per placeholder text).</summary>
+    public const string RulesPlaceholder = "rules_placeholder";
+}
+
+/// <summary>
+/// An estimate or unchecked item the design relies on. All must be cleared before sign-off.
+/// Each (subject, code) pair has at most one row; re-estimating reopens it.
+/// </summary>
+public sealed class Assumption
+{
+    private Assumption() { } // EF
+
+    public Assumption(Guid id, Guid projectId, string subjectType, Guid subjectId, string code, string text, DateTimeOffset now)
+    {
+        Id = id;
+        ProjectId = projectId;
+        SubjectType = subjectType;
+        SubjectId = subjectId;
+        Code = code;
+        Text = text;
+        Status = AssumptionStatus.Open;
+        CreatedAt = now;
+        UpdatedAt = now;
+    }
+
+    public Guid Id { get; private set; }
+    public Guid ProjectId { get; private set; }
+    public string SubjectType { get; private set; } = "";
+    public Guid SubjectId { get; private set; }
+    public string Code { get; private set; } = "";
+    public string Text { get; private set; } = "";
+    public AssumptionStatus Status { get; private set; }
+    public DateTimeOffset CreatedAt { get; private set; }
+    public DateTimeOffset UpdatedAt { get; private set; }
+    public Guid? ClearedBy { get; private set; }
+    public DateTimeOffset? ClearedAt { get; private set; }
+    public string? ClearNote { get; private set; }
+
+    public void Reopen(string text, DateTimeOffset now)
+    {
+        Text = text;
+        Status = AssumptionStatus.Open;
+        ClearedBy = null;
+        ClearedAt = null;
+        ClearNote = null;
+        UpdatedAt = now;
+    }
+
+    /// <summary>The engineer accepts the assumption as stated (plan 7.1); the note says why.</summary>
+    public void Confirm(Guid by, string note, DateTimeOffset now)
+    {
+        Status = AssumptionStatus.Confirmed;
+        ClearedBy = by;
+        ClearedAt = now;
+        ClearNote = note;
+        UpdatedAt = now;
+    }
+
+    public void Clear(Guid by, string? note, DateTimeOffset now)
+    {
+        Status = AssumptionStatus.Cleared;
+        ClearedBy = by;
+        ClearedAt = now;
+        ClearNote = note;
+        UpdatedAt = now;
+    }
+}

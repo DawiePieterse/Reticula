@@ -1,0 +1,26 @@
+# Eskom residential distribution rules: 0.6.0 plus pre-design placement settings (plan 2.0).
+# Only the keys below differ from the base file. Every value must be checked before use in a design.
+base: eskom/0.6.0
+authority: eskom
+version: 0.7.0
+effective_date: 2026-10-06
+notes: >-
+  As 0.6.0, plus the settings the pre-design placement uses to propose transformer sites, LV coverage and an MV route
+  from the loads and the road network. The ratings follow the SANS 780 preferred series; the growth allowance, LV reach,
+  feeder limit and the indicative costs are placeholders until Eskom 240-56062752 (mini-subs), 240-70465489 (voltage)
+  and the rate library are held. Not for design use until checked.
+
+# Pre-design placement (plan 2.0). The LV reach stands in for the voltage drop limit: a load further than this by road
+# from its transformer is not assigned to it. The design checks of plan 2.4 are what decide; this only shapes the proposal.
+mv_design:
+  clause: "Pre-design placement settings: SANS 780 preferred ratings; reach, growth, feeders and costs are placeholders"
+  index: SANS780-RATING
+  transformer_ratings_kva: [16, 25, 50, 100, 200, 315, 500]   # SANS 780 preferred series (to confirm)
+  growth_pct: 10               # PLACEHOLDER: growth allowance over the design horizon
+  lv_reach_m: 400              # PLACEHOLDER: longest LV road distance a transformer feeds, until the drop checks replace it
+  site_spacing_m: 50           # candidate transformer sites every 50 m along roads (a Reticula setting, not a standard)
+  max_feeders: 4               # PLACEHOLDER: feeders per transformer; see ESKOM-LVPROT for mini-subs (5 or 6)
+  costs:                       # PLACEHOLDER: indicative installed costs, ZAR, until the rate library (plan 5.1) carries them
+    transformer_zar: { "16": 60000, "25": 70000, "50": 90000, "100": 120000, "200": 160000, "315": 210000, "500": 280000 }
+    lv_zar_per_m: 180
+    mv_zar_per_m: 450

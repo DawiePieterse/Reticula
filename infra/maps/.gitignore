@@ -1,0 +1,2 @@
+# PMTiles basemaps mounted into the calc service at /maps. Large files: not committed.
+*.pmtiles

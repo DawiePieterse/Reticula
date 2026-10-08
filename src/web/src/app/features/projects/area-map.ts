@@ -1,0 +1,316 @@
+import {
+  Component,
+  ElementRef,
+  OnDestroy,
+  afterNextRender,
+  effect,
+  input,
+  output,
+  signal,
+  untracked,
+  viewChild,
+} from '@angular/core';
+import type { Feature as GjFeature } from 'geojson';
+import type { GeoJSONSource, Map as MlMap, MapMouseEvent, StyleSpecification } from 'maplibre-gl';
+import { GeoJsonPolygon, Position, bounds, emptyCollection, positionsOf, withIdProperty } from './geo';
+import { MapLegend } from '../../shared/map-legend';
+import { LAYOUT_LEGEND, NETWORK_ICON, lineColour, lineDash, registerSymbols } from '../../shared/symbols';
+import { AnyGeometry, BUILDING_COLOURS, FeatureCollection, flagIncomplete } from './layout.api';
+import { LvLayers } from './lv-network.api';
+import { PolygonDraw } from './polygon-draw';
+
+const OSM_STYLE: StyleSpecification = {
+  version: 8,
+  sources: {
+    osm: {
+      type: 'raster',
+      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+      tileSize: 256,
+      maxzoom: 19,
+      attribution: '© OpenStreetMap contributors',
+    },
+  },
+  layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
+};
+
+const SOUTH_AFRICA_CENTRE: Position = [25.0, -29.0];
+
+/**
+ * MapLibre 6 resolves its worker relative to its own module, which breaks once bundled.
+ * The worker files are copied to /maplibre by angular.json assets.
+ */
+const WORKER_PATH = 'maplibre/maplibre-gl-worker.mjs';
+const DRAW_SOURCE = 'area-draw';
+const STANDS = 'stands';
+const BUILDINGS = 'buildings';
+const PREVIEW = 'preview';
+const ROADS = 'roads';
+const CONTOURS = 'contours';
+const NETWORK = 'network';
+const LV_BRANCHES = 'lv-branches';
+const LV_NODES = 'lv-nodes';
+const LV_ISSUES = 'lv-issues';
+const LV_SERVICES = 'lv-services';
+const LV_LOADS = 'lv-loads';
+
+export type AnyCollection = FeatureCollection<unknown, AnyGeometry> | null;
+
+/** MapLibre map that shows a project area and, when editable, lets the user tap out a polygon. */
+@Component({
+  selector: 'app-area-map',
+  imports: [MapLegend],
+  template: `
+    <div class="map-wrap">
+      <div class="map" #mapEl></div>
+      <app-map-legend [items]="legend" />
+    </div>
+    @if (editable()) {
+      <div class="tools">
+        @if (drawing()) {
+          <span class="hint">Tap the map to add corners ({{ draw.points().length }})</span>
+          <button type="button" (click)="undo()" [disabled]="!draw.points().length">Undo</button>
+          <button type="button" class="primary" (click)="finish()" [disabled]="!draw.canFinish()">Finish</button>
+          @if (draw.points().length >= 3 && draw.selfIntersects()) {
+            <span class="warn">The area crosses itself. Undo the last corner.</span>
+          }
+        } @else {
+          <button type="button" (click)="start()">{{ draw.closed() ? 'Redraw area' : 'Draw area' }}</button>
+          @if (draw.closed()) {
+            <button type="button" (click)="clear()">Clear</button>
+          }
+        }
+      </div>
+    }
+  `,
+  styles: `
+    :host { display: block; }
+    .map-wrap { position: relative; }
+    .map { height: 460px; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .tools { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-top: .5rem; }
+    .hint { color: var(--muted); }
+    .warn { color: var(--danger); }
+  `,
+})
+export class AreaMap implements OnDestroy {
+  readonly area = input<GeoJsonPolygon | null>(null);
+  readonly editable = input(false);
+  readonly areaChange = output<GeoJsonPolygon | null>();
+  /** Optional overlays: imported stands, buildings coloured by predicted type, and an import preview. */
+  readonly stands = input<AnyCollection>(null);
+  readonly buildings = input<AnyCollection>(null);
+  readonly preview = input<AnyCollection>(null);
+  readonly roads = input<AnyCollection>(null);
+  readonly contours = input<AnyCollection>(null);
+  readonly network = input<AnyCollection>(null);
+  /** The LV network model: branches coloured by feeder, nodes, and where its issues are. */
+  readonly lv = input<LvLayers | null>(null);
+  protected readonly legend = LAYOUT_LEGEND;
+  /** Building to zoom to and highlight. */
+  readonly focusId = input<string | null>(null);
+  readonly featureClick = output<string>();
+
+  protected readonly draw = new PolygonDraw();
+  protected readonly drawing = signal(false);
+
+  private readonly mapEl = viewChild.required<ElementRef<HTMLDivElement>>('mapEl');
+  private map: MlMap | null = null;
+
+  constructor() {
+    effect(() => {
+      const a = this.area();
+      untracked(() => {
+        if (this.drawing()) return; // don't clobber an in-progress drawing
+        this.draw.load(a);
+        this.render();
+        this.fit();
+      });
+    });
+
+    effect(() => this.setData(STANDS, this.stands()));
+    effect(() => this.setData(BUILDINGS, this.buildings()));
+    effect(() => this.setData(ROADS, this.roads()));
+    effect(() => this.setData(CONTOURS, this.contours()));
+    effect(() => this.setData(NETWORK, flagIncomplete(this.network())));
+    effect(() => this.setLv(this.lv()));
+    effect(() => {
+      const p = this.preview();
+      untracked(() => {
+        this.setData(PREVIEW, p);
+        if (p?.features.length) this.fitCollection(p);
+      });
+    });
+    effect(() => {
+      const id = this.focusId();
+      untracked(() => this.focusOn(id));
+    });
+
+    afterNextRender(async () => {
+      const { Map, NavigationControl, setWorkerUrl } = await import('maplibre-gl');
+      setWorkerUrl(new URL(WORKER_PATH, document.baseURI).href);
+      const map = new Map({ container: this.mapEl().nativeElement, style: OSM_STYLE, center: SOUTH_AFRICA_CENTRE, zoom: 5 });
+      map.addControl(new NavigationControl(), 'top-right');
+      // Not 'load': that waits for the basemap tiles, so a slow or blocked tile server would hide the project's own layers.
+      map.on('style.load', async () => {
+        for (const id of [CONTOURS, ROADS, STANDS, BUILDINGS, NETWORK, LV_SERVICES, LV_LOADS, LV_BRANCHES, LV_NODES, LV_ISSUES, PREVIEW]) map.addSource(id, { type: 'geojson', data: emptyCollection(), promoteId: 'id' });
+        await registerSymbols(map);
+        if (!map.getSource(STANDS)) return; // the style changed while the icons were drawn
+        map.addLayer({ id: 'contours-line', type: 'line', source: CONTOURS, paint: { 'line-color': '#bc8f5a', 'line-width': 0.8, 'line-opacity': 0.8 } });
+        map.addLayer({ id: 'contours-label', type: 'symbol', source: CONTOURS, minzoom: 15,
+          layout: { 'symbol-placement': 'line', 'text-field': ['to-string', ['get', 'elevationM']], 'text-size': 10 },
+          paint: { 'text-color': '#8a5a2b', 'text-halo-color': '#fff', 'text-halo-width': 1 } });
+        map.addLayer({ id: 'roads-line', type: 'line', source: ROADS, paint: { 'line-color': '#9a6700', 'line-width': 2, 'line-opacity': 0.7 } });
+        map.addLayer({ id: 'stands-line', type: 'line', source: STANDS, paint: { 'line-color': '#6e7781', 'line-width': 1 } });
+        map.addLayer({
+          id: 'buildings-fill', type: 'fill', source: BUILDINGS,
+          paint: {
+            'fill-color': ['match', ['get', 'predictedType'], ...Object.entries(BUILDING_COLOURS).flat(), BUILDING_COLOURS['other']] as never,
+            'fill-opacity': ['interpolate', ['linear'], ['get', 'confidence'], 0, 0.25, 1, 0.85],
+          },
+        });
+        map.addLayer({ id: 'buildings-low', type: 'line', source: BUILDINGS, filter: ['==', ['get', 'lowConfidence'], true], paint: { 'line-color': '#cf222e', 'line-width': 1.5 } });
+        map.addLayer({ id: 'buildings-focus', type: 'line', source: BUILDINGS, filter: ['==', ['get', 'id'], ''], paint: { 'line-color': '#fb8500', 'line-width': 4 } });
+        // The authority's network in the drawing standard's symbols (shared/symbols); the LV model keeps its feeder colours.
+        map.addLayer({ id: 'network-line', type: 'line', source: NETWORK, filter: ['==', ['geometry-type'], 'LineString'],
+          paint: { 'line-color': lineColour('assetType') as never, 'line-width': ['match', ['get', 'assetType'], ['mv_line', 'mv_cable'], 3, 2] as never,
+            'line-dasharray': lineDash('assetType') as never } });
+        map.addLayer({ id: 'network-point', type: 'symbol', source: NETWORK, filter: ['==', ['geometry-type'], 'Point'],
+          layout: { 'icon-image': NETWORK_ICON as never, 'icon-size': ['match', ['get', 'assetType'], 'pole', 0.5, 0.75] as never, 'icon-allow-overlap': true, 'icon-ignore-placement': true } });
+        map.addLayer({ id: 'network-incomplete', type: 'circle', source: NETWORK, filter: ['all', ['==', ['geometry-type'], 'Point'], ['==', ['get', 'incomplete'], true]],
+          paint: { 'circle-radius': 14, 'circle-opacity': 0, 'circle-stroke-color': '#fb8500', 'circle-stroke-width': 2 } });
+        map.addLayer({ id: 'lv-service', type: 'line', source: LV_SERVICES, paint: { 'line-color': ['get', 'colour'] as never, 'line-width': 1.5 } });
+        map.addLayer({ id: 'lv-load', type: 'circle', source: LV_LOADS,
+          paint: { 'circle-radius': 3, 'circle-color': ['get', 'colour'] as never, 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1 } });
+        map.addLayer({ id: 'lv-overload', type: 'line', source: LV_BRANCHES, filter: ['==', ['get', 'overloaded'], true],
+          layout: { 'line-cap': 'round' }, paint: { 'line-color': '#cf222e', 'line-width': 9, 'line-opacity': 0.35 } });
+        map.addLayer({ id: 'lv-route', type: 'line', source: LV_BRANCHES, filter: ['==', ['get', 'kind'], 'route'],
+          layout: { 'line-cap': 'round' }, paint: { 'line-color': ['get', 'colour'] as never, 'line-width': 3.5 } });
+        map.addLayer({ id: 'lv-link', type: 'line', source: LV_BRANCHES, filter: ['==', ['get', 'kind'], 'link'],
+          paint: { 'line-color': ['get', 'colour'] as never, 'line-width': 2.5, 'line-dasharray': [1.5, 1] } });
+        map.addLayer({ id: 'lv-node', type: 'circle', source: LV_NODES, filter: ['!', ['in', ['get', 'kind'], ['literal', ['source', 'pole']]]] as never,
+          minzoom: 15, paint: { 'circle-radius': 2.5, 'circle-color': '#ffffff', 'circle-stroke-color': '#24292f', 'circle-stroke-width': 1 } });
+        map.addLayer({ id: 'lv-pole', type: 'symbol', source: LV_NODES, filter: ['==', ['get', 'kind'], 'pole'],
+          layout: { 'icon-image': 'pole_lv', 'icon-size': 0.45, 'icon-allow-overlap': true, 'icon-ignore-placement': true } });
+        // Voltage drop band as a ring around each node, so it shows over the pole markers.
+        map.addLayer({ id: 'lv-drop', type: 'circle', source: LV_NODES, filter: ['to-boolean', ['get', 'dropColour']] as never,
+          paint: { 'circle-radius': 6, 'circle-opacity': 0, 'circle-stroke-color': ['get', 'dropColour'] as never, 'circle-stroke-width': 2.5 } });
+        map.addLayer({ id: 'lv-source', type: 'symbol', source: LV_NODES, filter: ['==', ['get', 'kind'], 'source'],
+          layout: { 'icon-image': 'transformer', 'icon-size': 0.9, 'icon-allow-overlap': true, 'icon-ignore-placement': true } });
+        map.addLayer({ id: 'lv-issue', type: 'circle', source: LV_ISSUES,
+          paint: { 'circle-radius': 11, 'circle-opacity': 0, 'circle-stroke-width': 2.5,
+            'circle-stroke-color': ['match', ['get', 'severity'], 'error', '#cf222e', '#fb8500'] as never } });
+        map.addLayer({ id: 'preview-line', type: 'line', source: PREVIEW, filter: ['!=', ['geometry-type'], 'Point'], paint: { 'line-color': '#fb8500', 'line-width': 2, 'line-dasharray': [2, 1] } });
+        map.addLayer({ id: 'preview-point', type: 'circle', source: PREVIEW, filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-color': '#fb8500', 'circle-radius': 5 } });
+        map.on('click', 'buildings-fill', (e) => {
+          const id = e.features?.[0]?.id;
+          if (id !== undefined && !this.drawing()) this.featureClick.emit(String(id));
+        });
+        map.addSource(DRAW_SOURCE, { type: 'geojson', data: emptyCollection() });
+        map.addLayer({ id: 'area-fill', type: 'fill', source: DRAW_SOURCE, filter: ['==', '$type', 'Polygon'], paint: { 'fill-color': '#1f6feb', 'fill-opacity': 0.06 } });
+        map.addLayer({ id: 'area-line', type: 'line', source: DRAW_SOURCE, filter: ['==', '$type', 'LineString'], paint: { 'line-color': '#1f6feb', 'line-width': 2 } });
+        map.addLayer({ id: 'area-points', type: 'circle', source: DRAW_SOURCE, filter: ['==', '$type', 'Point'], paint: { 'circle-radius': 6, 'circle-color': '#fff', 'circle-stroke-color': '#1f6feb', 'circle-stroke-width': 2 } });
+        this.render();
+        this.fit();
+        this.setData(STANDS, this.stands());
+        this.setData(BUILDINGS, this.buildings());
+        this.setData(PREVIEW, this.preview());
+        this.setData(ROADS, this.roads());
+        this.setData(CONTOURS, this.contours());
+        this.setData(NETWORK, flagIncomplete(this.network()));
+        this.setLv(this.lv());
+      });
+      map.on('click', (e: MapMouseEvent) => {
+        if (!this.drawing()) return;
+        this.draw.add([e.lngLat.lng, e.lngLat.lat]);
+        this.render();
+      });
+      this.map = map;
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.map?.remove();
+    this.map = null;
+  }
+
+  protected start(): void {
+    this.draw.clear();
+    this.drawing.set(true);
+    this.map?.doubleClickZoom.disable();
+    this.map?.getCanvas().style.setProperty('cursor', 'crosshair');
+    this.render();
+  }
+
+  protected undo(): void {
+    this.draw.undo();
+    this.render();
+  }
+
+  protected finish(): void {
+    if (!this.draw.finish()) return;
+    this.stopDrawing();
+    this.render();
+    this.areaChange.emit(this.draw.toPolygon());
+  }
+
+  protected clear(): void {
+    this.draw.clear();
+    this.stopDrawing();
+    this.render();
+    this.areaChange.emit(null);
+  }
+
+  private stopDrawing(): void {
+    this.drawing.set(false);
+    this.map?.doubleClickZoom.enable();
+    this.map?.getCanvas().style.removeProperty('cursor');
+  }
+
+  private render(): void {
+    const source = this.map?.getSource(DRAW_SOURCE) as GeoJSONSource | undefined;
+    if (!source) return;
+    const pts = this.draw.points();
+    const closed = this.draw.closed();
+    const features: GjFeature[] = pts.map((p) => ({ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: p } }));
+    if (pts.length >= 2) {
+      features.push({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: closed ? [...pts, pts[0]] : pts } });
+    }
+    if (pts.length >= 3) {
+      features.push({ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[...pts, pts[0]]] } });
+    }
+    source.setData({ type: 'FeatureCollection', features });
+  }
+
+  private setLv(lv: LvLayers | null): void {
+    this.setData(LV_BRANCHES, lv?.branches ?? null);
+    this.setData(LV_NODES, lv?.nodes ?? null);
+    this.setData(LV_ISSUES, lv?.issues ?? null);
+    this.setData(LV_SERVICES, lv?.services ?? null);
+    this.setData(LV_LOADS, lv?.loads ?? null);
+  }
+
+  private setData(source: string, data: AnyCollection): void {
+    const src = this.map?.getSource(source) as GeoJSONSource | undefined;
+    src?.setData((data ? withIdProperty(data) : emptyCollection()) as never);
+  }
+
+  private fitCollection(fc: FeatureCollection<unknown, AnyGeometry>): void {
+    if (!this.map) return;
+    const all = fc.features.flatMap((f) => positionsOf(f.geometry));
+    if (!all.length) return;
+    this.map.fitBounds(bounds({ type: 'Polygon', coordinates: [all] }), { padding: 40, duration: 0, maxZoom: 18 });
+  }
+
+  private focusOn(id: string | null): void {
+    if (!this.map) return;
+    this.map.setFilter('buildings-focus', ['==', ['get', 'id'], id ?? '']);
+    const f = (this.buildings()?.features ?? []).find((x) => x.id === id);
+    if (f) this.map.fitBounds(bounds({ type: 'Polygon', coordinates: [positionsOf(f.geometry)] }), { padding: 80, duration: 300, maxZoom: 19 });
+  }
+
+  private fit(): void {
+    const polygon = this.draw.toPolygon();
+    if (!this.map || !polygon) return;
+    this.map.fitBounds(bounds(polygon), { padding: 40, duration: 0, maxZoom: 17 });
+  }
+}
+

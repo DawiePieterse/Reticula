@@ -1,0 +1,81 @@
+name: Release
+
+# The release gate (plan 7.6 and the master checklist in docs/PLAN.md): a tag becomes a release only when the whole
+# of CI passes, including backup and restore, and then each gate item below passes on its own, named, so a failed
+# release says which item stopped it.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  ci:
+    name: CI
+    uses: ./.github/workflows/ci.yml
+
+  gate:
+    name: Release gate
+    needs: ci
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:17-3.5
+        env:
+          POSTGRES_USER: reticula
+          POSTGRES_PASSWORD: reticula
+          POSTGRES_DB: reticula
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U reticula"
+          --health-interval 5s
+          --health-retries 10
+    env:
+      RETICULA_TEST_DB: "Host=localhost;Username=reticula;Password=reticula"
+      Assistant__Enabled: "false"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with: { python-version: "3.12" }
+      - run: uv sync --frozen
+        working-directory: src/calc
+      - name: All hand-worked test cases pass
+        run: uv run pytest -q tests/test_cases.py
+        working-directory: src/calc
+      - name: Every document carries the rules version, rate date, design date and revision
+        run: uv run pytest -q tests/test_documents.py
+        working-directory: src/calc
+      - name: A design request reproduces bit-for-bit in the calc service
+        run: uv run pytest -q tests/test_design.py -k bit_for_bit
+        working-directory: src/calc
+
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: "10.0.x" }
+      - run: dotnet restore && dotnet build --no-restore -warnaserror
+        working-directory: src/api
+      - name: Full API suite passes with the assistant disabled
+        run: dotnet test --no-build --filter "FullyQualifiedName!~AssistantTests"
+        working-directory: src/api
+      - name: A prior revision reproduces from its stored request
+        run: dotnet test --no-build --filter "FullyQualifiedName~ReviewTests"
+        working-directory: src/api
+
+      - uses: actions/setup-node@v4
+        with: { node-version: "24", cache: npm, cache-dependency-path: src/web/package-lock.json }
+      - run: npm ci
+        working-directory: src/web
+      - name: Offline sync regression passes
+        run: npx ng test --include 'src/app/features/field/**/*.spec.ts'
+        working-directory: src/web
+
+  release:
+    name: Publish the release
+    needs: gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes --title "Reticula $GITHUB_REF_NAME"
+        env:
+          GH_TOKEN: ${{ github.token }}

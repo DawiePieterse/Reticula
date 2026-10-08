@@ -1,0 +1,100 @@
+{
+  "rules": "eskom/0.8.0",
+  "candidates": [
+    {
+      "id": "tx",
+      "kind": "transformer",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          28.09999932739731,
+          -25.500090257500887
+        ]
+      }
+    },
+    {
+      "id": "lv",
+      "kind": "lv_route",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            28.1,
+            -25.5
+          ],
+          [
+            28.10079562271443,
+            -25.500004881145706
+          ]
+        ]
+      }
+    },
+    {
+      "id": "mv",
+      "kind": "mv_route",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            28.09999865479139,
+            -25.500180515000643
+          ],
+          [
+            28.099931377903243,
+            -25.509206259281978
+          ]
+        ]
+      }
+    }
+  ],
+  "loads": [
+    {
+      "id": "s1",
+      "building_id": "b1",
+      "label": "S1",
+      "coordinates": [
+        28.10019957811012,
+        -25.499910963184092
+      ],
+      "kva": 25,
+      "kind": "special"
+    },
+    {
+      "id": "s2",
+      "building_id": "b2",
+      "label": "S2",
+      "coordinates": [
+        28.10039848363368,
+        -25.499912183600454
+      ],
+      "kva": 25,
+      "kind": "special"
+    },
+    {
+      "id": "s3",
+      "building_id": "b3",
+      "label": "S3",
+      "coordinates": [
+        28.100597389170137,
+        -25.499913403747083
+      ],
+      "kva": 25,
+      "kind": "special"
+    }
+  ],
+  "connection_point": {
+    "coordinates": [
+      28.099931041437717,
+      -25.509251387975045
+    ],
+    "voltage_kv": 11,
+    "capacity_kva": 1000,
+    "fault_3ph_ka": 2.5,
+    "fault_1ph_ka": 2.0,
+    "x_over_r": 5
+  },
+  "options": {
+    "construction": "overhead",
+    "mv_construction": "overhead"
+  }
+}

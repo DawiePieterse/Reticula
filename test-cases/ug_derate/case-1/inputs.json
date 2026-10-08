@@ -1,0 +1,10 @@
+{
+  "rules": "eskom/0.8.0",
+  "conductor": "AL-4C-35",
+  "route_m": 100,
+  "design": {
+    "soil_resistivity_kmw": 1.75,
+    "depth_m": 0.8,
+    "ground_temp_c": 30
+  }
+}

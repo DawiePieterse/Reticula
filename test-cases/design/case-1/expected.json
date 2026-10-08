@@ -1,0 +1,13 @@
+{
+  "tx_demand_kva": 75.0,
+  "tx_rating_kva": 100,
+  "tx_spare_kva": 15.0,
+  "tx_mounting": "pole",
+  "mv_drop_pct": 0.054203,
+  "mv_regulation_pct": 2.11241,
+  "tap_pct": 0.0,
+  "lv_full_load_pct": 97.8334,
+  "nmd_kva": 100,
+  "ik3_cp_ka": 2.5,
+  "ik3_lv_ka": 3.6198
+}

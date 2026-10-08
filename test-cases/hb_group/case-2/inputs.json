@@ -1,0 +1,4 @@
+{"rules": "eskom/0.2.0", "loads": [
+  {"id": "dsp3", "kind": "residential", "kva": 1.30, "load_class": "informal_settlement"},
+  {"id": "dsp4", "kind": "residential", "kva": 2.37, "load_class": "township_area"}
+]}

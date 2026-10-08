@@ -32,3 +32,88 @@ conductors:
     x_ohm_per_km: 0.080
     rating_a: 150
     clause: "SANS1507 §TBD"
+
+# Building-type prediction before the field visit. A Reticula heuristic, not a published standard:
+# tune per authority. Confidence is 0..1; buildings below low_confidence_below are visited first.
+building_prediction:
+  clause: "Reticula building-type heuristic v1 (not a standard)"
+  osm_tags:
+    - { match: "amenity=school", type: school, confidence: 0.95 }
+    - { match: "building=school", type: school, confidence: 0.9 }
+    - { match: "shop=*", type: shop, confidence: 0.85 }
+    - { match: "building=retail", type: shop, confidence: 0.85 }
+    - { match: "building=commercial", type: shop, confidence: 0.6 }
+    - { match: "building=kiosk", type: shop, confidence: 0.8 }
+    - { match: "building=house", type: house, confidence: 0.9 }
+    - { match: "building=detached", type: house, confidence: 0.9 }
+    - { match: "building=semidetached_house", type: house, confidence: 0.9 }
+    - { match: "building=terrace", type: house, confidence: 0.85 }
+    - { match: "building=residential", type: house, confidence: 0.7 }
+    - { match: "building=hut", type: house, confidence: 0.6 }
+    - { match: "amenity=place_of_worship", type: other, confidence: 0.9 }
+    - { match: "building=church", type: other, confidence: 0.9 }
+    - { match: "amenity=clinic", type: other, confidence: 0.9 }
+    - { match: "building=garage", type: other, confidence: 0.7 }
+    - { match: "building=shed", type: other, confidence: 0.6 }
+    - { match: "building=yes", type: house, confidence: 0.3 }
+  zoning:
+    - { match: "residential", type: house, confidence: 0.6 }
+    - { match: "business", type: shop, confidence: 0.6 }
+    - { match: "commercial", type: shop, confidence: 0.6 }
+    - { match: "education", type: school, confidence: 0.7 }
+    - { match: "institutional", type: other, confidence: 0.5 }
+    - { match: "community", type: other, confidence: 0.5 }
+  footprint_m2:
+    - { min: 0, max: 6, type: other, confidence: 0.5 }
+    - { min: 6, max: 400, type: house, confidence: 0.45 }
+    - { min: 400, max: 1500, type: other, confidence: 0.3 }
+    - { min: 1500, max: null, type: other, confidence: 0.4 }
+  agreement_boost: 0.1
+  low_confidence_below: 0.6
+
+# Income and ADMD from what the inspector can see. PLACEHOLDER VALUES for pipeline development:
+# the scoring, bands, ADMD and diversity constant must be replaced with the authority's accepted
+# NRS 034-1 method before any design is submitted.
+income_admd:
+  clause: "NRS 034-1 §TBD; Reticula income-indicator scoring v1 (placeholder values)"
+  indicators:
+    dwelling:
+      label: Dwelling type
+      options: { informal: 0, rdp: 2, brick_small: 4, flat: 4, brick_large: 7 }
+    roof:
+      label: Roof
+      options: { sheeting: 0, asbestos: 1, tiles: 2, concrete: 2 }
+    walls:
+      label: Walls
+      options: { informal: 0, block_unplastered: 1, plastered: 2, face_brick: 3 }
+    vehicles:
+      label: Vehicles on the stand
+      options: { "0": 0, "1": 2, "2+": 4 }
+  multi_indicators:
+    appliances:
+      label: Visible appliances
+      options: { fridge: 1, tv: 1, electric_stove: 1, geyser: 2, aircon: 2, pool_pump: 3 }
+  band_indicators:
+    stand_size_m2:
+      label: Stand size
+      unit: m²
+      bands: [ { max: 300, points: 0 }, { max: 600, points: 1 }, { max: 1000, points: 2 }, { max: null, points: 4 } ]
+    occupants:
+      label: Occupants
+      bands: [ { max: 4, points: 0 }, { max: 7, points: 1 }, { max: null, points: 2 } ]
+  income_bands:
+    - { band: very low, category: R1, max_points: 3, admd_kva: 0.8 }
+    - { band: low, category: R2, max_points: 8, admd_kva: 1.5 }
+    - { band: middle, category: R3, max_points: 14, admd_kva: 3.0 }
+    - { band: upper, category: R4, max_points: null, admd_kva: 5.0 }
+  diversity:
+    formula: "admd_n = admd_inf * (1 + k / n)"
+    k: 1.5
+    clause: "NRS 034-1 §TBD (placeholder constant)"
+  special_loads:
+    school: 25
+    clinic: 15
+    shop: 5
+    borehole_pump: 7.5
+    church: 3
+    other: 2

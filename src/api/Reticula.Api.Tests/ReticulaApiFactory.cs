@@ -1,0 +1,564 @@
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using Microsoft.AspNetCore.Authentication.BearerToken;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Npgsql;
+using Microsoft.Extensions.Configuration;
+using Reticula.Infrastructure.Assistant;
+using Reticula.Infrastructure.Calc;
+using Reticula.Infrastructure.Jobs;
+
+namespace Reticula.Api.Tests;
+
+/// <summary>
+/// Hosts the API against a fresh Postgres database per test class.
+/// Base connection from RETICULA_TEST_DB (default: local reticula role).
+/// </summary>
+public sealed class ReticulaApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
+{
+    public const string EngineerEmail = "engineer@test.local";
+    public const string EngineerPassword = "engineer-test-pass";
+
+    private readonly string _dbName = $"reticula_test_{Guid.NewGuid():N}";
+    public string StorageRoot { get; } = Path.Combine(Path.GetTempPath(), $"reticula-files-{Guid.NewGuid():N}");
+
+    private static string BaseConnection =>
+        Environment.GetEnvironmentVariable("RETICULA_TEST_DB") ?? "Host=localhost;Username=reticula;Password=reticula";
+
+    private string ConnectionString => new NpgsqlConnectionStringBuilder(BaseConnection) { Database = _dbName }.ConnectionString;
+
+    public FakeCalc Calc { get; } = new();
+    public ScriptedModel Model { get; } = new();
+
+    /// <summary>Turns the design assistant on until disposed; the suite otherwise runs with it off (plan 8.5).</summary>
+    public IDisposable EnableAssistant(int maxTurns = 6)
+    {
+        var config = Services.GetRequiredService<IConfiguration>();
+        config["Assistant:Enabled"] = "true";
+        config["Assistant:ApiKey"] = "test-key-never-sent-in-a-message";
+        config["Assistant:MaxTurns"] = maxTurns.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return new Reset(() =>
+        {
+            config["Assistant:Enabled"] = "false";
+            config["Assistant:ApiKey"] = "";
+            config["Assistant:MaxTurns"] = "6";
+            Model.Clear();
+        });
+    }
+
+    private sealed class Reset(Action undo) : IDisposable
+    {
+        public void Dispose() => undo();
+    }
+    public JobGate Gate { get; } = new();
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        builder.UseSetting("ConnectionStrings:Default", ConnectionString);
+        builder.UseSetting("Database:MigrateOnStartup", "true");
+        builder.UseSetting("Bootstrap:EngineerEmail", EngineerEmail);
+        builder.UseSetting("Bootstrap:EngineerPassword", EngineerPassword);
+        builder.UseSetting("Bootstrap:EngineerName", "Test Engineer");
+        builder.UseSetting("Storage:Root", StorageRoot);
+        builder.UseSetting("Jobs:PollIntervalMs", "100");
+        builder.UseSetting("Jobs:CancellationCheckMs", "200");
+        builder.ConfigureServices(s =>
+        {
+            s.Replace(ServiceDescriptor.Singleton<ICalcClient>(Calc));
+            s.Replace(ServiceDescriptor.Singleton<IAssistantModel>(Model));
+            s.AddSingleton(Gate);
+            s.AddJobHandler<GatedJob>();
+            s.AddJobHandler<FailingJob>();
+        });
+    }
+
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    async Task IAsyncLifetime.DisposeAsync()
+    {
+        await base.DisposeAsync();
+        NpgsqlConnection.ClearAllPools();
+        await using var conn = new NpgsqlConnection(new NpgsqlConnectionStringBuilder(BaseConnection) { Database = "postgres" }.ConnectionString);
+        await conn.OpenAsync();
+        await using var cmd = new NpgsqlCommand($"DROP DATABASE IF EXISTS \"{_dbName}\" WITH (FORCE)", conn);
+        await cmd.ExecuteNonQueryAsync();
+        if (Directory.Exists(StorageRoot)) Directory.Delete(StorageRoot, recursive: true);
+    }
+
+    public async Task<HttpClient> ClientAsAsync(string email, string password)
+    {
+        var client = CreateClient();
+        var token = await LoginAsync(client, email, password);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.AccessToken);
+        return client;
+    }
+
+    public Task<HttpClient> EngineerClientAsync() => ClientAsAsync(EngineerEmail, EngineerPassword);
+
+    public static async Task<AccessTokenResponse> LoginAsync(HttpClient client, string email, string password)
+    {
+        var r = await client.PostAsJsonAsync("/api/auth/login", new { email, password });
+        r.EnsureSuccessStatusCode();
+        return (await r.Content.ReadFromJsonAsync<AccessTokenResponse>())!;
+    }
+}
+
+public sealed class FakeCalc : ICalcClient
+{
+    public bool Healthy { get; set; } = true;
+    public bool Unreachable { get; set; }
+    public HashSet<string> Rules { get; } = ["eskom/0.1.0"];
+
+    public Task<bool> IsHealthyAsync(CancellationToken ct = default) => Task.FromResult(Healthy && !Unreachable);
+
+    public Task<IReadOnlyList<string>> ListRulesAsync(CancellationToken ct = default)
+    {
+        Throw();
+        return Task.FromResult<IReadOnlyList<string>>([.. Rules]);
+    }
+
+    public Task<RulesInfo?> GetRulesInfoAsync(string rulesRef, CancellationToken ct = default)
+    {
+        Throw();
+        return Task.FromResult(Rules.Contains(rulesRef) ? new RulesInfo(rulesRef, "0123456789abcdef", "2026-10-03") : null);
+    }
+
+    /// <summary>Set by a test to decide what the calc service returns for an uploaded file.</summary>
+    public Func<CalcImportRequest, CalcImportResult> OnImport { get; set; } =
+        r => new CalcImportResult(r.Kind, "kml", "WGS84", "test", [], [], []);
+
+    public CalcImportRequest? LastImport { get; private set; }
+    public IReadOnlyList<AdmdGroupLoad> LastGroupLoads { get; private set; } = [];
+    public IReadOnlyList<BuildingPredictionInput> LastPredictionInputs { get; private set; } = [];
+
+    public Task<CalcImportResult> ImportAsync(CalcImportRequest request, CancellationToken ct = default)
+    {
+        Throw();
+        LastImport = request;
+        return Task.FromResult(OnImport(request));
+    }
+
+    /// <summary>Set by a test to decide what an OpenStreetMap fetch returns.</summary>
+    public Func<string, CalcImportResult> OnImportOsm { get; set; } = kind => new CalcImportResult(kind, "overpass", "WGS84", "OSM", [], [], []);
+
+    public Task<CalcImportResult> ImportOsmAsync(string kind, string areaGeoJson, CancellationToken ct = default)
+    {
+        Throw();
+        return Task.FromResult(OnImportOsm(kind));
+    }
+
+    /// <summary>Simplified predictor: building=house tag, else residential zoning, else low-confidence "other".</summary>
+    public Task<PredictionResult> PredictBuildingTypesAsync(string rulesRef, IReadOnlyList<BuildingPredictionInput> buildings, CancellationToken ct = default)
+    {
+        Throw();
+        LastPredictionInputs = buildings;
+        var predictions = buildings.Select(b =>
+            b.Tags.GetValueOrDefault("building") == "house" ? new BuildingPrediction(b.Id, "house", 0.9, "osm:building=house", false, [])
+            : b.Zoning?.Contains("Residential", StringComparison.OrdinalIgnoreCase) == true ? new BuildingPrediction(b.Id, "house", 0.6, $"zoning:{b.Zoning}", false, [])
+            : new BuildingPrediction(b.Id, "other", 0.3, "footprint", true, [])).ToList();
+        return Task.FromResult(new PredictionResult("0123456789abcdef", "test", predictions));
+    }
+
+    public Task<JsonElement> GetAdmdFormAsync(string rulesRef, CancellationToken ct = default) =>
+        Task.FromResult(JsonDocument.Parse("{\"indicators\":[{\"key\":\"dwelling\",\"options\":[\"rdp\",\"brick_small\"]}],\"special_loads\":{\"school\":25}}").RootElement.Clone());
+
+    /// <summary>Simplified estimator: residential 1.5 kVA (category R2), "roof" missing unless given; school 25 kVA, other special 2 kVA.</summary>
+    public Task<AdmdEstimate> EstimateAdmdAsync(AdmdEstimateRequest r, CancellationToken ct = default)
+    {
+        Throw();
+        if (r.Observations?.TryGetValue("dwelling", out var d) == true && d.GetString() == "castle")
+            throw new CalcRejectedException("dwelling: unknown option 'castle'");
+        var special = r.Kind == "special";
+        var estimated = special ? (r.SpecialLoad == "school" ? 25 : 2) : 1.5;
+        var kva = r.OverrideKva ?? estimated;
+        var missing = special || r.Observations?.ContainsKey("roof") == true ? new List<string>() : ["roof"];
+        var traced = new TracedValue(kva, "kVA", "test", "test", "test clause", "0123456789abcdef", JsonDocument.Parse("[]").RootElement.Clone());
+        var lc = special ? null : new AdmdLoadClass(r.LoadClass ?? "township_area", r.LoadClass is null ? "Township area" : $"Class {r.LoadClass}",
+            "nrs034_15y", "NRS 034 test table", estimated, r.LoadClass is null ? "score" : "engineer");
+        var result = new AdmdEstimate(r.Kind, missing, special ? null : "low", special ? r.SpecialLoad : lc!.Code, traced, estimated,
+            r.OverrideKva is not null, "0123456789abcdef", "", lc);
+        return Task.FromResult(result with { Raw = JsonSerializer.Serialize(new { kind = r.Kind, admd_kva = kva }) });
+    }
+
+    public Task<AdmdGroup> GroupAdmdAsync(string rulesRef, IReadOnlyList<AdmdGroupLoad> loads, CancellationToken ct = default)
+    {
+        LastGroupLoads = loads;
+        var res = loads.Where(l => l.Kind == "residential").ToList();
+        var factor = res.Count == 0 ? (double?)null : 1 + 1.5 / res.Count;
+        var resKva = res.Sum(l => l.Kva) * (factor ?? 0);
+        var special = loads.Where(l => l.Kind == "special").Sum(l => l.Kva);
+        TracedValue T(double v) => new(v, "kVA", "test", "S = sum", "test clause", "0123456789abcdef", JsonDocument.Parse("[]").RootElement.Clone());
+        return Task.FromResult(new AdmdGroup(res.Count, loads.Count - res.Count, factor is null ? null : T(factor.Value), T(resKva), special, T(resKva + special), "0123456789abcdef"));
+    }
+
+    /// <summary>Set by a test to decide what the calc service returns for a map extract.</summary>
+    public Func<double[], MapExtract> OnExtract { get; set; } = b => new MapExtract([.. "PMTiles"u8, 3, .. new byte[120]], 42, 15, "test-planet.pmtiles");
+
+    public double[]? LastExtractBox { get; private set; }
+
+    /// <summary>Set by a test to decide what the pre-design placement proposes.</summary>
+    public Func<IReadOnlyList<PlacementRoad>, IReadOnlyList<PlacementLoad>, double[]?, CalcPlacement> OnPlace { get; set; } =
+        (roads, loads, cp) => new CalcPlacement("eskom/0.7.0", "0123456789abcdef", "test", [], [], [], [], [],
+            JsonDocument.Parse("{}").RootElement, null, [], []);
+
+    public (IReadOnlyList<PlacementRoad> Roads, IReadOnlyList<PlacementLoad> Loads, double[]? ConnectionPoint)? LastPlacement { get; private set; }
+
+    public Task<CalcPlacement> PlaceLvAsync(string rulesRef, IReadOnlyList<PlacementRoad> roads, IReadOnlyList<PlacementLoad> loads, double[]? connectionPoint,
+        CancellationToken ct = default)
+    {
+        Throw();
+        LastPlacement = (roads, loads, connectionPoint);
+        return Task.FromResult(OnPlace(roads, loads, connectionPoint));
+    }
+
+    public Task<MapExtract> ExtractMapAsync(double minLon, double minLat, double maxLon, double maxLat, CancellationToken ct = default)
+    {
+        Throw();
+        LastExtractBox = [minLon, minLat, maxLon, maxLat];
+        return Task.FromResult(OnExtract(LastExtractBox));
+    }
+
+    /// <summary>Set by a test to decide what the LV network build returns. By default each LV route is one branch and each source one node.</summary>
+    public Func<string, IReadOnlyList<LvCandidate>, CalcLvNetwork> OnBuildLvNetwork { get; set; } = DefaultLvNetwork;
+
+    public IReadOnlyList<LvCandidate> LastLvCandidates { get; private set; } = [];
+
+    public Task<CalcLvNetwork> BuildLvNetworkAsync(string rulesRef, IReadOnlyList<LvCandidate> candidates, CancellationToken ct = default)
+    {
+        Throw();
+        LastLvCandidates = candidates;
+        return Task.FromResult(OnBuildLvNetwork(rulesRef, candidates));
+    }
+
+    public static CalcLvNetwork DefaultLvNetwork(string rulesRef, IReadOnlyList<LvCandidate> candidates)
+    {
+        var nodes = new List<CalcLvNode>();
+        var branches = new List<CalcLvBranch>();
+        foreach (var c in candidates)
+        {
+            var coords = c.Geometry.GetProperty("coordinates");
+            if (c.Kind == "lv_route")
+            {
+                var line = coords.Deserialize<double[][]>()!;
+                nodes.Add(new CalcLvNode($"N{nodes.Count + 1}", "end", line[0], null, null, null, null));
+                nodes.Add(new CalcLvNode($"N{nodes.Count + 1}", "end", line[^1], null, null, null, null));
+                branches.Add(new CalcLvBranch($"B{branches.Count + 1}", "route", nodes[^2].Id, nodes[^1].Id, line, 100, c.Id, null));
+            }
+            else if (c.Kind is "transformer" or "minisub")
+            {
+                nodes.Add(new CalcLvNode($"N{nodes.Count + 1}", "source", coords.Deserialize<double[]>()!, "TX1", c.Id, null, 0));
+            }
+        }
+        var routes = branches.Count;
+        return new CalcLvNetwork(rulesRef, "0123456789abcdef", "test tolerances", nodes, branches,
+            [new LvFeeder("TX1-F1", "N1", routes, 100.0 * routes, routes, 100)],
+            [new LvIssue("warning", "near_miss", "Route ends stop short.", 1, [], [[28.1, -25.5]])],
+            new LvSummary(routes, 1, 1, 0, 0, 1, nodes.Count, routes, 100.0 * routes, 0));
+    }
+
+    /// <summary>Set by a test to decide what load allocation returns. By default every estimated load goes in one box on the first branch, phase R.</summary>
+    public Func<string, CalcLvNetwork, IReadOnlyList<LvLoadIn>, CalcLvLoads> OnAllocateLvLoads { get; set; } = DefaultLvLoads;
+
+    public IReadOnlyList<LvLoadIn> LastLvLoads { get; private set; } = [];
+
+    public Task<CalcLvLoads> AllocateLvLoadsAsync(string rulesRef, CalcLvNetwork network, IReadOnlyList<LvLoadIn> loads, CancellationToken ct = default)
+    {
+        Throw();
+        LastLvLoads = loads;
+        return Task.FromResult(OnAllocateLvLoads(rulesRef, network, loads));
+    }
+
+    public static CalcLvLoads DefaultLvLoads(string rulesRef, CalcLvNetwork network, IReadOnlyList<LvLoadIn> loads)
+    {
+        var branch = network.Branches.FirstOrDefault();
+        var estimated = branch is null ? [] : loads.Where(l => l.Kva is not null).ToList();
+        var allocations = estimated.Select(l => new CalcLvAllocation(l.Id, l.BuildingId, l.Label, l.Kind, l.Kva!.Value, branch!.Id, null, 10,
+            branch.Coordinates[0], 12.5, "P1-1", "TX1-F1", 30, "R")).ToList();
+        var unestimated = loads.Where(l => l.Kva is null).ToList();
+        IReadOnlyList<LvIssue> issues = unestimated.Count == 0 ? [] : [new LvIssue("warning", "no_load", "No load estimate.", unestimated.Count, [], [])];
+        var kva = allocations.Sum(a => a.Kva);
+        return new CalcLvLoads(rulesRef, "0123456789abcdef", "test service practice", "pole_boxes", allocations,
+            allocations.Count == 0 ? [] : [new LvBox("P1-1", "N2", "TX1-F1", "R", allocations.Count, kva, 30)],
+            allocations.Count == 0 ? [] : [new LvFeederPhases("TX1-F1", new Dictionary<string, LvPhaseLoad>
+            {
+                ["R"] = new(allocations.Count, kva, 1), ["W"] = new(0, 0, 0), ["B"] = new(0, 0, 0),
+            }, 0, 200)],
+            issues, new LvLoadSummary(loads.Count, allocations.Count, 0, unestimated.Count, allocations.Count, 0, allocations.Count == 0 ? 0 : 1, kva, 12.5));
+    }
+
+    /// <summary>Set by a test to decide what the LV checks return. By default one feeder at 4.2 % drop, 61 % loading, 812 A at the end.</summary>
+    public Func<string, CalcLvNetwork, IReadOnlyList<LvLoadAt>, CalcLvAnalysis> OnAnalyseLv { get; set; } = DefaultLvAnalysis;
+
+    public IReadOnlyList<LvLoadAt> LastLvLoadsAt { get; private set; } = [];
+
+    public Task<CalcLvAnalysis> AnalyseLvAsync(string rulesRef, CalcLvNetwork network, IReadOnlyList<LvLoadAt> loads, CancellationToken ct = default)
+    {
+        Throw();
+        LastLvLoadsAt = loads;
+        return Task.FromResult(OnAnalyseLv(rulesRef, network, loads));
+    }
+
+    public static CalcLvAnalysis DefaultLvAnalysis(string rulesRef, CalcLvNetwork network, IReadOnlyList<LvLoadAt> loads)
+    {
+        var drops = new Dictionary<string, double> { ["R"] = 4.2, ["W"] = -0.5, ["B"] = -0.5 };
+        var points = network.Nodes.Select(n => new LvPointResult(n.Id, "node", "TX1-F1", 100, drops, 4.2, 812, true))
+            .Concat(loads.Select(l => new LvPointResult(l.LoadId, "connection", "TX1-F1", 90, drops, 4.2, 812, true))).ToList();
+        var branches = network.Branches.Select(b => new LvBranchResult(b.Id, "TX1-F1", "ABC-3C-70", 228,
+            new Dictionary<string, double> { ["R"] = 139, ["W"] = 0, ["B"] = 0 }, 61, true)).ToList();
+        TracedValue T(double v, string unit) => new(v, unit, "test", "test", "test clause", "0123456789abcdef", JsonDocument.Parse("[]").RootElement.Clone());
+        return new CalcLvAnalysis(rulesRef, "0123456789abcdef", "test design settings", 7.5, 230.94, 90, points, branches,
+            [new LvFeederResult("TX1-F1", 4.2, "N2", 61, "B1", 812, "N2", true)],
+            [new LvIssue("warning", "placeholders", "These results use placeholder values.", 1, [], [])],
+            T(4.2, "%"), T(139, "A"), T(812, "A"), ["the LV source transformer"]);
+    }
+
+    public Task<CalcConductorLibrary?> GetConductorsAsync(string rulesRef, CancellationToken ct = default)
+    {
+        Throw();
+        if (!Rules.Contains(rulesRef)) return Task.FromResult<CalcConductorLibrary?>(null);
+        return Task.FromResult<CalcConductorLibrary?>(new CalcConductorLibrary(rulesRef, "0123456789abcdef",
+        [
+            new CalcConductor("CU-4C-70", "70 mm² Cu 4-core", "underground", "cu", 70, 4, ["feeder"], 0.268, 0.08, 210,
+                new Dictionary<string, double> { ["ground"] = 210, ["pipe"] = 171, ["air"] = 205 }, 0.115, 8.05, ["r_ohm_per_km", "x_ohm_per_km"],
+                "R placeholder", "Eskom 240-56030637 Rev 2 Table 6", "ESKOM-LVCABLE-RATING"),
+        ]));
+    }
+
+    // ---------- design runs, rates and documents ----------
+
+    /// <summary>What the fake design says about fitness; a test sets it to make a design fit to submit.</summary>
+    public bool DesignFit { get; set; }
+
+    public List<string> DesignPlaceholders { get; } = ["lv_design.max_drop_pct: PLACEHOLDER value 5"];
+
+    public List<string> DesignRequests { get; } = [];
+    public List<string> OptimiseRequests { get; } = [];
+    public Dictionary<string, string> DocumentBodies { get; } = [];
+    public string? LastPackBody { get; private set; }
+
+    /// <summary>Set by a test to change the design the fake returns (to make a reproduction differ).</summary>
+    public Func<JsonObject, JsonObject>? OnDesign { get; set; }
+
+    public Task<string> RunDesignAsync(string requestJson, CancellationToken ct = default)
+    {
+        Throw();
+        lock (DesignRequests) DesignRequests.Add(requestJson);
+        return Task.FromResult(FakeDesign(JsonNode.Parse(requestJson)!.AsObject(), 0).ToJsonString());
+    }
+
+    public Task<string> OptimiseDesignAsync(string requestJson, CancellationToken ct = default)
+    {
+        Throw();
+        lock (OptimiseRequests) OptimiseRequests.Add(requestJson);
+        var req = JsonNode.Parse(requestJson)!.AsObject();
+        var design = req["design"]!.AsObject();
+        var objectives = req["options"]?["objectives"]?.AsArray().Select(o => o!.GetValue<string>()).ToList() ?? ["capex", "lifetime", "spare"];
+        var options = new JsonArray();
+        var rows = new JsonArray();
+        foreach (var (o, i) in objectives.Select((o, i) => (o, i)))
+        {
+            var request = (JsonObject)design.DeepClone();
+            request["options"]!["transformer_ratings"] = new JsonObject { ["TX1"] = 100.0 + 50 * i };
+            var d = FakeDesign(request, i);
+            options.Add(new JsonObject
+            {
+                ["objective"] = o, ["value"] = d["cost"]!["capex"]!.GetValue<double>(), ["design"] = d, ["request"] = request,
+                ["moves"] = new JsonArray(new JsonObject { ["kind"] = "transformer_rating", ["target"] = "TX1", ["detail"] = $"{100 + 50 * i} kVA" }),
+                ["start"] = "engineer",
+            });
+            rows.Add(new JsonObject
+            {
+                ["objective"] = o, ["construction"] = "overhead", ["capex"] = d["cost"]!["capex"]!.DeepClone(), ["failures"] = 0, ["moves"] = 1,
+                ["too_close"] = new JsonArray(), ["same_as"] = new JsonArray(),
+            });
+        }
+        return Task.FromResult(new JsonObject
+        {
+            ["rules_ref"] = design["rules"]!.DeepClone(), ["rules_hash"] = "0123456789abcdef", ["inputs_hash"] = "fedcba9876543210",
+            ["options"] = options, ["comparison"] = rows, ["siting"] = null, ["evaluations"] = 3 * objectives.Count, ["issues"] = new JsonArray(),
+        }.ToJsonString());
+    }
+
+    /// <summary>A Design with what the API reads off it: summary, cost, checks, placeholders, uninspected candidates, bulk stop.</summary>
+    private JsonObject FakeDesign(JsonObject req, int variant)
+    {
+        var loads = req["loads"]!.AsArray().Count;
+        var construction = req["options"]?["construction"]?.GetValue<string>() is "underground" ? "underground" : "overhead";
+        var cp = req["connection_point"] as JsonObject;
+        var stopped = cp?["capacity_kva"] is null || cp["fault_3ph_ka"] is null ? "No connection point capacity and fault level from the authority." : null;
+        var proposed = req["candidates"]!.AsArray().OfType<JsonObject>().Where(c => c["source"]?.GetValue<string>() == "proposed")
+            .Select(c => (JsonNode)new JsonObject { ["candidate_id"] = c["id"]!.DeepClone(), ["kind"] = c["kind"]!.DeepClone(), ["label"] = null, ["elements"] = new JsonArray() })
+            .ToList();
+        var capex = 10000.0 + 1000 * loads + 500 * variant;
+        var rates = req["rates"] as JsonObject;
+        var d = new JsonObject
+        {
+            ["rules_ref"] = req["rules"]!.DeepClone(), ["rules_hash"] = "0123456789abcdef", ["inputs_hash"] = "fedcba9876543210",
+            ["construction"] = construction, ["lv"] = new JsonObject(),
+            ["transformers"] = new JsonObject
+            {
+                ["transformers"] = new JsonArray(new JsonObject
+                {
+                    ["id"] = "TX1", ["rating_kva"] = 100.0,
+                    ["trace"] = new JsonObject
+                    {
+                        ["value"] = 100.0, ["unit"] = "kVA", ["formula_id"] = "tx.size.v1", ["formula"] = "S_r = min{r : r >= S_d (1 + g)}",
+                        ["clause"] = "test transformer clause", ["rules_hash"] = "0123456789abcdef", ["inputs"] = new JsonArray(),
+                    },
+                }),
+            },
+            ["bulk"] = new JsonObject { ["stopped"] = stopped },
+            ["cost"] = new JsonObject
+            {
+                ["capex"] = capex, ["lifetime"] = capex * 1.5, ["library"] = rates?["name"]?.DeepClone(), ["rate_date"] = rates?["rate_date"]?.DeepClone(),
+                ["indicative"] = rates?["indicative"]?.DeepClone() ?? true,
+            },
+            ["comparison"] = new JsonArray(),
+            ["checks"] = new JsonArray(new JsonObject
+            {
+                ["id"] = "lv_drop:N1", ["category"] = "lv_drop", ["element"] = "N1", ["value"] = 4.2, ["limit"] = 5.0, ["unit"] = "%", ["passes"] = true,
+                ["clause"] = "test clause",
+            }),
+            ["not_inspected"] = new JsonArray([.. proposed]),
+            ["issues"] = new JsonArray(),
+            ["placeholders"] = new JsonArray([.. DesignPlaceholders.Select(p => (JsonNode)p)]),
+            ["fit_to_submit"] = DesignFit && DesignPlaceholders.Count == 0 && stopped is null && proposed.Count == 0,
+            ["summary"] = new JsonObject
+            {
+                ["construction"] = construction, ["loads"] = loads, ["connected"] = loads, ["transformers"] = 1, ["transformer_kva"] = 100.0, ["poles"] = 0,
+                ["stays"] = 0, ["kiosks"] = 0, ["lv_km"] = 0.1, ["mv_km"] = 0.2, ["worst_lv_drop_pct"] = 4.2, ["worst_mv_drop_pct"] = 0.5, ["nmd_kva"] = 50.0,
+                ["capex"] = capex, ["lifetime"] = capex * 1.5, ["spare_pct"] = 20.0, ["checks"] = 1, ["failures"] = 0,
+            },
+        };
+        return OnDesign?.Invoke(d) ?? d;
+    }
+
+    public Task<string> GetDefaultRatesAsync(CancellationToken ct = default)
+    {
+        Throw();
+        return Task.FromResult("""
+            {"name":"indicative","rate_date":"2026-01-01","source":"Reticula placeholder rates","currency":"ZAR","indicative":true,
+             "items":[{"code":"M-ABC-70","description":"LV ABC 70 mm²","unit":"m","rate":120.0,"category":"material","rate_date":"2026-01-01","source":"placeholder","uncertainty_pct":30},
+                      {"code":"M-POLE-9","description":"Wood pole 9 m","unit":"each","rate":2500.0,"category":"material","rate_date":"2026-01-01","source":"placeholder","uncertainty_pct":30},
+                      {"code":"L-TEAM-DAY","description":"Construction team","unit":"day","rate":8000.0,"category":"labour","rate_date":"2026-01-01","source":"placeholder","uncertainty_pct":30}],
+             "assemblies":[{"code":"A-LV-OH","description":"LV overhead line","unit":"m","components":[{"item":"M-ABC-70","qty":1.0}]}]}
+            """);
+    }
+
+    public Task<CalcFile> RenderDocumentAsync(string kind, string bodyJson, CancellationToken ct = default)
+    {
+        Throw();
+        lock (DocumentBodies) DocumentBodies[kind] = bodyJson;
+        var rev = JsonNode.Parse(bodyJson)!["meta"]!["revision_number"]!.GetValue<int>();
+        var ext = kind switch { "drawing_dxf" => "dxf", "report_pdf" or "boq_pdf" => "pdf", "boq_xlsx" or "load_schedule_xlsx" => "xlsx", "geojson" => "geojson",
+            "kml" => "kml", _ => "zip" };
+        return Task.FromResult(new CalcFile(Encoding.UTF8.GetBytes($"FAKE {kind} R{rev}"), "application/octet-stream", $"test_{kind}_R{rev}.{ext}"));
+    }
+
+    public Task<CalcFile> PackDocumentsAsync(string bodyJson, CancellationToken ct = default)
+    {
+        Throw();
+        LastPackBody = bodyJson;
+        var rev = JsonNode.Parse(bodyJson)!["meta"]!["revision_number"]!.GetValue<int>();
+        return Task.FromResult(new CalcFile(Encoding.UTF8.GetBytes($"FAKE pack R{rev}"), "application/zip", $"test_submission-pack_R{rev}.zip"));
+    }
+
+    private void Throw()
+    {
+        if (Unreachable) throw new CalcUnavailableException("Calc service unreachable.");
+    }
+}
+
+/// <summary>A model that answers from a script, one reply per call, and keeps every request it was sent.</summary>
+public sealed class ScriptedModel : IAssistantModel
+{
+    private readonly Queue<JsonObject> _replies = new();
+    public List<JsonObject> Requests { get; } = [];
+
+    public ScriptedModel Text(string text) => Enqueue(new JsonObject
+    {
+        ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = text }), ["stop_reason"] = "end_turn",
+    });
+
+    public ScriptedModel Tool(string name, object input, string? text = null)
+    {
+        var content = new JsonArray();
+        if (text is not null) content.Add(new JsonObject { ["type"] = "text", ["text"] = text });
+        content.Add(new JsonObject
+        {
+            ["type"] = "tool_use", ["id"] = $"toolu_{Guid.NewGuid():N}", ["name"] = name, ["input"] = JsonSerializer.SerializeToNode(input),
+        });
+        return Enqueue(new JsonObject { ["content"] = content, ["stop_reason"] = "tool_use" });
+    }
+
+    private ScriptedModel Enqueue(JsonObject reply)
+    {
+        lock (_replies) _replies.Enqueue(reply);
+        return this;
+    }
+
+    public void Clear()
+    {
+        lock (_replies) _replies.Clear();
+        Requests.Clear();
+    }
+
+    public Task<JsonObject> CreateMessageAsync(JsonObject request, CancellationToken ct)
+    {
+        Requests.Add((JsonObject)request.DeepClone());
+        lock (_replies) return Task.FromResult(_replies.Count > 0 ? _replies.Dequeue() : JsonNode.Parse("""{"content":[{"type":"text","text":"(script ended)"}],"stop_reason":"end_turn"}""")!.AsObject());
+    }
+}
+
+/// <summary>Lets a test hold a running job open until it releases the gate.</summary>
+public sealed class JobGate
+{
+    private readonly SemaphoreSlim _release = new(0);
+    private readonly SemaphoreSlim _started = new(0);
+
+    public void Release() => _release.Release();
+    public Task<bool> WaitStartedAsync(TimeSpan timeout) => _started.WaitAsync(timeout);
+
+    internal async Task EnterAsync(CancellationToken ct)
+    {
+        _started.Release();
+        await _release.WaitAsync(ct);
+    }
+}
+
+public sealed class GatedJob(JobGate gate) : IJobHandler
+{
+    public const string JobKind = "test.gated";
+    public string Kind => JobKind;
+
+    public async Task<object?> RunAsync(JobContext context, CancellationToken ct)
+    {
+        await context.Progress.ReportAsync(50, "Waiting at gate", ct);
+        await gate.EnterAsync(ct);
+        return new { ok = true };
+    }
+}
+
+public sealed class FailingJob : IJobHandler
+{
+    public const string JobKind = "test.failing";
+    public string Kind => JobKind;
+
+    public Task<object?> RunAsync(JobContext context, CancellationToken ct) => throw new InvalidOperationException("boom");
+}
+
+/// <summary>
+/// All API tests share one host and database. Hangfire keeps process-wide static state (log provider,
+/// global configuration), so several hosts in one process interfere; production runs one host.
+/// </summary>
+[CollectionDefinition(Name)]
+public sealed class ApiCollection : ICollectionFixture<ReticulaApiFactory>
+{
+    public const string Name = "api";
+}

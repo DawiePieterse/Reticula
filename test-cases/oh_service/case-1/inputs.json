@@ -1,0 +1,6 @@
+{
+  "rules": "eskom/0.9.0",
+  "conductor": "AIRDAC-SNE-10",
+  "length_m": 50,
+  "feeder_pole_m": 7
+}
